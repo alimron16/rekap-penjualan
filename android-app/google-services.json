@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "444082183201",
+    "project_id": "elephant-pos-c6210",
+    "storage_bucket": "elephant-pos-c6210.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444082183201:android:0e69f7d7829ea8c3569760",
+        "android_client_info": {
+          "package_name": "com.elephantcell.pos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzlKnRo322THp5dPnWNvsgFmwfHaogSpM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

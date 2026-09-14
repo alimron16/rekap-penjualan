@@ -270,16 +270,18 @@ public class MainActivity extends Activity {
 
             builder.setContentTitle(title)
                    .setContentText(message)
-                   .setSmallIcon(R.mipmap.ic_launcher)
+                   .setSmallIcon(R.drawable.ic_stat_notify)
                    .setAutoCancel(true)
                    .setContentIntent(pendingIntent)
-                   .setPriority(android.app.Notification.PRIORITY_HIGH);
+                   .setDefaults(android.app.Notification.DEFAULT_ALL)
+                   .setPriority(android.app.Notification.PRIORITY_MAX);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 builder.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                builder.setCategory(android.app.Notification.CATEGORY_MESSAGE);
             }
 
-            manager.notify((int) System.currentTimeMillis(), builder.build());
+            manager.notify((int) (System.currentTimeMillis() % 100000), builder.build());
         } catch (Exception e) {
             e.printStackTrace();
         }
