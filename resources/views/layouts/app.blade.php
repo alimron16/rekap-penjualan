@@ -194,7 +194,7 @@
 
             @if(auth()->check())
             <!-- User Profile Bar -->
-            <div class="px-3.5 py-2.5 bg-[#081e0c] border-b border-white/10 flex items-center justify-between">
+            <div class="px-3.5 py-2.5 bg-[#081e0c] border-b border-white/10 flex items-center">
                 <div class="flex items-center gap-2.5 overflow-hidden">
                     <div class="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-xs">
                         {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
@@ -212,12 +212,6 @@
                         </div>
                     </div>
                 </div>
-                <form action="{{ route('logout') }}" method="POST" class="inline">
-                    @csrf
-                    <button type="submit" class="p-1 rounded text-white/60 hover:text-rose-300 hover:bg-white/10 transition" title="Keluar / Logout">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    </button>
-                </form>
             </div>
             @endif
 
