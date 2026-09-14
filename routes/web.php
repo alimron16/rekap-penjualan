@@ -22,7 +22,25 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 });
 
+// Mobile App Seamless Auto-Login Bridge
+Route::get('/mobile/auth-bridge', function (\Illuminate\Http\Request $request) {
+    $token = $request->query('token');
+    $target = $request->query('target', '/');
+
+    if ($token) {
+        $user = \App\Models\User::where('remember_token', $token)->first();
+        if ($user && $user->is_active) {
+            \Illuminate\Support\Facades\Auth::login($user, true);
+            $request->session()->regenerate();
+            return redirect($target);
+        }
+    }
+
+    return redirect('/login');
+});
+
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
+
 
 // Protected Routes (Must be logged in)
 Route::middleware('auth')->group(function () {

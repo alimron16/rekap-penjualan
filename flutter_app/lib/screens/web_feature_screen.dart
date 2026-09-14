@@ -30,7 +30,8 @@ class _WebFeatureScreenState extends State<WebFeatureScreen> {
   }
 
   void _initWebView() async {
-    final baseUrl = 'https://pos.moonbyte.my.id${widget.path}';
+    final token = await ApiService.getToken() ?? '';
+    final bridgeUrl = 'https://pos.moonbyte.my.id/mobile/auth-bridge?token=$token&target=${Uri.encodeComponent(widget.path)}';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -58,11 +59,11 @@ class _WebFeatureScreenState extends State<WebFeatureScreen> {
               });
             }
 
-            // Injeksi auto trigger notifikasi saat transaksi berhasil
-            if (url.contains('receipt') || url.contains('success')) {
+            // Injeksi auto trigger notifikasi Android saat ada aktivitas berhasil
+            if (url.contains('receipt') || url.contains('invoice') || url.contains('success')) {
               NotificationService.showNotification(
                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                title: '✅ Transaksi Berhasil Diproses',
+                title: '✅ Transaksi Berhasil Disimpan',
                 body: 'Struk / data transaksi telah berhasil dicatat ke sistem!',
               );
             }
@@ -72,7 +73,7 @@ class _WebFeatureScreenState extends State<WebFeatureScreen> {
           },
         ),
       )
-      ..loadRequest(Uri.parse(baseUrl));
+      ..loadRequest(Uri.parse(bridgeUrl));
   }
 
   @override
@@ -89,7 +90,7 @@ class _WebFeatureScreenState extends State<WebFeatureScreen> {
         appBar: AppBar(
           title: Text(
             widget.title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
           backgroundColor: ThemeConfig.primary,
           actions: [

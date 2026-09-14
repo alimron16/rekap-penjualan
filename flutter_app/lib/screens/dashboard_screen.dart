@@ -3,12 +3,8 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/theme_config.dart';
-import 'pos_screen.dart';
-import 'digital_screen.dart';
-import 'cash_screen.dart';
-import 'reports_screen.dart';
+import 'web_feature_screen.dart';
 import 'transfer_screen.dart';
-import 'products_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -20,7 +16,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? _userData;
   Map<String, dynamic>? _stats;
-  List<dynamic> _recentTransfers = [];
   bool _isLoading = true;
 
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -43,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _userData = user;
           if (data['success'] == true) {
             _stats = data['stats'];
-            _recentTransfers = data['recent_transfers'] ?? [];
 
             final pendingCount = _stats?['pending_transfers'] ?? 0;
             if (pendingCount > 0 && (_userData?['role'] == 'admin' || _userData?['role'] == 'superadmin')) {
@@ -84,6 +78,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
+  }
+
+  void _openPage(String title, String path) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WebFeatureScreen(title: title, path: path),
+      ),
+    );
   }
 
   @override
@@ -210,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 24),
 
                     // ==========================================
-                    // 1. MENU PENJUALAN & KASIR (100% NATIVE)
+                    // 1. MENU PENJUALAN & KASIR
                     // ==========================================
                     _buildSectionTitle('1. Penjualan & Kasir', Icons.shopping_cart_outlined),
                     const SizedBox(height: 10),
@@ -222,24 +225,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Kasir Eceran (Retail)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
-                        }),
-                        _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
-                        }),
-                        _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
-                        }),
-                        _buildMenuCard('Master Barang / Item', 'Katalog & stok item', Icons.inventory_2_outlined, Colors.blue.shade700, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
-                        }),
+                        _buildMenuCard('Kasir Retail (Eceran)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () => _openPage('Kasir Retail', '/pos/retail')),
+                        _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () => _openPage('Kasir Grosir', '/pos/wholesale')),
+                        _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () => _openPage('Produk Elektrik', '/digital')),
+                        _buildMenuCard('Pembayaran Piutang', 'Pelunasan piutang', Icons.credit_score, Colors.indigo, () => _openPage('Pembayaran Piutang', '/receivable/payments')),
+                        _buildMenuCard('Retur Penjualan', 'Pengembalian barang', Icons.assignment_return, Colors.red.shade700, () => _openPage('Retur Penjualan', '/receivable/returns')),
                       ],
                     ),
                     const SizedBox(height: 24),
 
                     // ==========================================
-                    // 2. TRANSFER AGEN & BANK (100% NATIVE)
+                    // 2. TRANSFER AGEN & BANK
                     // ==========================================
                     _buildSectionTitle('2. Transfer Agen & Bank', Icons.compare_arrows_rounded),
                     const SizedBox(height: 10),
@@ -251,17 +247,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Transfer Agen & Bank', 'Pengajuan transfer', Icons.swap_horiz_rounded, Colors.green.shade800, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
-                        }),
+                        _buildMenuCard('Transfer Agen & Bank', 'Pengajuan & persetujuan', Icons.swap_horiz_rounded, Colors.green.shade800, () => _openPage('Transfer Agen & Bank', '/transfer')),
                       ],
                     ),
                     const SizedBox(height: 24),
 
                     // ==========================================
-                    // 3. AKUNTANSI, KAS & LAPORAN (100% NATIVE)
+                    // 3. MASTER DATA LENGKAP
                     // ==========================================
-                    _buildSectionTitle('3. Akuntansi & Laporan', Icons.account_balance_outlined),
+                    _buildSectionTitle('3. Master Data', Icons.folder_open_rounded),
                     const SizedBox(height: 10),
                     GridView.count(
                       crossAxisCount: 2,
@@ -271,15 +265,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen(initialType: 'in')));
-                        }),
-                        _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen(initialType: 'out')));
-                        }),
-                        _buildMenuCard('Laporan Keuangan', 'Laba rugi & neraca', Icons.analytics_outlined, Colors.purple.shade800, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
-                        }),
+                        _buildMenuCard('Daftar Item / Produk', 'Kelola stok barang', Icons.inventory_2_outlined, Colors.blue.shade700, () => _openPage('Daftar Item', '/master/items')),
+                        _buildMenuCard('Produk Multi', 'Paket data & voucher', Icons.category_outlined, Colors.cyan.shade700, () => _openPage('Produk Multi', '/master/multi')),
+                        _buildMenuCard('Supplier', 'Mitra distributor', Icons.local_shipping_outlined, Colors.orange.shade800, () => _openPage('Supplier', '/master/suppliers')),
+                        _buildMenuCard('Pelanggan', 'Data pembeli', Icons.people_alt_outlined, Colors.purple.shade700, () => _openPage('Pelanggan', '/master/customers')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 4. PEMBELIAN & HUTANG
+                    // ==========================================
+                    _buildSectionTitle('4. Pembelian & Hutang', Icons.shopping_bag_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Daftar Pembelian', 'Faktur beli supplier', Icons.receipt_outlined, Colors.brown, () => _openPage('Daftar Pembelian', '/purchase')),
+                        _buildMenuCard('Pembayaran Hutang', 'Bayar tagihan agen', Icons.payment_outlined, Colors.deepOrange, () => _openPage('Pembayaran Hutang', '/purchase/debt-payments')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 5. PERSEDIAAN & STOK OPNAME
+                    // ==========================================
+                    _buildSectionTitle('5. Persediaan Stok', Icons.warehouse_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Penyesuaian Stok', 'Koreksi stok barang', Icons.tune_rounded, Colors.teal.shade800, () => _openPage('Penyesuaian Stok', '/inventory/adjustments')),
+                        _buildMenuCard('Stok Opname', 'Audit fisik barang', Icons.fact_check_outlined, Colors.blueGrey, () => _openPage('Stok Opname', '/inventory/opname')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 6. AKUNTANSI & KAS
+                    // ==========================================
+                    _buildSectionTitle('6. Akuntansi & Kas', Icons.account_balance_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Bagan Akun (COA)', 'Daftar rekening', Icons.menu_book_outlined, Colors.indigo.shade800, () => _openPage('Bagan Akun (COA)', '/accounting/accounts')),
+                        _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () => _openPage('Kas Masuk', '/accounting/cash-in')),
+                        _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () => _openPage('Kas Keluar', '/accounting/cash-out')),
+                        _buildMenuCard('Kas Transfer Antar Bank', 'Pindah buku bank', Icons.sync_alt_rounded, Colors.purple.shade800, () => _openPage('Kas Transfer', '/accounting/cash-transfer')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 7. LAPORAN KEUANGAN
+                    // ==========================================
+                    _buildSectionTitle('7. Laporan Keuangan', Icons.analytics_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Laba Rugi', 'Performa laba bersih', Icons.show_chart_rounded, Colors.green.shade800, () => _openPage('Laba Rugi', '/reports/profit-loss')),
+                        _buildMenuCard('Neraca Keuangan', 'Posisi aktiva & pasiva', Icons.balance, Colors.blue.shade900, () => _openPage('Neraca Keuangan', '/reports/balance-sheet')),
+                        _buildMenuCard('Lap. Penjualan', 'Histori rincian sales', Icons.description_outlined, Colors.teal.shade700, () => _openPage('Laporan Penjualan', '/reports/sales')),
+                        _buildMenuCard('Lap. Pembelian', 'Histori beli barang', Icons.receipt_long, Colors.amber.shade900, () => _openPage('Laporan Pembelian', '/reports/purchases')),
+                        _buildMenuCard('Lap. Kas & Bank', 'Mutasi arus kas', Icons.account_balance_wallet, Colors.deepPurple, () => _openPage('Laporan Kas', '/reports/cash')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 8. PENGATURAN & USER
+                    // ==========================================
+                    _buildSectionTitle('8. Pengaturan & Sistem', Icons.settings_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Kelola Pengguna', 'Hak akses kasir/admin', Icons.manage_accounts_outlined, Colors.grey.shade700, () => _openPage('Kelola Pengguna', '/settings/users')),
+                        _buildMenuCard('Tutup Buku Tahunan', 'Finalisasi pembukuan', Icons.event_available, Colors.red.shade900, () => _openPage('Tutup Buku', '/settings/yearly-closing')),
                       ],
                     ),
                     const SizedBox(height: 30),
