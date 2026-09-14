@@ -39,8 +39,8 @@
         
         <!-- Header Brand / Logo -->
         <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-800 shadow-lg shadow-emerald-900/20 mb-4 p-2.5">
-                <img src="/icons/icon-192x192.png" alt="Elephant Cell" class="w-full h-full object-contain rounded-xl">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md border border-slate-200/80 mb-3 p-2">
+                <img src="/logo.png" alt="Elephant Cell Logo" class="w-full h-full object-contain rounded-xl">
             </div>
             <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">ELEPHANT CELL GROUP</h1>
             <p class="text-xs text-slate-500 font-medium mt-1">Sistem POS & Akuntansi</p>

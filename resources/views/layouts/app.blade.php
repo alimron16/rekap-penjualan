@@ -180,11 +180,14 @@
             
             <!-- Sidebar Header Brand -->
             <div class="px-4 py-3.5 border-b border-white/10 flex items-center justify-between bg-[#0b2811]">
-                <div class="leading-tight">
-                    <h1 class="font-extrabold text-sm tracking-wide text-white">
-                        ELEPHANT CELL GROUP
-                    </h1>
-                    <p class="text-[9px] text-white/80 uppercase font-medium tracking-wider">POS & Akuntansi Mandiri</p>
+                <div class="flex items-center gap-2.5">
+                    <img src="/logo.png" alt="Logo" class="w-9 h-9 object-contain rounded-lg bg-white p-0.5 flex-shrink-0 shadow-xs">
+                    <div class="leading-tight">
+                        <h1 class="font-extrabold text-sm tracking-wide text-white">
+                            ELEPHANT CELL
+                        </h1>
+                        <p class="text-[9px] text-white/80 uppercase font-medium tracking-wider">POS & Akuntansi Mandiri</p>
+                    </div>
                 </div>
                 <!-- Close Button (Mobile Only) -->
                 <button onclick="toggleMobileSidebar()" class="lg:hidden text-white/80 hover:text-white p-1 rounded-md hover:bg-white/10" aria-label="Tutup Menu">
