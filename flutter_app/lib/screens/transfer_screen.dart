@@ -13,8 +13,8 @@ class TransferScreen extends StatefulWidget {
 
 class _TransferScreenState extends State<TransferScreen> {
   List<dynamic> _transfers = [];
-  Map<String, dynamic>? _user;
   bool _isLoading = true;
+  String? _errorMessage;
 
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
@@ -36,17 +36,25 @@ class _TransferScreenState extends State<TransferScreen> {
   void _loadTransfers() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-      final user = await ApiService.getUser();
       final res = await ApiService.getTransfers();
 
       if (mounted) {
         setState(() {
-          _user = user;
           if (res['success'] == true) {
-            _transfers = res['data']['data'] ?? [];
+            final data = res['data'];
+            if (data is List) {
+              _transfers = data;
+            } else if (data is Map && data['data'] is List) {
+              _transfers = data['data'];
+            } else {
+              _transfers = [];
+            }
+          } else {
+            _errorMessage = res['message'] ?? 'Gagal memuat data transfer';
           }
           _isLoading = false;
         });
@@ -54,6 +62,7 @@ class _TransferScreenState extends State<TransferScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
+          _errorMessage = 'Gagal terhubung ke server: $e';
           _isLoading = false;
         });
       }
@@ -98,20 +107,18 @@ class _TransferScreenState extends State<TransferScreen> {
 
       if (res['success'] == true) {
         if (!mounted) return;
-        Navigator.pop(context); // Close modal
+        Navigator.pop(context);
 
-        // Clear Form
         _bankNameController.clear();
         _accountNumberController.clear();
         _accountHolderController.clear();
         _amountController.clear();
         _notesController.clear();
 
-        // Show Native Notification
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
           title: '🔔 Pengajuan Transfer Terkirim!',
-          body: 'Pengajuan transfer Rp ${currencyFormatter.format(amount)} telah dikirim ke admin.',
+          body: 'Pengajuan transfer Rp ${currencyFormatter.format(amount)} telah dikirim ke Admin.',
         );
 
         _loadTransfers();
@@ -132,7 +139,7 @@ class _TransferScreenState extends State<TransferScreen> {
         _isSubmitting = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Koneksi gagal. Coba lagi.'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -164,7 +171,7 @@ class _TransferScreenState extends State<TransferScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Form Ajukan Transfer',
+                          'Form Pengajuan Transfer',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
                         ),
                         IconButton(
@@ -177,8 +184,8 @@ class _TransferScreenState extends State<TransferScreen> {
                     TextField(
                       controller: _bankNameController,
                       decoration: const InputDecoration(
-                        labelText: 'Nama Bank / E-Wallet',
-                        hintText: 'BCA, Mandiri, BRI, DANA',
+                        labelText: 'Bank Tujuan / E-Wallet',
+                        hintText: 'BCA, MANDIRI, BRI, DANA',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -195,7 +202,7 @@ class _TransferScreenState extends State<TransferScreen> {
                       controller: _accountHolderController,
                       decoration: const InputDecoration(
                         labelText: 'Nama Pemilik Rekening',
-                        hintText: 'AHMAD FADLI',
+                        hintText: 'NAMA LENGKAP',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -211,8 +218,8 @@ class _TransferScreenState extends State<TransferScreen> {
                     TextField(
                       controller: _notesController,
                       decoration: const InputDecoration(
-                        labelText: 'Catatan Opsional',
-                        hintText: 'Transfer modal kasir',
+                        labelText: 'Catatan (Opsional)',
+                        hintText: 'Transfer modal agen kasir',
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -220,13 +227,17 @@ class _TransferScreenState extends State<TransferScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _isSubmitting ? null : _submitTransferRequest,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ThemeConfig.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
                         child: _isSubmitting
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                               )
-                            : const Text('Kirim Pengajuan Transfer'),
+                            : const Text('Kirim Pengajuan Transfer', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     )
                   ],
@@ -242,12 +253,15 @@ class _TransferScreenState extends State<TransferScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Transfer Antar Agen & Bank'),
+        title: const Text('Transfer Antar Agen & Bank', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        backgroundColor: ThemeConfig.primary,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadTransfers,
+            tooltip: 'Segarkan',
           ),
         ],
       ),
@@ -261,134 +275,152 @@ class _TransferScreenState extends State<TransferScreen> {
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
           : RefreshIndicator(
               onRefresh: () async => _loadTransfers(),
-              child: _transfers.isEmpty
+              color: ThemeConfig.primary,
+              child: _errorMessage != null
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.compare_arrows_rounded, size: 64, color: Colors.grey.shade300),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Belum ada pengajuan transfer',
-                            style: TextStyle(fontSize: 14, color: ThemeConfig.textMuted),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _openRequestModal,
-                            child: const Text('Ajukan Transfer Baru'),
-                          )
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                            const SizedBox(height: 12),
+                            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(onPressed: _loadTransfers, child: const Text('Coba Lagi')),
+                          ],
+                        ),
                       ),
                     )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _transfers.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final item = _transfers[index];
-                        final String ref = item['reference_no'] ?? '-';
-                        final String bank = item['bank_name'] ?? '-';
-                        final String accNum = item['account_number'] ?? '-';
-                        final String holder = item['account_holder'] ?? '-';
-                        final double amount = (item['amount'] ?? 0).toDouble();
-                        final String status = item['status'] ?? 'pending';
-
-                        Color statusColor = Colors.amber.shade700;
-                        if (status == 'approved') statusColor = Colors.green.shade700;
-                        if (status == 'rejected') statusColor = Colors.red.shade700;
-
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.grey.shade300),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
+                  : _transfers.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.compare_arrows_rounded, size: 64, color: Colors.grey.shade300),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Belum ada riwayat pengajuan transfer',
+                                style: TextStyle(fontSize: 14, color: ThemeConfig.textMuted),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _openRequestModal,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Ajukan Transfer Pertama'),
+                              )
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    ref,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: ThemeConfig.textMuted,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      status.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                  )
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _transfers.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = _transfers[index];
+                            final String ref = item['reference_no'] ?? '-';
+                            final String bank = item['bank_name'] ?? '-';
+                            final String accNum = item['account_number'] ?? '-';
+                            final String holder = item['account_holder'] ?? '-';
+                            final double amount = double.tryParse(item['amount'].toString()) ?? 0;
+                            final String status = item['status'] ?? 'pending';
+
+                            Color statusColor = Colors.amber.shade800;
+                            if (status == 'approved') statusColor = Colors.green.shade700;
+                            if (status == 'rejected') statusColor = Colors.red.shade700;
+
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.grey.shade200),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8),
                                 ],
                               ),
-                              const Divider(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        '$bank - $accNum',
+                                        ref,
                                         style: const TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: ThemeConfig.textDark,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'a/n $holder',
-                                        style: const TextStyle(
-                                          fontSize: 12,
                                           color: ThemeConfig.textMuted,
                                         ),
                                       ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          status.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                      )
                                     ],
                                   ),
-                                  Text(
-                                    currencyFormatter.format(amount),
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      color: statusColor,
+                                  const Divider(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '$bank - $accNum',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: ThemeConfig.textDark,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'a/n $holder',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: ThemeConfig.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        currencyFormatter.format(amount),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          color: statusColor,
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                  if (item['notes'] != null && item['notes'].toString().isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Catatan: ${item['notes']}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.grey.shade600,
+                                      ),
                                     ),
-                                  )
+                                  ],
                                 ],
                               ),
-                              if (item['notes'] != null && item['notes'].toString().isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Catatan: ${item['notes']}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontStyle: FontStyle.italic,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                            );
+                          },
+                        ),
             ),
     );
   }

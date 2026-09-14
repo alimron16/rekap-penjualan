@@ -3,19 +3,34 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AgentTransfer;
 use App\Models\Account;
+use App\Models\AgentTransfer;
+use App\Models\CashTransaction;
+use App\Models\Customer;
+use App\Models\DigitalProduct;
+use App\Models\DigitalSale;
 use App\Models\Product;
+use App\Models\Purchase;
 use App\Models\Sale;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Services\AccountingService;
+use App\Services\FinancialReportService;
+use App\Services\PosTransactionService;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class MobileApiController extends Controller
 {
+    public function __construct(
+        protected PosTransactionService $posService,
+        protected AccountingService $accountingService,
+        protected FinancialReportService $reportService
+    ) {}
+
     /**
      * Mobile Login
      */
@@ -97,7 +112,7 @@ class MobileApiController extends Controller
     }
 
     /**
-     * Get Products Catalog
+     * Master Data: Products Catalog
      */
     public function products(Request $request)
     {
@@ -113,7 +128,7 @@ class MobileApiController extends Controller
                   ->orWhere('barcode', 'like', "%{$search}%");
         }
 
-        $products = $query->orderBy('name')->take(100)->get();
+        $products = $query->orderBy('name')->take(200)->get();
 
         return response()->json([
             'success' => true,
@@ -122,7 +137,155 @@ class MobileApiController extends Controller
     }
 
     /**
-     * Get Transfer List
+     * Master Data: Customers
+     */
+    public function customers(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $customers = Customer::orderBy('name')->get();
+        return response()->json(['success' => true, 'data' => $customers]);
+    }
+
+    /**
+     * Master Data: Suppliers
+     */
+    public function suppliers(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $suppliers = Supplier::orderBy('name')->get();
+        return response()->json(['success' => true, 'data' => $suppliers]);
+    }
+
+    /**
+     * Master Data: Accounts (Bagan Akun / Kas)
+     */
+    public function accounts(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $accounts = Account::orderBy('code')->get();
+        return response()->json(['success' => true, 'data' => $accounts]);
+    }
+
+    /**
+     * POS Data Helper (For Retail & Wholesale checkout form)
+     */
+    public function posData(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+
+        return response()->json([
+            'success' => true,
+            'products' => $products,
+            'customers' => $customers,
+            'accounts' => $accounts,
+        ]);
+    }
+
+    /**
+     * POS Checkout (Retail / Grosir)
+     */
+    public function posCheckout(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'sale_type' => 'required|in:retail,grosir',
+            'customer_id' => 'nullable|exists:customers,id',
+            'discount' => 'nullable|numeric|min:0',
+            'paid_amount' => 'required|numeric|min:0',
+            'payment_method' => 'required|string',
+            'account_id' => 'nullable|exists:accounts,id',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.price' => 'nullable|numeric|min:0',
+        ]);
+
+        try {
+            $sale = $this->posService->checkoutPos($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaksi POS berhasil disimpan!',
+                'sale' => $sale,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Digital / Pulsa Product List & Balance
+     */
+    public function digitalData(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $products = DigitalProduct::where('status', 'OPEN')->orderBy('name')->get();
+        $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])->get();
+        $cashAccounts = Account::whereIn('code', ['1-1110', '1-1112'])->get();
+
+        $saldoMulti = Account::where('code', '1-1131')->value('current_balance') ?? 0;
+
+        return response()->json([
+            'success' => true,
+            'products' => $products,
+            'deposit_accounts' => $depositAccounts,
+            'cash_accounts' => $cashAccounts,
+            'saldo_multi' => (float) $saldoMulti,
+        ]);
+    }
+
+    /**
+     * Digital / Pulsa Checkout
+     */
+    public function digitalCheckout(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'digital_product_id' => 'required|exists:digital_products,id',
+            'customer_number' => 'required|string',
+            'deposit_account_id' => 'required|exists:accounts,id',
+            'cash_account_id' => 'required|exists:accounts,id',
+            'selling_price' => 'nullable|numeric|min:0',
+            'hpp' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $this->posService->processDigitalSale($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaksi Pulsa / Elektrik berhasil!',
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Agent Transfer List
      */
     public function transfers(Request $request)
     {
@@ -140,10 +303,8 @@ class MobileApiController extends Controller
             $query->where('status', $status);
         }
 
-        $transfers = $query->paginate(30);
-
-        // Bank Accounts for admin
-        $bankAccounts = Account::where('group', 'like', '%AKTIVA%')->where('type', 'D')->take(10)->get();
+        $transfers = $query->take(50)->get();
+        $bankAccounts = Account::where('group', 'like', '%AKTIVA%')->where('type', 'D')->take(15)->get();
 
         return response()->json([
             'success' => true,
@@ -153,7 +314,7 @@ class MobileApiController extends Controller
     }
 
     /**
-     * Submit Transfer Request from Store (Kasir Toko)
+     * Store Agent Transfer Request
      */
     public function storeTransfer(Request $request)
     {
@@ -169,7 +330,7 @@ class MobileApiController extends Controller
         ]);
 
         $reference = 'TF-' . date('Ymd') . '-' . strtoupper(Str::random(4));
-        $adminFee = 0; // standard fee
+        $adminFee = 0;
         $totalAmount = $request->amount + $adminFee;
 
         $transfer = AgentTransfer::create([
@@ -193,42 +354,76 @@ class MobileApiController extends Controller
     }
 
     /**
-     * Admin Approve & Upload Proof Image
+     * Cash Flow: Kas Masuk / Kas Keluar
      */
-    public function approveTransfer(Request $request, $id)
+    public function cashTransactions(Request $request)
     {
         $user = $this->getUserFromToken($request);
-        if (!$user || (!$user->isAdmin() && !$user->isSuperAdmin())) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $type = $request->query('type'); // in / out / transfer
+        $query = CashTransaction::with(['account', 'oppositeAccount'])->latest();
+
+        if ($type) {
+            $query->where('type', $type);
         }
 
-        $transfer = AgentTransfer::findOrFail($id);
+        $transactions = $query->take(50)->get();
+        return response()->json(['success' => true, 'data' => $transactions]);
+    }
 
-        $request->validate([
-            'source_account_id' => 'required|exists:accounts,id',
-            'proof_image' => 'required|image|max:10240',
-            'notes' => 'nullable|string|max:255',
+    /**
+     * Cash Transaction Store (Kas Masuk & Kas Keluar)
+     */
+    public function storeCashTransaction(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'type' => 'required|in:in,out,transfer',
+            'account_id' => 'required|exists:accounts,id',
+            'opposite_account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:1',
+            'description' => 'required|string|max:255',
+            'transaction_date' => 'nullable|date',
         ]);
 
-        $path = $request->file('proof_image')->store('proofs', 'public');
-        $sourceAccount = Account::findOrFail($request->source_account_id);
+        $data['transaction_date'] = $data['transaction_date'] ?? date('Y-m-d H:i:s');
 
-        $transfer->update([
-            'status' => 'approved',
-            'processed_by' => $user->id,
-            'source_account_id' => $sourceAccount->id,
-            'proof_image' => $path,
-            'notes' => $request->notes ?? $transfer->notes,
-            'processed_at' => Carbon::now(),
-        ]);
+        try {
+            $trx = $this->accountingService->recordCashTransaction($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaksi kas berhasil dicatat!',
+                'data' => $trx,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
 
-        $sourceAccount->current_balance -= $transfer->total_amount;
-        $sourceAccount->save();
+    /**
+     * Financial Report: Summary Overview
+     */
+    public function financialReports(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $startDate = $request->query('start_date', date('Y-m-01'));
+        $endDate = $request->query('end_date', date('Y-m-d'));
+
+        $profitLoss = $this->reportService->getProfitLossData($startDate, $endDate);
+        $balanceSheet = $this->reportService->getBalanceSheetData($endDate);
 
         return response()->json([
             'success' => true,
-            'message' => 'Transfer berhasil disetujui & bukti tersimpan!',
-            'data' => $transfer,
+            'profit_loss' => $profitLoss,
+            'balance_sheet' => $balanceSheet,
         ]);
     }
 
