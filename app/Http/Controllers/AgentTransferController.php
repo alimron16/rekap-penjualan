@@ -37,13 +37,12 @@ class AgentTransferController extends Controller
             ->sum('total_amount');
 
         // Bank Accounts available for Admin funding
-        $bankAccounts = Account::where('category', 'AKTIVA')
-            ->where('is_active', true)
+        $bankAccounts = Account::where('group', 'like', '%AKTIVA%')
             ->whereIn('code', ['1-1113', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130', '1-1131'])
             ->get();
 
         if ($bankAccounts->isEmpty()) {
-            $bankAccounts = Account::where('category', 'AKTIVA')->where('type', 'D')->take(8)->get();
+            $bankAccounts = Account::where('group', 'like', '%AKTIVA%')->where('type', 'D')->take(8)->get();
         }
 
         return view('transfer.index', compact('transfers', 'pendingCount', 'approvedTodayTotal', 'bankAccounts'));
@@ -135,12 +134,10 @@ class AgentTransferController extends Controller
                     [
                         'name' => 'CASH TRANSFER',
                         'type' => 'D',
-                        'category' => 'AKTIVA',
-                        'group' => 'AKTIVA LANCAR',
+                        'group' => 'AKTIVA',
                         'initial_balance' => 0,
                         'current_balance' => 0,
-                        'is_locked' => true,
-                        'is_active' => true,
+                        'is_system_locked' => true,
                     ]
                 );
             }
