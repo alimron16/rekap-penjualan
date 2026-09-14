@@ -1,5 +1,6 @@
-package com.elephantcell.elephant_pos_flutter
+package com.elephantcell.pos
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

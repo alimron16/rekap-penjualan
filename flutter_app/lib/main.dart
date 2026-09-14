@@ -9,10 +9,22 @@ import 'utils/theme_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
+  
+  try {
+    await NotificationService.init();
+  } catch (e) {
+    debugPrint('Notification init error: $e');
+  }
 
-  final token = await ApiService.getToken();
-  final String initialRoute = (token != null && token.isNotEmpty) ? '/dashboard' : '/login';
+  String initialRoute = '/login';
+  try {
+    final token = await ApiService.getToken();
+    if (token != null && token.isNotEmpty) {
+      initialRoute = '/dashboard';
+    }
+  } catch (e) {
+    debugPrint('Token check error: $e');
+  }
 
   runApp(ElephantPosApp(initialRoute: initialRoute));
 }
