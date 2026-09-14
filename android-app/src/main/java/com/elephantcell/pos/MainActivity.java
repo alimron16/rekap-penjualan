@@ -3,6 +3,7 @@ package com.elephantcell.pos;
 import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -10,11 +11,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
@@ -40,7 +45,7 @@ public class MainActivity extends Activity {
     private static final String APP_URL = "https://pos.moonbyte.my.id/";
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
     private static final int PERMISSION_REQUEST_CODE = 2001;
-    private static final String CHANNEL_ID = "elephant_pos_channel";
+    private static final String CHANNEL_ID = "elephant_pos_alerts_v2";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -69,13 +74,23 @@ public class MainActivity extends Activity {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            CharSequence name = "Elephant POS Notifikasi";
-            String description = "Notifikasi transaksi dan transfer agen";
+            CharSequence name = "Elephant POS Notifikasi Transaksi";
+            String description = "Notifikasi pengajuan transfer agen dan pesanan POS";
             int importance = NotificationManager.IMPORTANCE_HIGH;
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
             channel.setDescription(description);
             channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 250, 100, 250});
             channel.enableLights(true);
+            channel.setShowBadge(true);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+
+            Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                    .build();
+            channel.setSound(defaultSoundUri, audioAttributes);
 
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             if (notificationManager != null) {
@@ -245,12 +260,54 @@ public class MainActivity extends Activity {
                 }
             });
         }
+
+        @JavascriptInterface
+        public void openNotificationSettings() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    openAppNotificationSettings();
+                }
+            });
+        }
+    }
+
+    private void openAppNotificationSettings() {
+        try {
+            Intent intent = new Intent();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            } else {
+                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.fromParts("package", getPackageName(), null));
+            }
+            startActivity(intent);
+            Toast.makeText(this, "Silakan aktifkan 'Izinkan Notifikasi' & 'Tampilkan Banner'", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Buka Pengaturan HP -> Aplikasi -> Elephant POS -> Notifikasi", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void triggerAndroidSystemNotification(String title, String message) {
         try {
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager == null) return;
+            if (manager == null) {
+                Toast.makeText(this, "Gagal mengakses NotificationManager", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Check if notifications are enabled for this app
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                if (!manager.areNotificationsEnabled()) {
+                    Toast.makeText(this, "Izin Notifikasi HP Belum Aktif! Membuka Pengaturan...", Toast.LENGTH_LONG).show();
+                    openAppNotificationSettings();
+                    return;
+                }
+            }
+
+            // Show feedback Toast
+            Toast.makeText(this, "🔔 Memunculkan Notifikasi di Status Bar...", Toast.LENGTH_SHORT).show();
 
             Intent intent = new Intent(this, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -259,13 +316,18 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 pendingFlags |= PendingIntent.FLAG_IMMUTABLE;
             }
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, pendingFlags);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, (int) System.currentTimeMillis(), intent, pendingFlags);
 
-            android.app.Notification.Builder builder;
+            Bitmap largeIcon = null;
+            try {
+                largeIcon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
+            } catch (Exception e) {}
+
+            Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder = new android.app.Notification.Builder(this, CHANNEL_ID);
+                builder = new Notification.Builder(this, CHANNEL_ID);
             } else {
-                builder = new android.app.Notification.Builder(this);
+                builder = new Notification.Builder(this);
             }
 
             builder.setContentTitle(title)
@@ -273,16 +335,27 @@ public class MainActivity extends Activity {
                    .setSmallIcon(R.drawable.ic_stat_notify)
                    .setAutoCancel(true)
                    .setContentIntent(pendingIntent)
-                   .setDefaults(android.app.Notification.DEFAULT_ALL)
-                   .setPriority(android.app.Notification.PRIORITY_MAX);
+                   .setDefaults(Notification.DEFAULT_ALL)
+                   .setPriority(Notification.PRIORITY_MAX);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                builder.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
-                builder.setCategory(android.app.Notification.CATEGORY_MESSAGE);
+            if (largeIcon != null) {
+                builder.setLargeIcon(largeIcon);
             }
 
-            manager.notify((int) (System.currentTimeMillis() % 100000), builder.build());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                builder.setStyle(new Notification.BigTextStyle().bigText(message).setSummaryText("Elephant POS"));
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                builder.setVisibility(Notification.VISIBILITY_PUBLIC);
+                builder.setCategory(Notification.CATEGORY_MESSAGE);
+            }
+
+            int notifId = (int) (System.currentTimeMillis() % 100000);
+            manager.notify(notifId, builder.build());
+
         } catch (Exception e) {
+            Toast.makeText(this, "Error Notifikasi: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
         }
     }
@@ -298,13 +371,32 @@ public class MainActivity extends Activity {
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED ||
-                    checkSelfPermission(
-                            Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[] {
                         Manifest.permission.CAMERA,
                         Manifest.permission.WRITE_EXTERNAL_STORAGE,
                         Manifest.permission.READ_EXTERNAL_STORAGE
                 }, PERMISSION_REQUEST_CODE);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean notifGranted = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                for (int i = 0; i < permissions.length; i++) {
+                    if (Manifest.permission.POST_NOTIFICATIONS.equals(permissions[i])) {
+                        notifGranted = (grantResults.length > i && grantResults[i] == PackageManager.PERMISSION_GRANTED);
+                    }
+                }
+            }
+            if (notifGranted) {
+                Toast.makeText(this, "Izin Notifikasi Berhasil Diberikan!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Peringatan: Notifikasi dimatikan. Anda tidak akan melihat notif di status bar.", Toast.LENGTH_LONG).show();
             }
         }
     }
