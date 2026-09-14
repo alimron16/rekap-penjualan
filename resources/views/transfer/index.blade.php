@@ -29,6 +29,11 @@
                 </div>
             @endif
 
+            <button type="button" onclick="testNotificationAlert()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center justify-center gap-2" title="Uji Coba Bunyi Suara & Notifikasi">
+                <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                <span>Test Notifikasi</span>
+            </button>
+
             <button onclick="openRequestTransferModal()" class="w-full sm:w-auto px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 <span>Ajukan Transfer</span>
@@ -404,6 +409,63 @@
         document.getElementById('proofLightbox').classList.add('hidden');
     }
 
+    // Play sound helper
+    function playBeepSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+        } catch (e) {
+            try {
+                const audio = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbqWEzMTCc2+nCbzY2M5zb58FlLTIzmdnnwGUuMTGY2ufBZS0yM5ja5sBlLjExmNrnwGUuMTGY2ufBZS0yM5na58FlLjExmNrmwGU=");
+                audio.play();
+            } catch (err) {}
+        }
+    }
+
+    // Function to trigger test alert
+    function testNotificationAlert() {
+        playBeepSound();
+
+        if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+                new Notification('🔔 Tes Notifikasi Berhasil!', {
+                    body: 'Elephant POS: Bunyi suara & izin notifikasi sistem berfungsi normal.',
+                    icon: '/logo.png',
+                    badge: '/icons/icon-192x192.png'
+                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('🔔 Notifikasi Diaktifkan!', {
+                            body: 'Sekarang Anda akan menerima pemberitahuan setiap ada pengajuan transfer baru.',
+                            icon: '/logo.png'
+                        });
+                    }
+                });
+            } else {
+                alert('Bunyi bell berhasil dibunyikan!\n\nCatatan: Izin notifikasi pop-up di browser/HP Anda saat ini berstatus "Diblokir". Silakan klik ikon gembok di URL bar browser untuk mengizinkan notifikasi.');
+            }
+        } else {
+            alert('Bunyi audio berhasil dibunyikan! (Perangkat ini tidak mendukung Web Notification API).');
+        }
+    }
+
+    // Auto-request notification permission when opening page
+    document.addEventListener('DOMContentLoaded', () => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    });
+
     // Real-time Poll for Admins
     @if(auth()->user()->isAdmin())
     let lastPendingCount = {{ $pendingCount }};
@@ -412,17 +474,14 @@
             .then(res => res.json())
             .then(data => {
                 if (data.count > lastPendingCount) {
-                    // Play notification sound
-                    try {
-                        const audio = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbqWEzMTCc2+nCbzY2M5zb58FlLTIzmdnnwGUuMTGY2ufBZS0yM5ja5sBlLjExmNrnwGUuMTGY2ufBZS0yM5na58FlLjExmNrmwGU=");
-                        audio.play();
-                    } catch (e) {}
+                    playBeepSound();
 
                     // Show push notification if permitted
                     if ('Notification' in window && Notification.permission === 'granted' && data.latest) {
                         new Notification('Pengajuan Transfer Baru!', {
                             body: data.latest.store + ' mengajukan transfer Rp ' + data.latest.amount + ' ke ' + data.latest.bank,
-                            icon: '/icons/icon-192x192.png'
+                            icon: '/logo.png',
+                            badge: '/icons/icon-192x192.png'
                         });
                     }
                 }
