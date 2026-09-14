@@ -435,6 +435,13 @@
     function testNotificationAlert() {
         playBeepSound();
 
+        // 1. Trigger Native Android Notification (APK)
+        if (window.AndroidBridge && typeof window.AndroidBridge.showNotification === 'function') {
+            window.AndroidBridge.showNotification('🔔 Tes Notifikasi Berhasil!', 'Elephant POS: Notifikasi status bar Android aktif & normal.');
+            return;
+        }
+
+        // 2. Fallback to Web Push Notification (Browser / PWA)
         if ('Notification' in window) {
             if (Notification.permission === 'granted') {
                 new Notification('🔔 Tes Notifikasi Berhasil!', {
@@ -455,7 +462,7 @@
                 alert('Bunyi bell berhasil dibunyikan!\n\nCatatan: Izin notifikasi pop-up di browser/HP Anda saat ini berstatus "Diblokir". Silakan klik ikon gembok di URL bar browser untuk mengizinkan notifikasi.');
             }
         } else {
-            alert('Bunyi audio berhasil dibunyikan! (Perangkat ini tidak mendukung Web Notification API).');
+            alert('Bunyi audio berhasil dibunyikan!');
         }
     }
 
@@ -476,8 +483,13 @@
                 if (data.count > lastPendingCount) {
                     playBeepSound();
 
-                    // Show push notification if permitted
-                    if ('Notification' in window && Notification.permission === 'granted' && data.latest) {
+                    // Native Android Status Bar Notification
+                    if (window.AndroidBridge && typeof window.AndroidBridge.showNotification === 'function') {
+                        let title = 'Pengajuan Transfer Baru!';
+                        let msg = (data.latest ? (data.latest.store + ' mengajukan transfer Rp ' + data.latest.amount + ' ke ' + data.latest.bank) : 'Ada pengajuan transfer baru dari kasir toko.');
+                        window.AndroidBridge.showNotification(title, msg);
+                    } else if ('Notification' in window && Notification.permission === 'granted' && data.latest) {
+                        // Web Notification
                         new Notification('Pengajuan Transfer Baru!', {
                             body: data.latest.store + ' mengajukan transfer Rp ' + data.latest.amount + ' ke ' + data.latest.bank,
                             icon: '/logo.png',

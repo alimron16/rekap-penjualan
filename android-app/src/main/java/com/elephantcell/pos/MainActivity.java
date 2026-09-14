@@ -3,6 +3,9 @@ package com.elephantcell.pos;
 import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -15,6 +18,7 @@ import android.provider.MediaStore;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -36,6 +40,7 @@ public class MainActivity extends Activity {
     private static final String APP_URL = "https://pos.moonbyte.my.id/";
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
     private static final int PERMISSION_REQUEST_CODE = 2001;
+    private static final String CHANNEL_ID = "elephant_pos_channel";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -51,6 +56,7 @@ public class MainActivity extends Activity {
         webView = findViewById(R.id.webView);
         progressBar = findViewById(R.id.progressBar);
 
+        createNotificationChannel();
         setupWebView();
         requestAppPermissions();
 
@@ -58,6 +64,23 @@ public class MainActivity extends Activity {
             webView.restoreState(savedInstanceState);
         } else {
             webView.loadUrl(APP_URL);
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "Elephant POS Notifikasi";
+            String description = "Notifikasi transaksi dan transfer agen";
+            int importance = NotificationManager.IMPORTANCE_HIGH;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            channel.enableVibration(true);
+            channel.enableLights(true);
+
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
         }
     }
 
@@ -77,6 +100,9 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUserAgentString(settings.getUserAgentString() + " ElephantPosAndroid/1.0");
 
+        // Native Android Bridge for System Push Notifications
+        webView.addJavascriptInterface(new AndroidNotificationBridge(), "AndroidBridge");
+
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
@@ -86,9 +112,8 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 if (url.startsWith("http://") || url.startsWith("https://")) {
-                    return false; // Load inside WebView
+                    return false;
                 }
-                // Handle external apps (WhatsApp, tel, mailto)
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     startActivity(intent);
@@ -125,7 +150,6 @@ public class MainActivity extends Activity {
                 }
             }
 
-            // Support photo capture and gallery picker for receipts & files
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
                     FileChooserParams fileChooserParams) {
@@ -176,7 +200,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Native Download Listener for Excel and Thermal receipts
         webView.setDownloadListener(new DownloadListener() {
             @Override
             public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType,
@@ -202,7 +225,6 @@ public class MainActivity extends Activity {
                         Toast.makeText(MainActivity.this, "Mengunduh " + fileName + "...", Toast.LENGTH_SHORT).show();
                     }
                 } catch (Exception e) {
-                    // Fallback to external browser for download
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     startActivity(intent);
                 }
@@ -210,9 +232,61 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * JavaScript Interface Bridge to trigger Android Status Bar Notification
+     */
+    public class AndroidNotificationBridge {
+        @JavascriptInterface
+        public void showNotification(String title, String message) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    triggerAndroidSystemNotification(title, message);
+                }
+            });
+        }
+    }
+
+    private void triggerAndroidSystemNotification(String title, String message) {
+        try {
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) return;
+
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            
+            int pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                pendingFlags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, pendingFlags);
+
+            android.app.Notification.Builder builder;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder = new android.app.Notification.Builder(this, CHANNEL_ID);
+            } else {
+                builder = new android.app.Notification.Builder(this);
+            }
+
+            builder.setContentTitle(title)
+                   .setContentText(message)
+                   .setSmallIcon(R.mipmap.ic_launcher)
+                   .setAutoCancel(true)
+                   .setContentIntent(pendingIntent)
+                   .setPriority(android.app.Notification.PRIORITY_HIGH);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                builder.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            }
+
+            manager.notify((int) System.currentTimeMillis(), builder.build());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private void requestAppPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ notification permission
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[] {
                         Manifest.permission.POST_NOTIFICATIONS,
