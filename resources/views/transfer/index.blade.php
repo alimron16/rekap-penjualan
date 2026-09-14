@@ -437,11 +437,15 @@
 
         // 1. Trigger Native Android Notification (APK)
         if (window.AndroidBridge && typeof window.AndroidBridge.showNotification === 'function') {
-            window.AndroidBridge.showNotification('🔔 Tes Notifikasi Berhasil!', 'Elephant POS: Notifikasi status bar Android aktif & normal.');
-            return;
+            try {
+                window.AndroidBridge.showNotification('🔔 Pengajuan Transfer Baru!', 'Elephant POS: Kasir Toko mengajukan transfer saldo.');
+                return;
+            } catch (err) {
+                alert('Error AndroidBridge: ' + err.message);
+            }
         }
 
-        // 2. Fallback to Web Push Notification (Browser / PWA)
+        // 2. If opened in Chrome / Browser / PWA
         if ('Notification' in window) {
             if (Notification.permission === 'granted') {
                 new Notification('🔔 Tes Notifikasi Berhasil!', {
@@ -456,13 +460,15 @@
                             body: 'Sekarang Anda akan menerima pemberitahuan setiap ada pengajuan transfer baru.',
                             icon: '/logo.png'
                         });
+                    } else {
+                        alert('Izin notifikasi ditolak oleh pengguna.');
                     }
                 });
             } else {
-                alert('Bunyi bell berhasil dibunyikan!\n\nCatatan: Izin notifikasi pop-up di browser/HP Anda saat ini berstatus "Diblokir". Silakan klik ikon gembok di URL bar browser untuk mengizinkan notifikasi.');
+                alert('Izin notifikasi di browser/HP saat ini DIBLOKIR. Buka Pengaturan -> Notifikasi untuk mengizinkan.');
             }
         } else {
-            alert('Bunyi audio berhasil dibunyikan!');
+            alert('Aplikasi tidak mendeteksi dukungan Notification API di webview ini.');
         }
     }
 
