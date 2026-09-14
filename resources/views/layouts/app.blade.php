@@ -192,29 +192,6 @@
                 </button>
             </div>
 
-            @if(auth()->check())
-            <!-- User Profile Bar -->
-            <div class="px-3.5 py-2.5 bg-[#081e0c] border-b border-white/10 flex items-center">
-                <div class="flex items-center gap-2.5 overflow-hidden">
-                    <div class="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-xs">
-                        {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                    </div>
-                    <div class="truncate">
-                        <div class="text-[11px] font-bold text-white truncate leading-tight">{{ auth()->user()->name }}</div>
-                        <div class="text-[9px] font-medium truncate mt-0.5">
-                            @if(auth()->user()->isSuperAdmin())
-                                <span class="text-purple-300 font-bold">Super Admin</span>
-                            @elseif(auth()->user()->isAdmin())
-                                <span class="text-blue-300 font-bold">Admin Operasional</span>
-                            @else
-                                <span class="text-emerald-300">{{ auth()->user()->store_name ?? 'Kasir Toko' }}</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endif
-
             <!-- Sidebar Navigation Menu Links -->
             <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-1 text-xs">
                 
