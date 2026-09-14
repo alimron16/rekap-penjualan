@@ -54,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Koneksi gagal. Pastikan terhubung ke internet.';
+        _errorMessage = 'Gagal: $e';
       });
     }
   }
