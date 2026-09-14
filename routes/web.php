@@ -173,3 +173,14 @@ Route::middleware('auth')->group(function () {
     });
 
 });
+
+// Mobile App REST API Endpoints
+Route::prefix('api')->group(function () {
+    Route::post('/login', [\App\Http\Controllers\Api\MobileApiController::class, 'login']);
+    Route::get('/dashboard', [\App\Http\Controllers\Api\MobileApiController::class, 'dashboard']);
+    Route::get('/products', [\App\Http\Controllers\Api\MobileApiController::class, 'products']);
+    Route::get('/transfers', [\App\Http\Controllers\Api\MobileApiController::class, 'transfers']);
+    Route::post('/transfers', [\App\Http\Controllers\Api\MobileApiController::class, 'storeTransfer']);
+    Route::post('/transfers/{id}/approve', [\App\Http\Controllers\Api\MobileApiController::class, 'approveTransfer']);
+});
+
