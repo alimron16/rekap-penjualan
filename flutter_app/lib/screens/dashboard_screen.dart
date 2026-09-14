@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/theme_config.dart';
+import 'web_feature_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +23,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Otomatis minta izin notifikasi saat masuk dashboard
+    NotificationService.requestPermission();
     _loadDashboardData();
   }
 
@@ -40,6 +43,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (data['success'] == true) {
             _stats = data['stats'];
             _recentTransfers = data['recent_transfers'] ?? [];
+            
+            // Cek jika ada transfer pending untuk admin
+            final pendingCount = _stats?['pending_transfers'] ?? 0;
+            if (pendingCount > 0 && (_userData?['role'] == 'admin' || _userData?['role'] == 'superadmin')) {
+              NotificationService.showNotification(
+                id: 101,
+                title: '⚠️ Pengajuan Transfer Baru Menunggu',
+                body: 'Ada $pendingCount pengajuan transfer agen yang butuh persetujuan Anda.',
+              );
+            }
           }
           _isLoading = false;
         });
@@ -59,30 +72,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  void _triggerTestNotification() {
-    NotificationService.showNotification(
+  void _triggerTestNotification() async {
+    await NotificationService.showNotification(
       id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: '🔔 Tes Notifikasi Status Bar!',
-      body: 'Notifikasi Flutter Native Elephant POS berfungsi 100% di status bar HP Anda!',
+      title: '🐘 ELEPHANT POS - Notifikasi Aktif!',
+      body: 'Notifikasi status bar native Android berfungsi 100% sempurna dengan suara & getar!',
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🔔 Notifikasi Native dikirim ke Status Bar HP!'),
-        backgroundColor: ThemeConfig.primary,
-        behavior: SnackBarBehavior.floating,
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔔 Notifikasi berhasil dikirim ke Status Bar HP!'),
+          backgroundColor: ThemeConfig.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _openPage(String title, String path) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WebFeatureScreen(title: title, path: path),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final userName = _userData?['name'] ?? 'User';
+    final userName = _userData?['name'] ?? 'Pengguna';
     final storeName = _userData?['store_name'] ?? 'Elephant Cell';
-    final role = _userData?['role'] ?? 'user';
+    final role = (_userData?['role'] ?? 'user').toString().toUpperCase();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
+        backgroundColor: ThemeConfig.primary,
+        elevation: 0,
         title: Row(
           children: [
             Container(
@@ -103,8 +130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ELEPHANT POS',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  'ELEPHANT CELL',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
                 Text(
                   'Sistem POS & Akuntansi',
@@ -118,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadDashboardData,
-            tooltip: 'Refresh Data',
+            tooltip: 'Segarkan',
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -138,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Header Card
+                    // Header Card Profil
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -185,7 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '$storeName • ${role.toUpperCase()}',
+                                  '$storeName • $role',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.white70,
@@ -197,9 +224,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ElevatedButton.icon(
                             onPressed: _triggerTestNotification,
                             icon: const Icon(Icons.notifications_active, size: 16),
-                            label: const Text('Test Notif', style: TextStyle(fontSize: 11)),
+                            label: const Text('Tes Notif', style: TextStyle(fontSize: 11)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.amber.shade700,
+                              foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             ),
                           )
@@ -208,62 +236,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Quick Action Menu
-                    const Text(
-                      'Menu Akses Cepat',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: ThemeConfig.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
+                    // Ringkasan Statistik
                     Row(
                       children: [
                         Expanded(
-                          child: _buildMenuCard(
-                            title: 'Transfer Agen',
-                            subtitle: 'Ajukan & persetujuan',
-                            icon: Icons.compare_arrows_rounded,
-                            color: Colors.green,
-                            onTap: () {
-                              Navigator.pushNamed(context, '/transfer');
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildMenuCard(
-                            title: 'Master Barang',
-                            subtitle: 'Katalog produk',
-                            icon: Icons.inventory_2_outlined,
-                            color: Colors.blue,
-                            onTap: () {
-                              Navigator.pushNamed(context, '/products');
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Stat Cards
-                    const Text(
-                      'Ringkasan Hari Ini',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: ThemeConfig.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            title: 'Penjualan',
+                          child: _buildSummaryCard(
+                            title: 'Penjualan Hari Ini',
                             value: currencyFormatter.format(_stats?['sales_today'] ?? 0),
                             icon: Icons.payments_outlined,
                             color: Colors.green,
@@ -271,152 +249,179 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildStatCard(
-                            title: 'Transfer Pending',
-                            value: '${_stats?['pending_transfers'] ?? 0} Antrean',
-                            icon: Icons.pending_actions,
-                            color: Colors.amber,
+                          child: _buildSummaryCard(
+                            title: 'Transaksi Hari Ini',
+                            value: '${_stats?['trx_today'] ?? 0} Transaksi',
+                            icon: Icons.receipt_long_outlined,
+                            color: Colors.blue,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
 
-                    // Recent Transfers List Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // ==========================================
+                    // 1. MENU PENJUALAN / KASIR
+                    // ==========================================
+                    _buildSectionTitle('1. Penjualan & Kasir', Icons.shopping_cart_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
                       children: [
-                        const Text(
-                          'Riwayat Transfer Terbaru',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: ThemeConfig.textDark,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/transfer');
-                          },
-                          child: const Text('Lihat Semua', style: TextStyle(fontSize: 12)),
-                        ),
+                        _buildMenuCard('Kasir Eceran (Retail)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () => _openPage('Kasir Retail', '/pos/retail')),
+                        _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () => _openPage('Kasir Grosir', '/pos/wholesale')),
+                        _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () => _openPage('Produk Elektrik', '/digital')),
+                        _buildMenuCard('Pembayaran Piutang', 'Pelunasan piutang', Icons.credit_score, Colors.indigo, () => _openPage('Pembayaran Piutang', '/receivable/payments')),
+                        _buildMenuCard('Retur Penjualan', 'Pengembalian barang', Icons.assignment_return, Colors.red.shade700, () => _openPage('Retur Penjualan', '/receivable/returns')),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 24),
 
-                    if (_recentTransfers.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.inbox_outlined, size: 36, color: Colors.grey),
-                            SizedBox(height: 8),
-                            Text(
-                              'Belum ada riwayat transfer',
-                              style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _recentTransfers.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final item = _recentTransfers[index];
-                          final amount = currencyFormatter.format(item['amount'] ?? 0);
-                          final status = item['status'] ?? 'pending';
+                    // ==========================================
+                    // 2. TRANSFER AGEN & BANK
+                    // ==========================================
+                    _buildSectionTitle('2. Transfer Agen & Bank', Icons.compare_arrows_rounded),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Transfer Agen & Bank', 'Pengajuan & bukti', Icons.swap_horiz_rounded, Colors.green.shade800, () {
+                          Navigator.pushNamed(context, '/transfer');
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
-                          Color statusColor = Colors.amber;
-                          if (status == 'approved') statusColor = Colors.green;
-                          if (status == 'rejected') statusColor = Colors.red;
+                    // ==========================================
+                    // 3. MASTER DATA
+                    // ==========================================
+                    _buildSectionTitle('3. Master Data', Icons.folder_open_rounded),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Daftar Item / Produk', 'Kelola stok barang', Icons.inventory_2_outlined, Colors.blue.shade700, () => _openPage('Daftar Item', '/master/items')),
+                        _buildMenuCard('Produk Multi', 'Paket & voucher', Icons.category_outlined, Colors.cyan.shade700, () => _openPage('Produk Multi', '/master/multi')),
+                        _buildMenuCard('Supplier', 'Mitra distributor', Icons.local_shipping_outlined, Colors.orange.shade800, () => _openPage('Supplier', '/master/suppliers')),
+                        _buildMenuCard('Pelanggan', 'Data pembeli', Icons.people_alt_outlined, Colors.purple.shade700, () => _openPage('Pelanggan', '/master/customers')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
 
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: statusColor.withOpacity(0.15),
-                                  child: Icon(
-                                    status == 'approved'
-                                        ? Icons.check_circle_outline
-                                        : (status == 'rejected'
-                                            ? Icons.cancel_outlined
-                                            : Icons.access_time),
-                                    size: 18,
-                                    color: statusColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${item['bank_name']} - ${item['account_number']}',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: ThemeConfig.textDark,
-                                        ),
-                                      ),
-                                      Text(
-                                        'a/n ${item['account_holder']}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: ThemeConfig.textMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      amount,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        status.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                          color: statusColor,
-                                        ),
-                                      ),
-                                    )
-                                  ],
-                                )
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                    // ==========================================
+                    // 4. PEMBELIAN & HUTANG
+                    // ==========================================
+                    _buildSectionTitle('4. Pembelian & Hutang', Icons.shopping_bag_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Daftar Pembelian', 'Faktur beli supplier', Icons.receipt_outlined, Colors.brown, () => _openPage('Daftar Pembelian', '/purchase')),
+                        _buildMenuCard('Pembayaran Hutang', 'Bayar tagihan agen', Icons.payment_outlined, Colors.deepOrange, () => _openPage('Pembayaran Hutang', '/purchase/debt-payments')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 5. PERSEDIAAN & STOK OPNAME
+                    // ==========================================
+                    _buildSectionTitle('5. Persediaan Stok', Icons.warehouse_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Penyesuaian Stok', 'Koreksi stok barang', Icons.tune_rounded, Colors.teal.shade800, () => _openPage('Penyesuaian Stok', '/inventory/adjustments')),
+                        _buildMenuCard('Stok Opname', 'Audit fisik barang', Icons.fact_check_outlined, Colors.blueGrey, () => _openPage('Stok Opname', '/inventory/opname')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 6. AKUNTANSI & KAS
+                    // ==========================================
+                    _buildSectionTitle('6. Akuntansi & Kas', Icons.account_balance_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Bagan Akun (COA)', 'Daftar rekening', Icons.menu_book_outlined, Colors.indigo.shade800, () => _openPage('Bagan Akun (COA)', '/accounting/accounts')),
+                        _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () => _openPage('Kas Masuk', '/accounting/cash-in')),
+                        _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () => _openPage('Kas Keluar', '/accounting/cash-out')),
+                        _buildMenuCard('Kas Transfer', 'Pindah buku bank', Icons.sync_alt_rounded, Colors.purple.shade800, () => _openPage('Kas Transfer', '/accounting/cash-transfer')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 7. LAPORAN KEUANGAN
+                    // ==========================================
+                    _buildSectionTitle('7. Laporan Keuangan', Icons.analytics_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Laba Rugi', 'Performa laba bersih', Icons.show_chart_rounded, Colors.green.shade800, () => _openPage('Laba Rugi', '/reports/profit-loss')),
+                        _buildMenuCard('Neraca Keuangan', 'Posisi aktiva & pasiva', Icons.balance, Colors.blue.shade900, () => _openPage('Neraca', '/reports/balance-sheet')),
+                        _buildMenuCard('Lap. Penjualan', 'Histori rincian sales', Icons.description_outlined, Colors.teal.shade700, () => _openPage('Laporan Penjualan', '/reports/sales')),
+                        _buildMenuCard('Lap. Pembelian', 'Histori beli barang', Icons.receipt_long, Colors.amber.shade900, () => _openPage('Laporan Pembelian', '/reports/purchases')),
+                        _buildMenuCard('Lap. Kas & Bank', 'Mutasi arus kas', Icons.account_balance_wallet, Colors.deepPurple, () => _openPage('Laporan Kas', '/reports/cash')),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // 8. PENGATURAN & USER
+                    // ==========================================
+                    _buildSectionTitle('8. Pengaturan & Sistem', Icons.settings_outlined),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.1,
+                      children: [
+                        _buildMenuCard('Kelola Pengguna', 'Hak akses kasir/admin', Icons.manage_accounts_outlined, Colors.grey.shade700, () => _openPage('Kelola Pengguna', '/settings/users')),
+                        _buildMenuCard('Tutup Buku Tahunan', 'Finalisasi pembukuan', Icons.event_available, Colors.red.shade900, () => _openPage('Tutup Buku', '/settings/yearly-closing')),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
                   ],
                 ),
               ),
@@ -424,61 +429,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMenuCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-            )
-          ],
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: ThemeConfig.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: ThemeConfig.textDark,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: ThemeConfig.textDark,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 10, color: ThemeConfig.textMuted),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildSummaryCard({
     required String title,
     required String value,
     required IconData icon,
@@ -489,41 +457,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 22),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
                   title,
-                  style: const TextStyle(fontSize: 10, color: ThemeConfig.textMuted),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-          )
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildMenuCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: ThemeConfig.textDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade400),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
