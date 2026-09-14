@@ -1,0 +1,2068 @@
+{
+  "products": [
+    {
+      "item_code": "VIS6/2",
+      "name": "V ISAT 6GB 2H",
+      "type": "VOCER",
+      "brand": "INDOSAT",
+      "stock": 13.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 12000.0,
+      "wholesale_price": 12000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VIS6/5",
+      "name": "V ISAT 6GB 5H",
+      "type": "VOCER",
+      "brand": "INDOSAT",
+      "stock": 30.0,
+      "min_stock": 0,
+      "hpp": 14999.104886735517,
+      "retail_price": 18000.0,
+      "wholesale_price": 18000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VIS13/7",
+      "name": "V ISAT 13GB 7H",
+      "type": "VOCER",
+      "brand": "INDOSAT",
+      "stock": 12.0,
+      "min_stock": 0,
+      "hpp": 22250.0,
+      "retail_price": 26000.0,
+      "wholesale_price": 26000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VIS7/30",
+      "name": "V ISAT 7GB 30H",
+      "type": "VOCER",
+      "brand": "INDOSAT",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 33500.0,
+      "retail_price": 37000.0,
+      "wholesale_price": 37000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTS6/2",
+      "name": "V TSEL 6GB 2H",
+      "type": "VOCER",
+      "brand": "TELKOMSEL",
+      "stock": 19.0,
+      "min_stock": 0,
+      "hpp": 11607.142857142857,
+      "retail_price": 13000.0,
+      "wholesale_price": 13000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTS4/5",
+      "name": "V TSEL 4GB 5H",
+      "type": "VOCER",
+      "brand": "TELKOMSEL",
+      "stock": 13.0,
+      "min_stock": 0,
+      "hpp": 14200.0,
+      "retail_price": 16000.0,
+      "wholesale_price": 16000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTS5/7",
+      "name": "V TSEL 5GB 7H",
+      "type": "VOCER",
+      "brand": "TELKOMSEL",
+      "stock": 3.0,
+      "min_stock": 0,
+      "hpp": 18000.0,
+      "retail_price": 23000.0,
+      "wholesale_price": 23000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTS10/30",
+      "name": "V TSEL 10GB 30H",
+      "type": "VOCER",
+      "brand": "TELKOMSEL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 41500.0,
+      "retail_price": 45000.0,
+      "wholesale_price": 45000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTR7/2",
+      "name": "V TRI 7 2H",
+      "type": "VOCER",
+      "brand": "TRI",
+      "stock": 31.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 12000.0,
+      "wholesale_price": 12000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTR5,5/3",
+      "name": "V TRI 5.5GB 3H",
+      "type": "VOCER",
+      "brand": "TRI",
+      "stock": 14.0,
+      "min_stock": 0,
+      "hpp": 12062.8125,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTR10/5",
+      "name": "V TRI 10GB 5H",
+      "type": "VOCER",
+      "brand": "TRI",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 20000.0,
+      "retail_price": 22000.0,
+      "wholesale_price": 22000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTR6/30",
+      "name": "V TRI AON 6GB",
+      "type": "VOCER",
+      "brand": "TRI",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 33500.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VTR9/30",
+      "name": "V TRI AON 9GB",
+      "type": "VOCER",
+      "brand": "TRI",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 51000.0,
+      "retail_price": 51000.0,
+      "wholesale_price": 51000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VXL7/2B",
+      "name": "V XL 7GB 2H BARU",
+      "type": "VOCER",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 11500.0,
+      "retail_price": 13000.0,
+      "wholesale_price": 13000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VXL4/3",
+      "name": "V XL 4GB 3H",
+      "type": "VOCER",
+      "brand": "XL",
+      "stock": 2.0,
+      "min_stock": 0,
+      "hpp": 12500.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VXL6/7B",
+      "name": "V XL 6GB 7H BARU",
+      "type": "VOCER",
+      "brand": "XL",
+      "stock": 3.0,
+      "min_stock": 0,
+      "hpp": 19000.0,
+      "retail_price": 22000.0,
+      "wholesale_price": 22000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VXL16/30",
+      "name": "V XL 16GB 30H",
+      "type": "VOCER",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 50000.0,
+      "retail_price": 50000.0,
+      "wholesale_price": 50000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VXL23/30",
+      "name": "V XL 23GB 30H",
+      "type": "VOCER",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 56500.0,
+      "retail_price": 60000.0,
+      "wholesale_price": 60000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX6/7",
+      "name": "V AXIS 6GB 7H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 16.0,
+      "min_stock": 0,
+      "hpp": 18000.0,
+      "retail_price": 22000.0,
+      "wholesale_price": 22000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX7/2B",
+      "name": "V AXIS 7GB 2H BARU",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 10500.0,
+      "retail_price": 12000.0,
+      "wholesale_price": 12000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX4/5",
+      "name": "V AXIS 4GB 5H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 12833.333333333334,
+      "retail_price": 17000.0,
+      "wholesale_price": 17000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX3/7",
+      "name": "V AXIS 3GB 7H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 15600.0,
+      "retail_price": 16000.0,
+      "wholesale_price": 16000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX5/14",
+      "name": "V AXIS 5GB 14H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 8.0,
+      "min_stock": 0,
+      "hpp": 22500.0,
+      "retail_price": 27000.0,
+      "wholesale_price": 27000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX6/14",
+      "name": "V AXIS 6GB 14H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 26600.0,
+      "retail_price": 30000.0,
+      "wholesale_price": 30000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VAX7/30",
+      "name": "V AXIS 7GB 30H",
+      "type": "VOCER",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 34733.333333333336,
+      "retail_price": 37000.0,
+      "wholesale_price": 37000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSF6/2",
+      "name": "V SMART 6GB 2H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 7.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 12000.0,
+      "wholesale_price": 12000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSF6/3",
+      "name": "V SMART 6GB 3H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 11.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 14000.0,
+      "wholesale_price": 14000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSF4/5",
+      "name": "V SMART 4GB 5H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 11.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 16000.0,
+      "wholesale_price": 16000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSF2/7",
+      "name": "V SMART 2GB 7H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 19500.0,
+      "retail_price": 12000.0,
+      "wholesale_price": 12000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSF10/7",
+      "name": "V SMART 10GB 7H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 5.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 22000.0,
+      "wholesale_price": 22000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "VSFUNL7H",
+      "name": "V SMART UNL 2GB 7H",
+      "type": "VOCER",
+      "brand": "SMARTFREN",
+      "stock": 8.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 28000.0,
+      "wholesale_price": 28000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPIS0K",
+      "name": "SP ISAT 3GB FRESH",
+      "type": "PERDANA",
+      "brand": "INDOSAT",
+      "stock": 13.0,
+      "min_stock": 0,
+      "hpp": 18500.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPI3",
+      "name": "SP ISAT 3GB",
+      "type": "PERDANA",
+      "brand": "INDOSAT",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPI10",
+      "name": "SP ISAT 10GB",
+      "type": "PERDANA",
+      "brand": "INDOSAT",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 22000.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPT3F",
+      "name": "SP TRI 3GB FRESH",
+      "type": "PERDANA",
+      "brand": "TRI",
+      "stock": 4.0,
+      "min_stock": 0,
+      "hpp": 19000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPT3A",
+      "name": "SP TRI 3GB",
+      "type": "PERDANA",
+      "brand": "TRI",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPT18GB",
+      "name": "SP TRI 18GB",
+      "type": "PERDANA",
+      "brand": "TRI",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 25000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPTS3GB",
+      "name": "SP TSEL 3GB",
+      "type": "PERDANA",
+      "brand": "TELKOMSEL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 13000.0,
+      "wholesale_price": 13000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPT0K",
+      "name": "SP TSEL 0K",
+      "type": "PERDANA",
+      "brand": "TELKOMSEL",
+      "stock": 4.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL8A",
+      "name": "SP XL 8GB",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL10",
+      "name": "SP XL10GB",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 20909.090909090908,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL3F",
+      "name": "SP XL 3GB FRESH",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 1.0,
+      "min_stock": 0,
+      "hpp": 25000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL3A",
+      "name": "SP XL 3AGB",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 19.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL0K",
+      "name": "SP XL 0K FRSEH",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 16666.666666666668,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPXL5A",
+      "name": "SP XL 5GB A",
+      "type": "PERDANA",
+      "brand": "XL",
+      "stock": 20.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 17000.0,
+      "wholesale_price": 17000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPAX3F",
+      "name": "SP AXIS 3GB FRESH",
+      "type": "PERDANA",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 25000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPAX0K",
+      "name": "SP AXIS 0K",
+      "type": "PERDANA",
+      "brand": "AXIS",
+      "stock": 3.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPAX3A",
+      "name": "SP AXIS 3GBA",
+      "type": "PERDANA",
+      "brand": "AXIS",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPSF3F",
+      "name": "SP SMART 3GB FRESH",
+      "type": "PERDANA",
+      "brand": "SMARTFREN",
+      "stock": 1.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPSF3",
+      "name": "SP SMART 3GB",
+      "type": "PERDANA",
+      "brand": "SMARTFREN",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "SPSF10",
+      "name": "SP SMART 10 GB",
+      "type": "PERDANA",
+      "brand": "SMARTFREN",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 22000.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "D78L",
+      "name": "KABEL DATA VDENMENV D78L",
+      "type": "KABEL",
+      "brand": "VDENMENV",
+      "stock": 4.0,
+      "min_stock": 0,
+      "hpp": 17000.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "DC01",
+      "name": "ADAPTOR KEPALA CHARGER VDENMENV DC01",
+      "type": "CHARGER",
+      "brand": "VDENMENV",
+      "stock": 0.0,
+      "min_stock": 0,
+      "hpp": 13090.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB80/C",
+      "name": "KABEL DATA TOPLES TYPE C LOG ON CB80",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 31.0,
+      "min_stock": 0,
+      "hpp": 14875.965130759652,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB80/M",
+      "name": "KABEL DATA MIKRO LOG ON CB80",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 5.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB80/L",
+      "name": "KABEL DATA IP LOG ON CB80",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 18.0,
+      "min_stock": 0,
+      "hpp": 20000.0,
+      "retail_price": 30000.0,
+      "wholesale_price": 30000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB69/M",
+      "name": "KABEL DATA MIKRO LOG ON CB69",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 4.0,
+      "min_stock": 0,
+      "hpp": 14000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB68/L",
+      "name": "KABEL DATA IP LOG ON CB68",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 10.0,
+      "min_stock": 0,
+      "hpp": 8200.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB69/L",
+      "name": "KABEL DATA IP LOG ON CB69",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 9.0,
+      "min_stock": 0,
+      "hpp": 16000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "OS/IP",
+      "name": "ONE SET LOG ON IP",
+      "type": "ONE SET",
+      "brand": "LOG ON",
+      "stock": 16.0,
+      "min_stock": 0,
+      "hpp": 25000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "LOC29",
+      "name": "KEPALA CHARGER LOG ON DUAL USB LOC29",
+      "type": "CHARGER",
+      "brand": "LOG ON",
+      "stock": 6.0,
+      "min_stock": 0,
+      "hpp": 19000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "LOC33/M",
+      "name": "ONE SET CHARGER LOG ON MICRO LOC33",
+      "type": "ONE SET",
+      "brand": "LOG ON",
+      "stock": 5.0,
+      "min_stock": 0,
+      "hpp": 30000.0,
+      "retail_price": 50000.0,
+      "wholesale_price": 50000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "HF782",
+      "name": "HEADSET LOG ON HF782",
+      "type": "HEADSET",
+      "brand": "LOG ON",
+      "stock": 9.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "HF680",
+      "name": "HEADSET LOG ON HF680",
+      "type": "HEADSET",
+      "brand": "LOG ON",
+      "stock": 26.0,
+      "min_stock": 0,
+      "hpp": 15528.921568627453,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "PB",
+      "name": "POWERBANK LOG ON",
+      "type": "ACC",
+      "brand": "LOG ON",
+      "stock": 1.0,
+      "min_stock": 0,
+      "hpp": 130000.0,
+      "retail_price": 200000.0,
+      "wholesale_price": 200000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "CB90/CTC",
+      "name": "KABEL DATA C TO C LOG ON CB90",
+      "type": "KABEL",
+      "brand": "LOG ON",
+      "stock": 8.0,
+      "min_stock": 0,
+      "hpp": 20000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "HF620",
+      "name": "HEADSET LOG ON HF620",
+      "type": "HEADSET",
+      "brand": "LOG ON",
+      "stock": 16.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "D203L/IP",
+      "name": "KABEL DATA IP  D203L O LIKE",
+      "type": "KABEL",
+      "brand": "O LIKE",
+      "stock": 12.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "OCG1L",
+      "name": "KABEL DATA IP GAMING O LIKE",
+      "type": "KABEL",
+      "brand": "O LIKE",
+      "stock": 42.0,
+      "min_stock": 0,
+      "hpp": 15000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "D306/M",
+      "name": "KABEL DATA TOPLES TYPE MICRO  D306 O LIKE",
+      "type": "KABEL",
+      "brand": "O LIKE",
+      "stock": 1.0,
+      "min_stock": 0,
+      "hpp": 5000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "D306C/C",
+      "name": "KABEL DATA TYPE  C D306C O LIKE",
+      "type": "KABEL",
+      "brand": "O LIKE",
+      "stock": 11.0,
+      "min_stock": 0,
+      "hpp": 5000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "OS/ELP M",
+      "name": "ONE SET MICRO (ELEPHANT)",
+      "type": "ONE SET",
+      "brand": "ELEPHANT",
+      "stock": 3.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 20000.0,
+      "wholesale_price": 20000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "OS/ELP C",
+      "name": "ONE SET TYPE  C ( ELEPHANT)",
+      "type": "ONE SET",
+      "brand": "ELEPHANT",
+      "stock": 5.0,
+      "min_stock": 0,
+      "hpp": 10000.0,
+      "retail_price": 35000.0,
+      "wholesale_price": 35000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "RTK4S",
+      "name": "KEPALA CASAN ROBOT",
+      "type": "KEPALA",
+      "brand": "ROBOT",
+      "stock": 2.0,
+      "min_stock": 0,
+      "hpp": 11836.363636363636,
+      "retail_price": 25000.0,
+      "wholesale_price": 25000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "AIO5KX",
+      "name": "HEADSET REXY AIO5KX",
+      "type": "HEADSET",
+      "brand": "REXY",
+      "stock": 2.0,
+      "min_stock": 0,
+      "hpp": 38000.0,
+      "retail_price": 50000.0,
+      "wholesale_price": 50000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "MT101",
+      "name": "KABEL DATA TYPE C MT101 MAESTRO",
+      "type": "KABEL",
+      "brand": "MAESTRO",
+      "stock": 7.0,
+      "min_stock": 0,
+      "hpp": 6000.0,
+      "retail_price": 15000.0,
+      "wholesale_price": 15000.0,
+      "status": "Masih Dijual"
+    },
+    {
+      "item_code": "UPCC",
+      "name": "KABEL DATA C TO C UP",
+      "type": "KABEL",
+      "brand": "UP",
+      "stock": 9.0,
+      "min_stock": 0,
+      "hpp": 12000.0,
+      "retail_price": 30000.0,
+      "wholesale_price": 30000.0,
+      "status": "Masih Dijual"
+    }
+  ],
+  "multi_products": [
+    {
+      "product_code": "PLN20",
+      "name": "TOKEN PLN 20,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 21430.0,
+      "selling_price": 23000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN50",
+      "name": "TOKEN PLN 50,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 51570.0,
+      "selling_price": 53000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN100",
+      "name": "TOKEN PLN 100,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 101860.0,
+      "selling_price": 103000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN200",
+      "name": "TOKEN PLN 200,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 201810.0,
+      "selling_price": 203000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN500",
+      "name": "TOKEN PLN 500,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 501820.0,
+      "selling_price": 503000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN25",
+      "name": "TOKEN PLN 25,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 26814.0,
+      "selling_price": 28000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS5",
+      "name": "PULSA TELKOMSEL 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 5200.0,
+      "selling_price": 7000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS10",
+      "name": "PULSA TELKOMSEL 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 10150.0,
+      "selling_price": 12000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS15",
+      "name": "PULSA TELKOMSEL 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 14884.0,
+      "selling_price": 17000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS20",
+      "name": "PULSA TELKOMSEL 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 19815.0,
+      "selling_price": 22000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS25",
+      "name": "PULSA TELKOMSEL 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 24715.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS30",
+      "name": "PULSA TELKOMSEL 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 31602.0,
+      "selling_price": 33000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS35",
+      "name": "PULSA TELKOMSEL 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 35692.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS40",
+      "name": "PULSA TELKOMSEL 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 41082.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS45",
+      "name": "PULSA TELKOMSEL 45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 44679.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS50",
+      "name": "PULSA TELKOMSEL 50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 49595.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS55",
+      "name": "PULSA TELKOMSEL 55,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 55497.0,
+      "selling_price": 57000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS60",
+      "name": "PULSA TELKOMSEL 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 59224.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS65",
+      "name": "PULSA TELKOMSEL 65,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 64947.0,
+      "selling_price": 67000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS70",
+      "name": "PULSA TELKOMSEL 70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 69777.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS75",
+      "name": "PULSA TELKOMSEL 75,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 74217.0,
+      "selling_price": 77000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS80",
+      "name": "PULSA TELKOMSEL 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 79727.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS85",
+      "name": "PULSA TELKOMSEL 85,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 84317.0,
+      "selling_price": 87000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS90",
+      "name": "PULSA TELKOMSEL 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 88987.0,
+      "selling_price": 91000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS95",
+      "name": "PULSA TELKOMSEL 95,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 94307.0,
+      "selling_price": 96000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TS100",
+      "name": "PULSA TELKOMSEL 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TELKOMSEL",
+      "hpp": 98224.0,
+      "selling_price": 102000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I5",
+      "name": "PULSA INDOSAT 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 5855.0,
+      "selling_price": 8000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I10",
+      "name": "PULSA INDOSAT 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 10750.0,
+      "selling_price": 13000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I12",
+      "name": "PULSA INDOSAT 12,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 13020.0,
+      "selling_price": 14000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I15",
+      "name": "PULSA INDOSAT 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 15700.0,
+      "selling_price": 18000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I20",
+      "name": "PULSA INDOSAT 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 20563.0,
+      "selling_price": 23000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I25",
+      "name": "PULSA INDOSAT 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 25280.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I30",
+      "name": "PULSA INDOSAT 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 30730.0,
+      "selling_price": 32000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I35",
+      "name": "PULSA INDOSAT 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 35405.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I40",
+      "name": "PULSA INDOSAT 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 39950.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I45",
+      "name": "PULSA INDOSAT 45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 44679.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I50",
+      "name": "PULSA INDOSAT 50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 48450.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I60",
+      "name": "PULSA INDOSAT 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 58258.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I70",
+      "name": "PULSA INDOSAT 70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 68503.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I80",
+      "name": "PULSA INDOSAT 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 78750.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I90",
+      "name": "PULSA INDOSAT 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 89700.0,
+      "selling_price": 92000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "I100",
+      "name": "PULSA INDOSAT 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "INDOSAT",
+      "hpp": 95075.0,
+      "selling_price": 102000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX5",
+      "name": "PULSA AXIS 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 5660.0,
+      "selling_price": 7000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX10",
+      "name": "PULSA AXIS 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 10600.0,
+      "selling_price": 12000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX15",
+      "name": "PULSA AXIS 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 15080.0,
+      "selling_price": 17000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX20",
+      "name": "PULSA AXIS 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 20044.0,
+      "selling_price": 22000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX25",
+      "name": "PULSA AXIS 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 24888.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX30",
+      "name": "PULSA AXIS 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 29861.0,
+      "selling_price": 33000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX35",
+      "name": "PULSA AXIS 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 35692.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX40",
+      "name": "PULSA AXIS 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 40265.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX45",
+      "name": "PULSA AXIS 45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 45393.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX50",
+      "name": "PULSA AXIS 50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 49030.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX55",
+      "name": "PULSA AXIS 55,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 55113.0,
+      "selling_price": 57000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX60",
+      "name": "PULSA AXIS 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 59317.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX65",
+      "name": "PULSA AXIS 65,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 64912.0,
+      "selling_price": 67000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX70",
+      "name": "PULSA AXIS 70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 69607.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX75",
+      "name": "PULSA AXIS 75,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 74004.0,
+      "selling_price": 77000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX80",
+      "name": "PULSA AXIS 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 79497.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX85",
+      "name": "PULSA AXIS 85,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 82892.0,
+      "selling_price": 87000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX90",
+      "name": "PULSA AXIS 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 88529.0,
+      "selling_price": 91000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX95",
+      "name": "PULSA AXIS 95,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 94582.0,
+      "selling_price": 96000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "AX100",
+      "name": "PULSA AXIS 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "AXIS",
+      "hpp": 99985.0,
+      "selling_price": 100000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR5",
+      "name": "PULSA TRI 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 5175.0,
+      "selling_price": 7000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR10",
+      "name": "PULSA TRI 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 10159.0,
+      "selling_price": 12000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR15",
+      "name": "PULSA TRI 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 14772.0,
+      "selling_price": 17000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR20",
+      "name": "PULSA TRI 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 19570.0,
+      "selling_price": 22000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR25",
+      "name": "PULSA TRI 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 24705.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR30",
+      "name": "PULSA TRI 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 29500.0,
+      "selling_price": 33000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR35",
+      "name": "PULSA TRI 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 35692.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR40",
+      "name": "PULSA TRI 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 38490.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR45",
+      "name": "PULSA TRI 45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 45100.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR50",
+      "name": "PULSA TRI 50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 47880.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR55",
+      "name": "PULSA TRI 55,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 55113.0,
+      "selling_price": 57000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR60",
+      "name": "PULSA TRI 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 57669.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR65",
+      "name": "PULSA TRI 65,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 64912.0,
+      "selling_price": 67000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR70",
+      "name": "PULSA TRI 70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 67360.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR75",
+      "name": "PULSA TRI 75,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 74004.0,
+      "selling_price": 77000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR80",
+      "name": "PULSA TRI 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 76600.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR85",
+      "name": "PULSA TRI 85,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 82892.0,
+      "selling_price": 87000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR90",
+      "name": "PULSA TRI 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 89165.0,
+      "selling_price": 91000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR95",
+      "name": "PULSA TRI 95,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 94582.0,
+      "selling_price": 96000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "TR100",
+      "name": "PULSA TRI 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "TRI",
+      "hpp": 95150.0,
+      "selling_price": 100000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL5",
+      "name": "PULSA XL 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 5660.0,
+      "selling_price": 7000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL10",
+      "name": "PULSA XL 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 10600.0,
+      "selling_price": 12000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL15",
+      "name": "PULSA XL 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 15080.0,
+      "selling_price": 17000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL20",
+      "name": "PULSA XL 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 20044.0,
+      "selling_price": 22000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL25",
+      "name": "PULSA XL 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 24888.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL30",
+      "name": "PULSA XL 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 29861.0,
+      "selling_price": 33000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL35",
+      "name": "PULSA XL 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 35692.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL40",
+      "name": "PULSA XL 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 40265.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL45",
+      "name": "PULSA XL 45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 45393.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL50",
+      "name": "PULSA XL 50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 49030.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL55",
+      "name": "PULSA XL 55,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 55113.0,
+      "selling_price": 57000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL60",
+      "name": "PULSA XL 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 59317.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL65",
+      "name": "PULSA XL 65,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 64912.0,
+      "selling_price": 67000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL70",
+      "name": "PULSA XL 70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 69607.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL75",
+      "name": "PULSA XL 75,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 74004.0,
+      "selling_price": 77000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL80",
+      "name": "PULSA XL 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 79497.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL85",
+      "name": "PULSA XL 85,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 82892.0,
+      "selling_price": 87000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL90",
+      "name": "PULSA XL 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 88529.0,
+      "selling_price": 91000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL95",
+      "name": "PULSA XL 95,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 94582.0,
+      "selling_price": 96000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "XL100",
+      "name": "PULSA XL 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "XL",
+      "hpp": 99985.0,
+      "selling_price": 100000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF5",
+      "name": "PULSA SMARTFREN 5,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 5090.0,
+      "selling_price": 7000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF10",
+      "name": "PULSA SMARTFREN 10,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 10270.0,
+      "selling_price": 12000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF15",
+      "name": "PULSA SMARTFREN 15,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 15140.0,
+      "selling_price": 17000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF20",
+      "name": "PULSA SMARTFREN 20,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 20020.0,
+      "selling_price": 22000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF25",
+      "name": "PULSA SMARTFREN 25,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 25065.0,
+      "selling_price": 27000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF30",
+      "name": "PULSA SMARTFREN 30,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 30160.0,
+      "selling_price": 33000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF35",
+      "name": "PULSA SMARTFREN 35,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 35150.0,
+      "selling_price": 37000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF40",
+      "name": "PULSA SMARTFREN 40,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 40125.0,
+      "selling_price": 42000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF45",
+      "name": "PULSA SMARTFREN45,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 45205.0,
+      "selling_price": 47000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF50",
+      "name": "PULSA SMARTFREN50,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 50180.0,
+      "selling_price": 52000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF55",
+      "name": "PULSA SMARTFREN 55,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 55265.0,
+      "selling_price": 57000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF60",
+      "name": "PULSA SMARTFREN 60,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 60240.0,
+      "selling_price": 62000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF65",
+      "name": "PULSA SMARTFREN 65,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 65148.0,
+      "selling_price": 67000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF70",
+      "name": "PULSA SMARTFREN70,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 70680.0,
+      "selling_price": 72000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF75",
+      "name": "PULSA SMARTFREN 75,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 75345.0,
+      "selling_price": 77000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF80",
+      "name": "PULSA SMARTFREN 80,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 80130.0,
+      "selling_price": 82000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF85",
+      "name": "PULSA SMARTFREN 85,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 85590.0,
+      "selling_price": 87000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF90",
+      "name": "PULSA SMARTFREN 90,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 90225.0,
+      "selling_price": 91000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF95",
+      "name": "PULSA SMARTFREN 95,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 95540.0,
+      "selling_price": 96000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "SF100",
+      "name": "PULSA SMARTFREN 100,000",
+      "trx_type": "PULSA ELEKTRIK",
+      "category": "SMARTFREN",
+      "hpp": 97700.0,
+      "selling_price": 102000.0,
+      "status": "OPEN"
+    },
+    {
+      "product_code": "PLN15",
+      "name": "TOKEN PLN 15,000",
+      "trx_type": "TOKEN LISTRIK",
+      "category": "PLN",
+      "hpp": 16800.0,
+      "selling_price": 18000.0,
+      "status": "OPEN"
+    }
+  ],
+  "suppliers": [
+    {
+      "name": "Grosir Terdekat",
+      "phone": "081200000000",
+      "address": "BEKASI",
+      "bank_name": "Bca",
+      "account_number": "5655555555",
+      "account_name": "GROSIR",
+      "notes": ""
+    },
+    {
+      "name": "Sales Provider",
+      "phone": "081211111111",
+      "address": "Jakarta",
+      "bank_name": "Bca",
+      "account_number": "5755555555",
+      "account_name": "SALES",
+      "notes": ""
+    }
+  ],
+  "customers": [
+    {
+      "name": "UMUM",
+      "phone": "0812XXXXXXXX",
+      "address": "Pangkalan raya jl. kebanjiran Desa Jarang Kering",
+      "bank_name": "Kang Ngampul",
+      "account_number": "",
+      "notes": "",
+      "status": "Aktif"
+    }
+  ]
+}
