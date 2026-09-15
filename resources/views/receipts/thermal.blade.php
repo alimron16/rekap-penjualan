@@ -63,11 +63,20 @@
         <button onclick="window.print()" class="btn-print">CETAK STRUK THERMAL</button>
     </div>
 
-    <!-- Header Identitas Toko (Sesuai Sheet Struk Excel) -->
+    <!-- Header Identitas Toko / Cabang -->
+    @php
+        $receiptStoreName = $sale->outlet ? $sale->outlet->name : $setting->name;
+        $receiptAddress = ($sale->outlet && !empty($sale->outlet->address)) ? $sale->outlet->address : $setting->address;
+        $receiptPhone = ($sale->outlet && !empty($sale->outlet->phone)) ? $sale->outlet->phone : $setting->phone;
+    @endphp
     <div class="text-center">
-        <div class="bold" style="font-size: 13px; text-transform: uppercase;">{{ $setting->name }}</div>
-        <div style="font-size: 10px;">{{ $setting->address }}</div>
-        <div style="font-size: 10px;">Telp/WA: {{ $setting->phone }}</div>
+        <div class="bold" style="font-size: 13px; text-transform: uppercase;">{{ $receiptStoreName }}</div>
+        @if($receiptAddress)
+            <div style="font-size: 10px;">{{ $receiptAddress }}</div>
+        @endif
+        @if($receiptPhone)
+            <div style="font-size: 10px;">Telp/WA: {{ $receiptPhone }}</div>
+        @endif
     </div>
 
     <div class="dashed"></div>
@@ -146,10 +155,14 @@
 
     <!-- Footer Struk -->
     <div class="text-center" style="font-size: 10px; margin-top: 6px;">
-        <div>Terima Kasih Atas Kunjungan Anda</div>
-        <div>Barang yang dibeli tidak dapat ditukar</div>
-        <div>kecuali dengan perjanjian nota</div>
-        <div style="margin-top: 4px; font-weight: bold;">-- ELEPHANT CELL GROUP --</div>
+        @if(!empty($setting->receipt_footer))
+            <div>{!! nl2br(e($setting->receipt_footer)) !!}</div>
+        @else
+            <div>Terima Kasih Atas Kunjungan Anda</div>
+            <div>Barang yang dibeli tidak dapat ditukar</div>
+            <div>kecuali dengan perjanjian nota</div>
+        @endif
+        <div style="margin-top: 4px; font-weight: bold;">-- {{ $receiptStoreName }} --</div>
     </div>
 
     <script>

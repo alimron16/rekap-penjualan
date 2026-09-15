@@ -174,6 +174,7 @@ class MobileApiController extends Controller
                 ->orderBy('day')
                 ->pluck('revenue', 'day')
                 ->toArray();
+            $dailySalesObj = empty($dailySales) ? (object)[] : $dailySales;
 
             // Accounts list for cash & bank breakdown
             $cashAccounts = Account::whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1131'])
@@ -228,7 +229,7 @@ class MobileApiController extends Controller
                 'progressPct' => (float)$progressPct,
                 'cashAccounts' => $cashAccounts,
                 'topProducts' => $topProducts,
-                'dailySales' => $dailySales,
+                'dailySales' => $dailySalesObj,
                 'pending_transfers' => $pendingTransfers,
                 'total_products' => $totalProducts,
                 'recent_transfers' => $recentTransfers,
@@ -754,12 +755,15 @@ class MobileApiController extends Controller
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $setting = StoreSetting::first();
 
         return response()->json([
             'success' => true,
             'products' => $products,
             'customers' => $customers,
             'accounts' => $accounts,
+            'setting' => $setting,
+            'outlet' => $user->outlet,
         ]);
     }
 
@@ -785,10 +789,12 @@ class MobileApiController extends Controller
         try {
             $data['outlet_id'] = $user->outlet_id;
             $sale = $this->posService->checkoutPos($data);
+            $sale->load(['items.product', 'customer', 'outlet', 'user']);
             return response()->json([
                 'success' => true,
                 'message' => 'Transaksi POS berhasil disimpan!',
                 'sale' => $sale,
+                'setting' => StoreSetting::first(),
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -1687,10 +1693,76 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $setting = StoreSetting::first();
+        $setting = StoreSetting::firstOrCreate(
+            ['id' => 1],
+            [
+                'name' => 'ELEPHANT CELL GROUP',
+                'phone' => '088212283661',
+                'address' => 'Kav. Virlania Tridaya Sakti, Kec. Tambun Selatan Kab. Bekasi',
+                'receipt_footer' => "Terima kasih telah berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.",
+                'active_year' => 2026,
+            ]
+        );
         $closingHistory = YearlyClosing::latest()->take(5)->get();
 
         return response()->json(['success' => true, 'setting' => $setting, 'closing_history' => $closingHistory]);
+    }
+
+    public function updateSettings(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $validated = $request->validate([
+            'name' => 'nullable|string|max:100',
+            'store_name' => 'nullable|string|max:100',
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string|max:500',
+            'receipt_footer' => 'nullable|string',
+            'active_year' => 'nullable|integer',
+        ]);
+
+        $setting = StoreSetting::firstOrCreate(['id' => 1]);
+        $name = $validated['store_name'] ?? $validated['name'] ?? $setting->name;
+
+        $setting->update([
+            'name' => $name,
+            'phone' => $validated['phone'] ?? $setting->phone,
+            'address' => $validated['address'] ?? $setting->address,
+            'receipt_footer' => $validated['receipt_footer'] ?? $setting->receipt_footer,
+            'active_year' => $validated['active_year'] ?? $setting->active_year,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengaturan toko & struk berhasil disimpan!',
+            'setting' => $setting,
+        ]);
+    }
+
+    public function uploadSettingsLogo(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $request->validate([
+            'logo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        $setting = StoreSetting::firstOrCreate(['id' => 1]);
+
+        if ($request->hasFile('logo')) {
+            $path = $request->file('logo')->store('settings/logos', 'public');
+            $setting->logo_path = $path;
+            $setting->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Logo toko berhasil diperbarui!',
+            'logo_url' => asset('storage/' . $setting->logo_path),
+            'setting' => $setting,
+        ]);
     }
 
     /**

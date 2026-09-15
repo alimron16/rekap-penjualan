@@ -90,4 +90,6 @@ Route::put('/users/{id}', [MobileApiController::class, 'updateUser']);
 Route::delete('/users/{id}', [MobileApiController::class, 'destroyUser']);
 Route::post('/users/{id}/toggle-status', [MobileApiController::class, 'toggleUserStatus']);
 Route::get('/settings', [MobileApiController::class, 'storeSettings']);
+Route::put('/settings', [MobileApiController::class, 'updateSettings']);
+Route::post('/settings/logo', [MobileApiController::class, 'uploadSettingsLogo']);
 

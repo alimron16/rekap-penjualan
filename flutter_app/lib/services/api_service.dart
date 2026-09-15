@@ -542,6 +542,10 @@ class ApiService {
     return await _delete('$baseUrl/outlets/$id');
   }
 
+  static Future<Map<String, dynamic>> toggleOutletStatus(int id) async {
+    return await _post('$baseUrl/outlets/$id/toggle-status', {});
+  }
+
   // --- Kas & Akuntansi ---
   static Future<Map<String, dynamic>> getCashTransactions({String? type}) async {
     final url = type != null ? '$baseUrl/cash-transactions?type=$type' : '$baseUrl/cash-transactions';

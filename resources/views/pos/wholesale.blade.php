@@ -152,15 +152,14 @@
                     </div>
                 </div>
 
-                <!-- Tombol Cetak Sesuai Excel Sheet Grosir (THERMAL vs CETAK A4) -->
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                    <button type="button" onclick="submitCheckout('thermal')" class="btn-retro btn-save py-2.5 text-xs justify-center rounded-lg shadow-xs">
+                <!-- Tombol Cetak Struk Saja -->
+                <div class="flex items-center gap-2 pt-1">
+                    <button type="button" onclick="submitCheckout('thermal')" class="flex-1 btn-retro btn-save py-2.5 text-xs sm:text-sm justify-center rounded-lg shadow-xs">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                        <span>STRUK THERMAL (F9)</span>
+                        <span>SIMPAN & CETAK STRUK (F9)</span>
                     </button>
-                    <button type="button" onclick="submitCheckout('invoice')" class="btn-retro bg-emerald-800 hover:bg-emerald-900 text-white border border-emerald-900 py-2.5 text-xs justify-center rounded-lg shadow-xs">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <span>FAKTUR JALAN A4</span>
+                    <button type="button" onclick="clearCart()" class="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-semibold text-xs transition">
+                        RESET (F4)
                     </button>
                 </div>
             </div>

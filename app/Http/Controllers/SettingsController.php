@@ -26,6 +26,7 @@ class SettingsController extends Controller
                 'name' => 'ELEPHANT CELL GROUP',
                 'phone' => '088212283661',
                 'address' => 'Kav. Virlania Tridaya Sakti, Kec. Tambun Selatan Kab. Bekasi',
+                'receipt_footer' => "Terima kasih telah berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.",
                 'active_year' => 2026,
             ]
         );
@@ -39,6 +40,7 @@ class SettingsController extends Controller
             'name' => 'required|string',
             'phone' => 'nullable|string',
             'address' => 'nullable|string',
+            'receipt_footer' => 'nullable|string',
             'active_year' => 'required|integer',
         ]);
 

@@ -22,6 +22,7 @@ import 'cash_screen.dart';
 import 'reports_screen.dart';
 import 'users_screen.dart';
 import 'settings_screen.dart';
+import 'outlets_screen.dart';
 
 class AppColors {
   static const Color slateBorder = Color(0xFFE2E8F0);
@@ -1021,7 +1022,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildDailyTrendCard() {
     final d = _dashboardData ?? {};
-    final dailySales = (d['dailySales'] as Map?) ?? {};
+    final rawDaily = d['dailySales'];
+    final Map<dynamic, dynamic> dailySales = (rawDaily is Map) ? rawDaily : {};
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1222,6 +1224,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
                   }),
                   const Divider(),
+                  _drawerItem(Icons.storefront, 'Master Cabang / Toko', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const OutletsScreen()));
+                  }),
                   _drawerItem(Icons.inventory_2, 'Master Data Produk', () {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));

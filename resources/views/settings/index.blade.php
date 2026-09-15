@@ -38,6 +38,12 @@
             </div>
 
             <div>
+                <label class="font-bold text-slate-800 block mb-1">Catatan Bawah Struk (Footer Struk Thermal)</label>
+                <textarea name="receipt_footer" rows="3" placeholder="Terima kasih telah berbelanja!&#10;Barang yang sudah dibeli tidak dapat ditukar/dikembalikan." class="w-full px-3 py-2 border border-slate-300 rounded leading-relaxed text-slate-800">{{ $setting->receipt_footer }}</textarea>
+                <p class="text-[11px] text-slate-400 mt-1">Pesan footer atau ucapan terima kasih yang tercetak di bagian paling bawah struk kasir.</p>
+            </div>
+
+            <div>
                 <label class="font-bold text-slate-800 block mb-1">Tahun Buku Fiskal Aktif *</label>
                 <input type="number" name="active_year" value="{{ $setting->active_year }}" required class="w-32 px-3 py-2 border border-slate-300 rounded font-mono font-bold text-sm text-emerald-900">
             </div>

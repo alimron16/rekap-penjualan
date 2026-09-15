@@ -80,10 +80,19 @@ class PrinterService {
     final double rollWidth = paperSize == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
     final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 4 * PdfPageFormat.mm);
 
-    final storeName = storeSetting?['store_name'] ?? 'ELEPHANT CELL';
-    final storeAddress = storeSetting?['address'] ?? 'Jl. Raya Utama No. 88';
-    final storePhone = storeSetting?['phone'] ?? '0812-3456-7890';
-    final receiptFooter = storeSetting?['receipt_footer'] ?? 'Barang yang sudah dibeli tidak dapat ditukar.';
+    final outlet = (sale['outlet'] is Map) ? sale['outlet'] : null;
+    final storeName = (outlet?['name'] != null && outlet!['name'].toString().isNotEmpty)
+        ? outlet['name'].toString()
+        : (storeSetting?['name'] ?? storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP');
+    final storeAddress = (outlet?['address'] != null && outlet!['address'].toString().isNotEmpty)
+        ? outlet['address'].toString()
+        : (storeSetting?['address'] ?? '');
+    final storePhone = (outlet?['phone'] != null && outlet!['phone'].toString().isNotEmpty)
+        ? outlet['phone'].toString()
+        : (storeSetting?['phone'] ?? '');
+    final receiptFooter = (storeSetting?['receipt_footer'] != null && storeSetting!['receipt_footer'].toString().isNotEmpty)
+        ? storeSetting['receipt_footer'].toString()
+        : 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.';
 
     final invoiceNo = sale['invoice_number'] ?? sale['invoice_no'] ?? '-';
     final dateStr = sale['date'] != null ? sale['date'].toString() : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());

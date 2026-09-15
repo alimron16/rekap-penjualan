@@ -14,6 +14,7 @@ class _UsersScreenState extends State<UsersScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _users = [];
+  List<dynamic> _outlets = [];
   String _searchQuery = '';
   String _roleFilter = 'ALL';
   final TextEditingController _searchController = TextEditingController();
@@ -32,12 +33,16 @@ class _UsersScreenState extends State<UsersScreen> {
 
     try {
       final res = await ApiService.getUsers();
+      final outletRes = await ApiService.getOutlets();
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
             _users = res['data'] ?? [];
           } else {
             _errorMessage = res['message'] ?? 'Gagal memuat pengguna';
+          }
+          if (outletRes['success'] == true) {
+            _outlets = outletRes['data'] ?? [];
           }
           _isLoading = false;
         });
@@ -75,6 +80,7 @@ class _UsersScreenState extends State<UsersScreen> {
     final storeNameController = TextEditingController();
     final phoneController = TextEditingController();
     String role = 'toko';
+    int? selectedOutletId;
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -131,7 +137,37 @@ class _UsersScreenState extends State<UsersScreen> {
                   onChanged: (val) => setModalState(() => role = val!),
                 ),
                 const SizedBox(height: 14),
-                const Text('Nama Toko / Cabang (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const Text('Penugasan Cabang Toko / Outlet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<int?>(
+                  value: null,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.storefront, size: 18),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Kantor Pusat / Akses Semua Cabang'),
+                    ),
+                    ..._outlets.map((ot) => DropdownMenuItem<int?>(
+                      value: ot['id'] as int?,
+                      child: Text('${ot['code']} - ${ot['name']}'),
+                    )),
+                  ],
+                  onChanged: (val) {
+                    setModalState(() {
+                      selectedOutletId = val;
+                      if (val != null) {
+                        final found = _outlets.firstWhere((o) => o['id'] == val, orElse: () => null);
+                        if (found != null) {
+                          storeNameController.text = found['name'] ?? '';
+                        }
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 14),
+                const Text('Nama Toko / Keterangan (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 TextField(controller: storeNameController, decoration: const InputDecoration(hintText: 'Contoh: Elephant Cell Pusat')),
                 const SizedBox(height: 14),
@@ -159,6 +195,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               'email': emailController.text.trim(),
                               'password': passwordController.text.trim(),
                               'role': role,
+                              'outlet_id': selectedOutletId,
                               'store_name': storeNameController.text.trim(),
                               'phone': phoneController.text.trim(),
                             });
@@ -201,6 +238,7 @@ class _UsersScreenState extends State<UsersScreen> {
     final storeNameController = TextEditingController(text: user['store_name'] ?? '');
     final phoneController = TextEditingController(text: user['phone'] ?? '');
     String role = user['role'] ?? 'toko';
+    int? selectedOutletId = user['outlet_id'];
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -257,7 +295,37 @@ class _UsersScreenState extends State<UsersScreen> {
                   onChanged: (val) => setModalState(() => role = val!),
                 ),
                 const SizedBox(height: 14),
-                const Text('Nama Toko / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const Text('Penugasan Cabang Toko / Outlet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<int?>(
+                  value: selectedOutletId,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.storefront, size: 18),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Kantor Pusat / Akses Semua Cabang'),
+                    ),
+                    ..._outlets.map((ot) => DropdownMenuItem<int?>(
+                      value: ot['id'] as int?,
+                      child: Text('${ot['code']} - ${ot['name']}'),
+                    )),
+                  ],
+                  onChanged: (val) {
+                    setModalState(() {
+                      selectedOutletId = val;
+                      if (val != null) {
+                        final found = _outlets.firstWhere((o) => o['id'] == val, orElse: () => null);
+                        if (found != null) {
+                          storeNameController.text = found['name'] ?? '';
+                        }
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 14),
+                const Text('Nama Toko / Keterangan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 TextField(controller: storeNameController, decoration: const InputDecoration(hintText: 'Nama toko/cabang')),
                 const SizedBox(height: 14),
@@ -284,6 +352,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               'name': nameController.text.trim(),
                               'email': emailController.text.trim(),
                               'role': role,
+                              'outlet_id': selectedOutletId,
                               'store_name': storeNameController.text.trim(),
                               'phone': phoneController.text.trim(),
                             };
@@ -564,7 +633,19 @@ class _UsersScreenState extends State<UsersScreen> {
                                                         ],
                                                       ),
                                                     ],
-                                                    if (u['store_name'] != null && u['store_name'].toString().isNotEmpty) ...[
+                                                    if (u['outlet'] != null && u['outlet'] is Map) ...[
+                                                      const SizedBox(height: 2),
+                                                      Row(
+                                                        children: [
+                                                          const Icon(Icons.storefront, size: 13, color: ThemeConfig.primary),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            'Cabang: ${u['outlet']['code']} - ${u['outlet']['name']}',
+                                                            style: const TextStyle(color: ThemeConfig.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ] else if (u['store_name'] != null && u['store_name'].toString().isNotEmpty) ...[
                                                       const SizedBox(height: 2),
                                                       Row(
                                                         children: [

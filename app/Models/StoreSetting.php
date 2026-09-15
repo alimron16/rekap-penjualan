@@ -10,6 +10,7 @@ class StoreSetting extends Model
         'name',
         'phone',
         'address',
+        'receipt_footer',
         'logo_path',
         'active_year',
     ];
