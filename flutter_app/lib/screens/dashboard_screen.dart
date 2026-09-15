@@ -51,6 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Timer? _pollingTimer;
   int _lastPendingTransferCount = 0;
+  int? _selectedOutletId;
 
   @override
   void initState() {
@@ -146,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final user = await ApiService.getUser();
-      final data = await ApiService.getDashboard(startDate: _startDate, endDate: _endDate);
+      final data = await ApiService.getDashboard(startDate: _startDate, endDate: _endDate, outletId: _selectedOutletId);
 
       if (!mounted) return;
 
@@ -472,6 +473,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ===========================================================================
 
   Widget _buildTopFilterPanel() {
+    final role = (_userData?['role'] ?? 'toko').toString().toLowerCase();
+    final isAdmin = role == 'admin' || role == 'super_admin' || role == 'superadmin';
+    final outlets = (_dashboardData?['outlets'] as List?) ?? [];
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -539,6 +544,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+          // Cabang Toko Switcher (Admin / Super Admin)
+          if (isAdmin && outlets.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.storefront, size: 15, color: ThemeConfig.primary),
+                const SizedBox(width: 6),
+                const Text('Cabang:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Semua Cabang', style: TextStyle(fontSize: 11)),
+                          selected: _selectedOutletId == null,
+                          selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                          labelStyle: TextStyle(
+                            color: _selectedOutletId == null ? ThemeConfig.primary : Colors.black87,
+                            fontWeight: _selectedOutletId == null ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() => _selectedOutletId = null);
+                              _loadDashboardData();
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        ...outlets.map((ot) {
+                          final isSel = _selectedOutletId == ot['id'];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text('${ot['code']} - ${ot['name']}', style: const TextStyle(fontSize: 11)),
+                              selected: isSel,
+                              selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                              labelStyle: TextStyle(
+                                color: isSel ? ThemeConfig.primary : Colors.black87,
+                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              onSelected: (selected) {
+                                setState(() => _selectedOutletId = selected ? ot['id'] : null);
+                                _loadDashboardData();
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

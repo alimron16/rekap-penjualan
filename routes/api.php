@@ -32,6 +32,12 @@ Route::post('/accounts', [MobileApiController::class, 'storeAccount']);
 Route::put('/accounts/{id}', [MobileApiController::class, 'updateAccount']);
 Route::delete('/accounts/{id}', [MobileApiController::class, 'destroyAccount']);
 
+Route::get('/outlets', [MobileApiController::class, 'outlets']);
+Route::post('/outlets', [MobileApiController::class, 'storeOutlet']);
+Route::put('/outlets/{id}', [MobileApiController::class, 'updateOutlet']);
+Route::delete('/outlets/{id}', [MobileApiController::class, 'destroyOutlet']);
+Route::post('/outlets/{id}/toggle-status', [MobileApiController::class, 'toggleOutletStatus']);
+
 
 // 2. POS Kasir
 Route::get('/pos/data', [MobileApiController::class, 'posData']);

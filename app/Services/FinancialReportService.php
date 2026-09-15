@@ -18,16 +18,18 @@ class FinancialReportService
     /**
      * Generate Profit and Loss statement (Laporan Laba Rugi).
      */
-    public function getProfitAndLoss(string $startDate, string $endDate): array
+    public function getProfitAndLoss(string $startDate, string $endDate, ?int $outletId = null): array
     {
         // 1. Revenue components via fast SQL aggregation
         $retailRevenue = (float) DB::table('sales')
             ->where('sale_type', 'retail')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('total');
 
         $wholesaleRevenue = (float) DB::table('sales')
             ->where('sale_type', 'grosir')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('total');
 
@@ -42,6 +44,7 @@ class FinancialReportService
             ->sum('selling_price');
 
         $salesDiscount = (float) DB::table('sales')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('discount');
 
@@ -51,6 +54,7 @@ class FinancialReportService
         $retailHpp = (float) DB::table('sale_items')
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.sale_type', 'retail')
+            ->when($outletId, fn($q) => $q->where('sales.outlet_id', $outletId))
             ->whereBetween('sales.date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->selectRaw('COALESCE(SUM(sale_items.qty * sale_items.hpp), 0) as val')
             ->value('val');
@@ -58,6 +62,7 @@ class FinancialReportService
         $wholesaleHpp = (float) DB::table('sale_items')
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.sale_type', 'grosir')
+            ->when($outletId, fn($q) => $q->where('sales.outlet_id', $outletId))
             ->whereBetween('sales.date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->selectRaw('COALESCE(SUM(sale_items.qty * sale_items.hpp), 0) as val')
             ->value('val');

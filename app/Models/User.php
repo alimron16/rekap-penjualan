@@ -17,6 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'outlet_id',
         'store_name',
         'phone',
         'permissions',
@@ -82,5 +83,10 @@ class User extends Authenticatable
             'toko' => in_array($module, ['pos', 'transfer', 'reports_toko']),
             default => false,
         };
+    }
+
+    public function outlet()
+    {
+        return $this->belongsTo(Outlet::class);
     }
 }

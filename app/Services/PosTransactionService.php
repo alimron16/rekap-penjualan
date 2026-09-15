@@ -102,6 +102,7 @@ class PosTransactionService
                 'sale_type' => $saleType,
                 'date' => now(),
                 'customer_id' => $customerId,
+                'outlet_id' => $data['outlet_id'] ?? (auth()->check() ? auth()->user()->outlet_id : null),
                 'subtotal' => $subtotal,
                 'discount' => $discount,
                 'total' => $total,

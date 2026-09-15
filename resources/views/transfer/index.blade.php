@@ -75,6 +75,39 @@
         </div>
     </div>
 
+    <!-- Filter Toolbar (Cabang & Status) -->
+    <div class="bg-white rounded-xl p-3 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <form method="GET" action="{{ route('transfer.index') }}" class="flex-1 flex flex-wrap items-center gap-2">
+            @if(auth()->user()->isAdmin())
+                <select name="outlet_id" onchange="this.form.submit()" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600">
+                    <option value="">-- Semua Cabang Toko --</option>
+                    @foreach($outlets as $ot)
+                        <option value="{{ $ot->id }}" {{ (string)$selectedOutletId === (string)$ot->id ? 'selected' : '' }}>
+                            {{ $ot->code }} - {{ $ot->name }}
+                        </option>
+                    @endforeach
+                </select>
+            @endif
+
+            <select name="status" onchange="this.form.submit()" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600">
+                <option value="">-- Semua Status --</option>
+                <option value="pending" {{ $selectedStatus === 'pending' ? 'selected' : '' }}>Menunggu Admin</option>
+                <option value="approved" {{ $selectedStatus === 'approved' ? 'selected' : '' }}>Berhasil (Approved)</option>
+                <option value="rejected" {{ $selectedStatus === 'rejected' ? 'selected' : '' }}>Ditolak</option>
+            </select>
+
+            @if(!empty($selectedOutletId) || !empty($selectedStatus))
+                <a href="{{ route('transfer.index') }}" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold transition">
+                    Reset Filter
+                </a>
+            @endif
+        </form>
+
+        <div class="text-slate-500 font-medium text-[11px]">
+            Total Transaksi: <span class="font-bold text-slate-800">{{ $transfers->total() }}</span>
+        </div>
+    </div>
+
     <!-- Transfers Table Card -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
@@ -87,7 +120,7 @@
                 <thead>
                     <tr class="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                         <th class="py-3 px-4">No. Ref & Waktu</th>
-                        <th class="py-3 px-4">Toko Pengaju</th>
+                        <th class="py-3 px-4">Toko / Cabang</th>
                         <th class="py-3 px-4">Bank & Rekening Tujuan</th>
                         <th class="py-3 px-4 text-right">Nominal</th>
                         <th class="py-3 px-4 text-right">Biaya Admin</th>
@@ -104,8 +137,13 @@
                                 <div class="text-[10px] text-slate-400">{{ $tf->created_at->format('d/m/Y H:i') }}</div>
                             </td>
                             <td class="py-3 px-4">
-                                <div class="font-semibold text-slate-800">{{ $tf->store_name }}</div>
-                                <div class="text-[10px] text-slate-400">{{ $tf->user->name ?? 'Kasir' }}</div>
+                                <div class="font-bold text-slate-900">{{ $tf->outlet ? $tf->outlet->name : $tf->store_name }}</div>
+                                <div class="flex items-center gap-1.5 mt-0.5">
+                                    @if($tf->outlet)
+                                        <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-mono font-bold">{{ $tf->outlet->code }}</span>
+                                    @endif
+                                    <span class="text-[10px] text-slate-400">Oleh: {{ $tf->user->name ?? 'Kasir' }}</span>
+                                </div>
                             </td>
                             <td class="py-3 px-4">
                                 <div class="font-bold text-slate-900 flex items-center gap-1.5">
@@ -138,14 +176,29 @@
                             </td>
                             <td class="py-3 px-4 text-center">
                                 @if($tf->proof_image)
-                                    <button type="button" onclick="viewProofModal('{{ asset('storage/' . $tf->proof_image) }}', '{{ $tf->reference_no }}')" class="group relative inline-block p-1 rounded-lg border border-slate-200 hover:border-emerald-500 transition">
-                                        <img src="{{ asset('storage/' . $tf->proof_image) }}" alt="Bukti" class="w-10 h-10 object-cover rounded shadow-xs">
-                                        <div class="absolute inset-0 bg-slate-900/40 rounded opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <div class="inline-flex flex-col items-center gap-1">
+                                        <button type="button" onclick="viewProofModal('{{ asset('storage/' . $tf->proof_image) }}', '{{ $tf->reference_no }}', '{{ $tf->bank_name }} - {{ $tf->account_number }}', 'Rp {{ number_format($tf->total_amount, 0, ',', '.') }}', '{{ $tf->outlet ? $tf->outlet->name : $tf->store_name }}')" class="group relative inline-block p-1 rounded-lg border border-slate-200 hover:border-emerald-500 transition shadow-xs">
+                                            <img src="{{ asset('storage/' . $tf->proof_image) }}" alt="Bukti" class="w-12 h-12 object-cover rounded shadow-xs">
+                                            <div class="absolute inset-0 bg-slate-900/40 rounded opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            </div>
+                                        </button>
+                                        <div class="flex items-center gap-1.5 text-[10px]">
+                                            <button type="button" onclick="viewProofModal('{{ asset('storage/' . $tf->proof_image) }}', '{{ $tf->reference_no }}', '{{ $tf->bank_name }} - {{ $tf->account_number }}', 'Rp {{ number_format($tf->total_amount, 0, ',', '.') }}', '{{ $tf->outlet ? $tf->outlet->name : $tf->store_name }}')" class="text-emerald-700 hover:underline font-semibold flex items-center gap-0.5">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                <span>Zoom</span>
+                                            </button>
+                                            <span class="text-slate-300">•</span>
+                                            <a href="{{ asset('storage/' . $tf->proof_image) }}" download="Bukti_{{ $tf->reference_no }}.jpg" class="text-slate-600 hover:text-slate-900 flex items-center gap-0.5 font-semibold" title="Unduh File">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                <span>Unduh</span>
+                                            </a>
                                         </div>
-                                    </button>
+                                    </div>
                                 @else
-                                    <span class="text-[10px] text-slate-400 italic">- Belum Ada -</span>
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-[10px] text-slate-400 font-medium">
+                                        Tanpa lampiran bukti transfer
+                                    </span>
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-right">
@@ -153,14 +206,14 @@
                                     <div class="inline-flex items-center gap-1.5">
                                         <button type="button" onclick="openApproveModal({{ json_encode($tf) }})" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                            <span>Proses & Transfer</span>
+                                            <span>Proses & ACC</span>
                                         </button>
                                         <button type="button" onclick="openRejectModal({{ json_encode($tf) }})" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Tolak Pengajuan">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
                                 @elseif($tf->status === 'approved' && $tf->proof_image)
-                                    <button type="button" onclick="viewProofModal('{{ asset('storage/' . $tf->proof_image) }}', '{{ $tf->reference_no }}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition">
+                                    <button type="button" onclick="viewProofModal('{{ asset('storage/' . $tf->proof_image) }}', '{{ $tf->reference_no }}', '{{ $tf->bank_name }} - {{ $tf->account_number }}', 'Rp {{ number_format($tf->total_amount, 0, ',', '.') }}', '{{ $tf->outlet ? $tf->outlet->name : $tf->store_name }}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition">
                                         Lihat Bukti
                                     </button>
                                 @else
@@ -304,10 +357,39 @@
             </div>
 
             <div>
-                <label class="block font-semibold text-slate-700 mb-1">Unggah Foto / Struk Bukti Transfer *</label>
-                <input type="file" name="proof_image" accept="image/*" capture="environment" required
-                       class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-100 file:text-emerald-800 hover:file:bg-emerald-200 cursor-pointer">
-                <p class="text-[10px] text-slate-400 mt-1">Bisa ambil langsung via Kamera HP atau pilih foto struk dari Galeri HP (Maks 5MB)</p>
+                <label class="block font-semibold text-slate-700 mb-1">
+                    <span>Lampiran Foto / Struk Bukti Transfer</span>
+                    <span class="text-[10px] text-emerald-700 font-bold ml-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">OPSIONAL</span>
+                </label>
+
+                <!-- Drag and drop zone -->
+                <div id="proofDropZone"
+                     ondragover="event.preventDefault(); this.classList.add('border-emerald-500', 'bg-emerald-50/40');"
+                     ondragleave="this.classList.remove('border-emerald-500', 'bg-emerald-50/40');"
+                     ondrop="handleProofDrop(event)"
+                     onclick="document.getElementById('proofFileInput').click()"
+                     class="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl p-4 text-center cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition group">
+                    <input type="file" id="proofFileInput" name="proof_image" accept="image/jpeg,image/png,image/jpg,image/webp" capture="environment" class="hidden" onchange="handleProofSelect(this)">
+                    
+                    <div id="proofUploadPrompt" class="space-y-1.5">
+                        <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 group-hover:bg-emerald-100 text-slate-500 group-hover:text-emerald-700 flex items-center justify-center transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div class="text-slate-700 font-semibold text-[11px]">
+                            Klik untuk pilih file atau seret foto ke sini
+                        </div>
+                        <p class="text-[10px] text-slate-400">Kamera HP / Galeri foto (JPG, PNG, WEBP maks 5MB)</p>
+                        <p class="text-[10px] text-emerald-800 font-medium">Boleh dikosongkan jika tidak ada struk fisik/digital</p>
+                    </div>
+
+                    <div id="proofPreviewBox" class="hidden relative inline-block mt-2">
+                        <img id="proofPreviewImg" src="" alt="Pratinjau Bukti" class="max-h-36 rounded-lg shadow-sm border border-slate-200 object-contain mx-auto">
+                        <button type="button" onclick="event.stopPropagation(); clearProofSelection();" class="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 shadow-md hover:bg-rose-700 transition" title="Hapus Gambar">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                        <div id="proofFileName" class="text-[10px] text-slate-600 font-mono mt-1 truncate max-w-xs mx-auto"></div>
+                    </div>
+                </div>
             </div>
 
             <div>
@@ -319,7 +401,7 @@
             <div class="pt-3 flex gap-2 border-t border-slate-100">
                 <button type="submit" class="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Selesaikan & Simpan Struk</span>
+                    <span>Setujui & Proses Transfer (ACC)</span>
                 </button>
                 <button type="button" onclick="closeApproveModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition">
                     Batal
@@ -354,16 +436,36 @@
 
 <!-- Modal 4: Lihat Bukti Struk Gambar (Lightbox) -->
 <div id="proofLightbox" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs hidden flex items-center justify-center p-4" onclick="closeProofModal()">
-    <div class="bg-white rounded-2xl max-w-md w-full p-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 class="font-bold text-xs text-slate-800 font-mono" id="proofRefTitle">Struk Bukti Transfer</h3>
+            <div>
+                <h3 class="font-bold text-sm text-slate-900 font-mono" id="proofRefTitle">Struk Bukti Transfer</h3>
+                <div class="text-[11px] text-slate-500" id="proofDetailSub">-</div>
+            </div>
             <button onclick="closeProofModal()" class="text-slate-400 hover:text-slate-700 p-1 text-xl font-bold leading-none">&times;</button>
         </div>
-        <div class="py-3 flex items-center justify-center bg-slate-100 rounded-xl my-2 overflow-hidden max-h-[70vh]">
-            <img id="proofImageEl" src="" alt="Bukti Transfer" class="max-h-full max-w-full object-contain rounded-lg">
+
+        <div class="py-3 flex items-center justify-center bg-slate-900/5 rounded-xl my-2 overflow-hidden max-h-[65vh]">
+            <img id="proofImageEl" src="" alt="Bukti Transfer" class="max-h-full max-w-full object-contain rounded-lg shadow-sm">
         </div>
-        <div class="text-right">
-            <a id="proofDownloadLink" href="" download class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition">
+
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
+            <div class="flex items-center gap-1.5">
+                <!-- WhatsApp Direct Share -->
+                <button type="button" onclick="shareProofWhatsApp()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.972.531 1.769.813 2.796.813 3.18 0 5.766-2.587 5.767-5.767 0-3.18-2.586-5.767-5.767-5.767zm3.391 8.232c-.145.409-.848.797-1.189.849-.33.05-.758.077-2.185-.515-1.745-.724-2.883-2.485-2.971-2.6-.088-.116-.708-.941-.708-1.796 0-.855.449-1.275.609-1.448.16-.174.349-.217.466-.217.116 0 .232.001.334.006.107.005.251-.041.393.299.145.349.494 1.203.537 1.29.043.088.072.19.014.305-.058.117-.087.189-.174.29-.088.102-.185.228-.264.306-.088.087-.18.182-.078.358.102.174.453.748.972 1.211.669.596 1.233.78 1.408.868.174.087.276.073.379-.044.102-.117.436-.509.552-.684.116-.175.233-.146.393-.087.16.058 1.018.48 1.193.567.174.088.291.131.334.204.043.073.043.424-.102.833z"/></svg>
+                    <span>Kirim WA</span>
+                </button>
+
+                <!-- Native Web Share API -->
+                <button type="button" onclick="shareProofNative()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                    <span>Bagikan</span>
+                </button>
+            </div>
+
+            <!-- Download Link -->
+            <a id="proofDownloadLink" href="" download class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-xs">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 <span>Unduh Gambar</span>
             </a>
@@ -372,6 +474,45 @@
 </div>
 
 <script>
+    let currentProofUrl = '';
+    let currentProofRef = '';
+    let currentProofText = '';
+
+    function handleProofSelect(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            showProofPreview(file);
+        }
+    }
+
+    function handleProofDrop(e) {
+        e.preventDefault();
+        document.getElementById('proofDropZone').classList.remove('border-emerald-500', 'bg-emerald-50/40');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const file = e.dataTransfer.files[0];
+            document.getElementById('proofFileInput').files = e.dataTransfer.files;
+            showProofPreview(file);
+        }
+    }
+
+    function showProofPreview(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('proofPreviewImg').src = e.target.result;
+            document.getElementById('proofFileName').innerText = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            document.getElementById('proofUploadPrompt').classList.add('hidden');
+            document.getElementById('proofPreviewBox').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearProofSelection() {
+        document.getElementById('proofFileInput').value = '';
+        document.getElementById('proofPreviewImg').src = '';
+        document.getElementById('proofUploadPrompt').classList.remove('hidden');
+        document.getElementById('proofPreviewBox').classList.add('hidden');
+    }
+
     function openRequestTransferModal() {
         document.getElementById('requestModal').classList.remove('hidden');
     }
@@ -380,6 +521,7 @@
     }
 
     function openApproveModal(tf) {
+        clearProofSelection();
         document.getElementById('approveForm').action = "/transfer/" + tf.id + "/approve";
         document.getElementById('apprRef').innerText = tf.reference_no;
         document.getElementById('apprTarget').innerText = tf.bank_name + ' - ' + tf.account_number;
@@ -399,14 +541,40 @@
         document.getElementById('rejectModal').classList.add('hidden');
     }
 
-    function viewProofModal(url, ref) {
+    function viewProofModal(url, ref, target, amount, store) {
+        currentProofUrl = url;
+        currentProofRef = ref;
+        currentProofText = `Bukti Transfer Ref: ${ref}\nToko: ${store || '-'}\nTujuan: ${target || '-'}\nNominal: ${amount || '-'}\nLink: ${url}`;
+
         document.getElementById('proofRefTitle').innerText = 'Bukti: ' + ref;
+        document.getElementById('proofDetailSub').innerText = (store || '-') + ' • ' + (target || '-') + ' • ' + (amount || '-');
         document.getElementById('proofImageEl').src = url;
         document.getElementById('proofDownloadLink').href = url;
+        document.getElementById('proofDownloadLink').download = 'Bukti_' + ref + '.jpg';
         document.getElementById('proofLightbox').classList.remove('hidden');
     }
+
     function closeProofModal() {
         document.getElementById('proofLightbox').classList.add('hidden');
+    }
+
+    function shareProofWhatsApp() {
+        if (!currentProofUrl) return;
+        const text = encodeURIComponent(currentProofText);
+        window.open('https://api.whatsapp.com/send?text=' + text, '_blank');
+    }
+
+    function shareProofNative() {
+        if (!currentProofUrl) return;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Bukti Transfer ' + currentProofRef,
+                text: currentProofText,
+                url: currentProofUrl
+            }).catch(() => {});
+        } else {
+            shareProofWhatsApp();
+        }
     }
 
     // Play sound helper

@@ -252,13 +252,19 @@ class ApiService {
   }
 
   // --- Dashboard & Notifications ---
-  static Future<Map<String, dynamic>> getDashboard({String? startDate, String? endDate}) async {
-    final query = (startDate != null && endDate != null)
-        ? '?start_date=${Uri.encodeComponent(startDate)}&end_date=${Uri.encodeComponent(endDate)}'
-        : '';
+  static Future<Map<String, dynamic>> getDashboard({String? startDate, String? endDate, int? outletId}) async {
+    final params = <String>[];
+    if (startDate != null && endDate != null) {
+      params.add('start_date=${Uri.encodeComponent(startDate)}');
+      params.add('end_date=${Uri.encodeComponent(endDate)}');
+    }
+    if (outletId != null) {
+      params.add('outlet_id=$outletId');
+    }
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     final res = await _get('$baseUrl/dashboard$query', timeout: const Duration(seconds: 15));
     if (res['success'] == true) {
-      await saveCachedDashboard(res);
+      saveCachedDashboard(res);
     }
     return res;
   }
@@ -425,9 +431,12 @@ class ApiService {
   }
 
   // --- Transfer Agen ---
-  static Future<Map<String, dynamic>> getTransfers({String? status}) async {
-    final url = status != null ? '$baseUrl/transfers?status=$status' : '$baseUrl/transfers';
-    return await _get(url);
+  static Future<Map<String, dynamic>> getTransfers({String? status, int? outletId}) async {
+    final params = <String>[];
+    if (status != null && status.isNotEmpty) params.add('status=$status');
+    if (outletId != null) params.add('outlet_id=$outletId');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/transfers$query');
   }
 
   static Future<Map<String, dynamic>> requestTransfer({
@@ -435,6 +444,7 @@ class ApiService {
     required String accountNumber,
     required String accountHolder,
     required double amount,
+    double? adminFee,
     String? notes,
   }) async {
     return await _post('$baseUrl/transfers', {
@@ -442,15 +452,41 @@ class ApiService {
       'account_number': accountNumber,
       'account_holder': accountHolder,
       'amount': amount,
+      if (adminFee != null) 'admin_fee': adminFee,
       'notes': notes,
     });
   }
 
-  static Future<Map<String, dynamic>> approveTransfer(int id, {required int sourceAccountId, String? notes}) async {
-    return await _post('$baseUrl/transfers/$id/approve', {
-      'source_account_id': sourceAccountId,
-      'notes': notes,
-    });
+  static Future<Map<String, dynamic>> approveTransfer(
+    int id, {
+    required int sourceAccountId,
+    String? notes,
+    File? proofImage,
+  }) async {
+    if (proofImage != null) {
+      try {
+        final token = await getToken();
+        final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/transfers/$id/approve'));
+        if (token != null) request.headers['Authorization'] = 'Bearer $token';
+        request.headers['Accept'] = 'application/json';
+        request.fields['source_account_id'] = sourceAccountId.toString();
+        if (notes != null && notes.isNotEmpty) {
+          request.fields['notes'] = notes;
+        }
+        request.files.add(await http.MultipartFile.fromPath('proof_image', proofImage.path));
+
+        final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+        final response = await http.Response.fromStream(streamedResponse);
+        return jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'message': 'Gagal mengunggah bukti: $e'};
+      }
+    } else {
+      return await _post('$baseUrl/transfers/$id/approve', {
+        'source_account_id': sourceAccountId,
+        'notes': notes,
+      });
+    }
   }
 
   static Future<Map<String, dynamic>> rejectTransfer(int id, {required String notes}) async {
@@ -459,8 +495,51 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> checkPendingTransfers() async {
-    return await _get('$baseUrl/transfers/pending-check');
+  static Future<Map<String, dynamic>> checkPendingTransfers({int? outletId}) async {
+    final query = outletId != null ? '?outlet_id=$outletId' : '';
+    return await _get('$baseUrl/transfers/pending-check$query');
+  }
+
+  // --- Cabang / Outlet ---
+  static Future<Map<String, dynamic>> getOutlets() async {
+    return await _get('$baseUrl/outlets');
+  }
+
+  static Future<Map<String, dynamic>> storeOutlet({
+    required String code,
+    required String name,
+    String? address,
+    String? phone,
+    String status = 'active',
+  }) async {
+    return await _post('$baseUrl/outlets', {
+      'code': code,
+      'name': name,
+      'address': address,
+      'phone': phone,
+      'status': status,
+    });
+  }
+
+  static Future<Map<String, dynamic>> updateOutlet(
+    int id, {
+    required String code,
+    required String name,
+    String? address,
+    String? phone,
+    String status = 'active',
+  }) async {
+    return await _put('$baseUrl/outlets/$id', {
+      'code': code,
+      'name': name,
+      'address': address,
+      'phone': phone,
+      'status': status,
+    });
+  }
+
+  static Future<Map<String, dynamic>> deleteOutlet(int id) async {
+    return await _delete('$baseUrl/outlets/$id');
   }
 
   // --- Kas & Akuntansi ---

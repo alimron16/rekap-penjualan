@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Outlet;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,11 +18,14 @@ class UserController extends Controller
             abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk mengelola pengguna.');
         }
 
-        $users = User::orderByRaw("FIELD(role, 'super_admin', 'admin', 'toko')")
+        $users = User::with('outlet')
+            ->orderByRaw("FIELD(role, 'super_admin', 'admin', 'toko')")
             ->orderBy('name')
             ->get();
 
-        return view('settings.users', compact('users'));
+        $outlets = Outlet::active()->orderBy('name')->get();
+
+        return view('settings.users', compact('users', 'outlets'));
     }
 
     public function store(Request $request)
@@ -35,6 +39,7 @@ class UserController extends Controller
             'email' => 'required|email|max:100|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => ['required', Rule::in(['super_admin', 'admin', 'toko'])],
+            'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
             'permissions' => 'nullable|array',
@@ -43,6 +48,19 @@ class UserController extends Controller
         // Non-super-admins cannot create super_admins
         if ($validated['role'] === 'super_admin' && !Auth::user()->isSuperAdmin()) {
             return back()->with('error', 'Hanya Super Admin yang dapat membuat akun Super Admin baru.');
+        }
+
+        $outletId = null;
+        $storeName = 'Kantor Pusat';
+
+        if ($validated['role'] === 'toko') {
+            $outletId = $validated['outlet_id'] ?? null;
+            if ($outletId) {
+                $outlet = Outlet::find($outletId);
+                $storeName = $outlet ? $outlet->name : ($validated['store_name'] ?? 'Toko Cabang');
+            } else {
+                $storeName = $validated['store_name'] ?? 'Toko Cabang';
+            }
         }
 
         $permissions = [
@@ -61,7 +79,8 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
-            'store_name' => $validated['store_name'] ?? ($validated['role'] === 'toko' ? 'Toko Cabang' : 'Kantor Pusat'),
+            'outlet_id' => $outletId,
+            'store_name' => $storeName,
             'phone' => $validated['phone'],
             'permissions' => $permissions,
             'is_active' => true,
@@ -81,6 +100,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => 'nullable|string|min:6',
             'role' => ['required', Rule::in(['super_admin', 'admin', 'toko'])],
+            'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
             'permissions' => 'nullable|array',
@@ -89,6 +109,19 @@ class UserController extends Controller
         // Protection: Non-super-admin cannot change super_admin role
         if ($user->isSuperAdmin() && !Auth::user()->isSuperAdmin()) {
             return back()->with('error', 'Hanya Super Admin yang dapat mengedit akun Super Admin.');
+        }
+
+        $outletId = null;
+        $storeName = 'Kantor Pusat';
+
+        if ($validated['role'] === 'toko') {
+            $outletId = $validated['outlet_id'] ?? null;
+            if ($outletId) {
+                $outlet = Outlet::find($outletId);
+                $storeName = $outlet ? $outlet->name : ($validated['store_name'] ?? 'Toko Cabang');
+            } else {
+                $storeName = $validated['store_name'] ?? $user->store_name;
+            }
         }
 
         $permissions = [
@@ -106,7 +139,8 @@ class UserController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role' => $validated['role'],
-            'store_name' => $validated['store_name'],
+            'outlet_id' => $outletId,
+            'store_name' => $storeName,
             'phone' => $validated['phone'],
             'permissions' => $permissions,
         ];

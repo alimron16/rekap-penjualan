@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DigitalSaleController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\OutletController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\ReceiptController;
@@ -73,6 +74,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/categories', [MasterDataController::class, 'storeCategory'])->name('categories.store');
         Route::put('/categories/{category}', [MasterDataController::class, 'updateCategory'])->name('categories.update');
         Route::delete('/categories/{category}', [MasterDataController::class, 'destroyCategory'])->name('categories.destroy');
+
+        // Master Cabang / Outlets
+        Route::get('/outlets', [OutletController::class, 'index'])->name('outlets.index');
+        Route::post('/outlets', [OutletController::class, 'store'])->name('outlets.store');
+        Route::put('/outlets/{outlet}', [OutletController::class, 'update'])->name('outlets.update');
+        Route::delete('/outlets/{outlet}', [OutletController::class, 'destroy'])->name('outlets.destroy');
+        Route::post('/outlets/{outlet}/toggle-status', [OutletController::class, 'toggleStatus'])->name('outlets.toggle_status');
     });
 
     // Pembelian

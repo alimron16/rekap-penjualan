@@ -10,6 +10,25 @@
         
         <!-- Filter Form -->
         <form action="{{ route('dashboard') }}" method="GET" class="flex flex-wrap items-center gap-2 sm:gap-3">
+            @if(auth()->user()->isAdmin())
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <span class="text-xs font-bold text-slate-700">Cabang:</span>
+                    <select name="outlet_id" onchange="this.form.submit()" class="text-xs px-2.5 py-1.5 border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 bg-slate-50">
+                        <option value="">-- Semua Cabang (Agregat) --</option>
+                        @foreach($outlets as $ot)
+                            <option value="{{ $ot->id }}" {{ (string)$selectedOutletId === (string)$ot->id ? 'selected' : '' }}>
+                                {{ $ot->code }} - {{ $ot->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @else
+                <div class="px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded text-xs text-emerald-800 font-bold flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <span>Cabang: {{ auth()->user()->outlet ? auth()->user()->outlet->name : (auth()->user()->store_name ?? 'Toko Anda') }}</span>
+                </div>
+            @endif
+
             <div class="flex items-center gap-1.5 sm:gap-2">
                 <span class="text-xs font-bold text-slate-700">Periode:</span>
                 <input type="date" name="start_date" value="{{ $startDate }}" class="text-xs px-2.5 py-1.5 border border-slate-300 rounded font-medium focus:ring-1 focus:ring-emerald-500">
@@ -33,6 +52,25 @@
             <span><strong>PETUNJUK:</strong> Data periode terakumulasi otomatis secara real-time dari database ACID.</span>
         </div>
     </div>
+
+    @if($pendingTransfersCount > 0)
+        <!-- Alert Banner Pending Transfer -->
+        <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-3.5 rounded-xl shadow-md flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                </div>
+                <div>
+                    <h4 class="font-bold text-xs tracking-wide">Pemberitahuan Transfer Saldo Agen</h4>
+                    <p class="text-[11px] text-amber-100">Terdapat <strong>{{ $pendingTransfersCount }} pengajuan transfer</strong> yang menunggu verifikasi admin & upload bukti struk.</p>
+                </div>
+            </div>
+            <a href="{{ route('transfer.index', ['status' => 'pending']) }}" class="px-3.5 py-1.5 bg-white hover:bg-amber-50 active:bg-amber-100 text-amber-900 text-xs font-extrabold rounded-lg shadow-sm transition flex-shrink-0 flex items-center gap-1.5">
+                <span>Tinjau Sekarang</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+    @endif
 
     <!-- 8 KOTAK KPI UTAMA (Responsive: 1 col HP, 2 col Tablet, 4 col Desktop) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -248,6 +286,64 @@
 
     </div>
 
+    <!-- PERFORMA PENJUALAN ANTAR-CABANG (TOP OUTLETS) -->
+    @if(auth()->user()->isAdmin() && count($outletPerformances) > 0)
+    <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-4 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+                <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <span>Perbandingan Performa Penjualan Antar-Cabang (Top Outlet)</span>
+                </h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">Monitoring omzet dan volume transaksi per cabang toko untuk periode aktif.</p>
+            </div>
+            <a href="{{ route('master.outlets.index') }}" class="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                <span>Kelola Cabang</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+            <!-- Chart Bar Omzet Antar Cabang -->
+            <div class="lg:col-span-7 h-[240px]">
+                <canvas id="outletComparisonChart"></canvas>
+            </div>
+
+            <!-- List / Table Ranking Cabang -->
+            <div class="lg:col-span-5 space-y-2.5">
+                @php
+                    $highestOmzet = $outletPerformances->max('sales_sum_total') ?: 1;
+                @endphp
+                @foreach($outletPerformances as $index => $op)
+                    @php
+                        $omzet = (float)($op->sales_sum_total ?? 0);
+                        $percentage = round(($omzet / $highestOmzet) * 100);
+                    @endphp
+                    <div class="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-50 transition">
+                        <div class="flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] {{ $index === 0 ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-200 text-slate-700' }}">
+                                    {{ $index + 1 }}
+                                </span>
+                                <div>
+                                    <div class="font-bold text-slate-900">{{ $op->name }}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">{{ $op->code }} • {{ $op->sales_count }} Transaksi</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-mono font-bold text-emerald-800 text-xs">Rp {{ number_format($omzet, 0, ',', '.') }}</div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                            <div class="bg-emerald-600 h-full rounded-full" style="width: {{ $percentage }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- TABEL PREVIEW: URUTAN PRODUK TERLARIS -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div class="bg-[#133e1c] text-white px-4 py-3 flex items-center justify-between">
@@ -344,6 +440,49 @@
                         },
                         x: {
                             ticks: { font: { size: 10, family: 'Plus Jakarta Sans' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        const outletCtx = document.getElementById('outletComparisonChart');
+        if (outletCtx) {
+            const outletData = @json($outletPerformances);
+            const outletLabels = outletData.map(o => o.name);
+            const outletValues = outletData.map(o => Number(o.sales_sum_total || 0));
+
+            new Chart(outletCtx, {
+                type: 'bar',
+                data: {
+                    labels: outletLabels,
+                    datasets: [{
+                        label: 'Total Omzet (Rp)',
+                        data: outletValues,
+                        backgroundColor: '#10b981',
+                        borderColor: '#059669',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(val) {
+                                    return 'Rp ' + (val >= 1000 ? (val/1000).toLocaleString('id-ID') + 'k' : val);
+                                },
+                                font: { size: 10, family: 'JetBrains Mono' }
+                            }
+                        },
+                        x: {
+                            ticks: { font: { size: 11, family: 'Plus Jakarta Sans' } }
                         }
                     }
                 }

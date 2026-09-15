@@ -13,6 +13,7 @@ use App\Models\DigitalProduct;
 use App\Models\DigitalSale;
 use App\Models\InventoryAdjustment;
 use App\Models\MonthlyTarget;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\ReceivablePayment;
@@ -53,7 +54,7 @@ class MobileApiController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('outlet')->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -82,9 +83,18 @@ class MobileApiController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
-                'store_name' => $user->store_name,
+                'store_name' => $user->outlet ? $user->outlet->name : $user->store_name,
                 'phone' => $user->phone,
                 'permissions' => $user->permissions,
+                'outlet_id' => $user->outlet_id,
+                'outlet' => $user->outlet ? [
+                    'id' => $user->outlet->id,
+                    'code' => $user->outlet->code,
+                    'name' => $user->outlet->name,
+                    'address' => $user->outlet->address,
+                    'phone' => $user->outlet->phone,
+                    'status' => $user->outlet->status,
+                ] : null,
             ],
         ]);
     }
@@ -107,26 +117,39 @@ class MobileApiController extends Controller
             $startDate = $request->query('start_date', date('Y-m-01'));
             $endDate = $request->query('end_date', date('Y-m-d'));
 
+            // Multi-Outlet Filter & Scoping
+            $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+            $outletId = $request->query('outlet_id');
+            if ($user->isToko()) {
+                $outletId = $user->outlet_id;
+            }
+
             // Financial report for period (using optimized SQL)
-            $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
+            $pl = $this->reportService->getProfitAndLoss($startDate, $endDate, $outletId ? (int)$outletId : null);
 
             // Core KPI Cards (fast pure SQL aggregates)
             $totalPersediaan = (float) DB::table('products')->selectRaw('COALESCE(SUM(stock * hpp), 0) as val')->value('val');
             $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')->sum('remaining_debt');
-            $totalPiutang = (float) Sale::where('status', 'BELUM LUNAS')->sum('remaining_receivable');
+            $totalPiutang = (float) Sale::when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+                ->where('status', 'BELUM LUNAS')
+                ->sum('remaining_receivable');
 
             $totalKasBank = (float) Account::where('group', 'AKTIVA')
                 ->whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130', '1-1131', '1-1190'])
                 ->sum('current_balance');
 
-            $salesCount = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
-            $retailSalesCount = Sale::where('sale_type', 'retail')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
-            $grosirSalesCount = Sale::where('sale_type', 'grosir')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
+            $salesQuery = Sale::when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+                ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
 
-            // Top 10 Best-selling items (URUTAN PRODUK TERLARIS)
+            $salesCount = (clone $salesQuery)->count();
+            $retailSalesCount = (clone $salesQuery)->where('sale_type', 'retail')->count();
+            $grosirSalesCount = (clone $salesQuery)->where('sale_type', 'grosir')->count();
+
+            // Top 10 Best-selling items
             $topProducts = SaleItem::select('product_id', DB::raw('SUM(qty) as total_sold'))
-                ->whereHas('sale', function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
+                ->whereHas('sale', function ($q) use ($startDate, $endDate, $outletId) {
+                    $q->when($outletId, fn($sq) => $sq->where('outlet_id', $outletId))
+                      ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
                 })
                 ->groupBy('product_id')
                 ->orderByDesc('total_sold')
@@ -145,6 +168,7 @@ class MobileApiController extends Controller
 
             // Daily trend data for Chart
             $dailySales = Sale::select(DB::raw("DATE(date) as day"), DB::raw("SUM(total) as revenue"))
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
                 ->groupBy('day')
                 ->orderBy('day')
@@ -163,13 +187,27 @@ class MobileApiController extends Controller
                     ];
                 });
 
-            $pendingTransfers = AgentTransfer::where('status', 'pending')->count();
+            $pendingTransfers = AgentTransfer::where('status', 'pending')
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+                ->count();
             $totalProducts = Product::count();
 
-            $recentTransfers = AgentTransfer::with(['user', 'processedBy'])
+            $recentTransfers = AgentTransfer::with(['user', 'processedBy', 'outlet'])
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->latest()
                 ->take(5)
                 ->get();
+
+            // Top Outlet Performance comparison for Admin
+            $outletPerformances = Outlet::withSum(['sales' => function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
+            }], 'total')
+            ->withCount(['sales' => function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
+            }])
+            ->get()
+            ->sortByDesc('sales_sum_total')
+            ->values();
 
             return response()->json([
                 'success' => true,
@@ -194,6 +232,9 @@ class MobileApiController extends Controller
                 'pending_transfers' => $pendingTransfers,
                 'total_products' => $totalProducts,
                 'recent_transfers' => $recentTransfers,
+                'outlets' => $outlets,
+                'selected_outlet_id' => $outletId,
+                'outlet_performances' => $outletPerformances,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -742,6 +783,7 @@ class MobileApiController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = $user->outlet_id;
             $sale = $this->posService->checkoutPos($data);
             return response()->json([
                 'success' => true,
@@ -1011,10 +1053,17 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $query = AgentTransfer::with(['user', 'processedBy', 'sourceAccount'])->latest();
+        $query = AgentTransfer::with(['user', 'processedBy', 'approvedBy', 'sourceAccount', 'outlet'])->latest();
 
+        $selectedOutletId = $request->query('outlet_id');
         if ($user->isToko()) {
-            $query->where('user_id', $user->id);
+            if ($user->outlet_id) {
+                $query->where('outlet_id', $user->outlet_id);
+            } else {
+                $query->where('user_id', $user->id);
+            }
+        } elseif ($selectedOutletId) {
+            $query->where('outlet_id', $selectedOutletId);
         }
 
         $status = $request->query('status');
@@ -1023,12 +1072,20 @@ class MobileApiController extends Controller
         }
 
         $transfers = $query->take(50)->get();
+        $transfers->transform(function ($t) {
+            $t->proof_image_url = $t->proof_image ? asset('storage/' . $t->proof_image) : null;
+            return $t;
+        });
+
         $bankAccounts = Account::where('group', 'like', '%AKTIVA%')->where('type', 'D')->take(15)->get();
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
 
         return response()->json([
             'success' => true,
             'data' => $transfers,
             'bank_accounts' => $bankAccounts,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $selectedOutletId,
         ]);
     }
 
@@ -1042,16 +1099,19 @@ class MobileApiController extends Controller
             'account_number' => 'required|string|max:50',
             'account_holder' => 'required|string|max:100',
             'amount' => 'required|numeric|min:1000',
+            'admin_fee' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:255',
         ]);
 
         $reference = 'TF-' . date('Ymd') . '-' . strtoupper(Str::random(4));
-        $adminFee = 0;
-        $totalAmount = $request->amount + $adminFee;
+        $adminFee = (float)($request->admin_fee ?? 2500);
+        $totalAmount = (float)$request->amount + $adminFee;
 
         $transfer = AgentTransfer::create([
             'reference_no' => $reference,
             'user_id' => $user->id,
+            'outlet_id' => $user->outlet_id,
+            'store_name' => $user->outlet ? $user->outlet->name : ($user->store_name ?? 'Kasir Cabang'),
             'bank_name' => strtoupper($request->bank_name),
             'account_number' => $request->account_number,
             'account_holder' => strtoupper($request->account_holder),
@@ -1080,31 +1140,39 @@ class MobileApiController extends Controller
 
         $request->validate([
             'source_account_id' => 'required|exists:accounts,id',
-            'proof_image' => 'nullable|image|max:10240',
+            'proof_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'notes' => 'nullable|string|max:255',
         ]);
 
-        $path = $request->hasFile('proof_image')
-            ? $request->file('proof_image')->store('proofs', 'public')
-            : null;
+        $proofPath = null;
+        if ($request->hasFile('proof_image')) {
+            $year = date('Y');
+            $month = date('m');
+            $folder = "transfers/proofs/{$year}/{$month}";
+            $proofPath = $request->file('proof_image')->store($folder, 'public');
+        }
 
         $sourceAccount = Account::findOrFail($request->source_account_id);
 
         $transfer->update([
             'status' => 'approved',
+            'approved_by' => $user->id,
+            'approved_at' => Carbon::now(),
             'processed_by' => $user->id,
-            'source_account_id' => $sourceAccount->id,
-            'proof_image' => $path ?? $transfer->proof_image,
-            'notes' => $request->notes ?? $transfer->notes,
             'processed_at' => Carbon::now(),
+            'source_account_id' => $sourceAccount->id,
+            'proof_image' => $proofPath ?? $transfer->proof_image,
+            'notes' => $request->notes ?? $transfer->notes,
         ]);
 
         $sourceAccount->current_balance -= $transfer->total_amount;
         $sourceAccount->save();
 
+        $transfer->proof_image_url = $transfer->proof_image ? asset('storage/' . $transfer->proof_image) : null;
+
         return response()->json([
             'success' => true,
-            'message' => 'Transfer berhasil disetujui & bukti tersimpan!',
+            'message' => 'Transfer berhasil disetujui' . ($proofPath ? ' & bukti struk tersimpan!' : '!'),
             'data' => $transfer,
         ]);
     }
@@ -1140,8 +1208,20 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $pendingCount = AgentTransfer::where('status', 'pending')->count();
-        $latest = AgentTransfer::where('status', 'pending')->with('user')->latest()->first();
+        $query = AgentTransfer::where('status', 'pending');
+        $selectedOutletId = $request->query('outlet_id');
+        if ($user->isToko()) {
+            if ($user->outlet_id) {
+                $query->where('outlet_id', $user->outlet_id);
+            } else {
+                $query->where('user_id', $user->id);
+            }
+        } elseif ($selectedOutletId) {
+            $query->where('outlet_id', $selectedOutletId);
+        }
+
+        $pendingCount = (clone $query)->count();
+        $latest = (clone $query)->with(['user', 'outlet'])->latest()->first();
 
         return response()->json([
             'success' => true,
@@ -1150,6 +1230,7 @@ class MobileApiController extends Controller
                 'id' => $latest->id,
                 'ref' => $latest->reference_no,
                 'user' => $latest->user?->name ?? 'Kasir Agen',
+                'store' => $latest->outlet ? $latest->outlet->name : ($latest->store_name ?? 'Kasir Cabang'),
                 'bank' => $latest->bank_name,
                 'amount' => (float) $latest->amount,
                 'time' => $latest->created_at->diffForHumans(),
@@ -1417,7 +1498,7 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
 
-        $users = User::orderByRaw("FIELD(role, 'super_admin', 'admin', 'toko')")->orderBy('name')->get();
+        $users = User::with('outlet')->orderByRaw("FIELD(role, 'super_admin', 'admin', 'toko')")->orderBy('name')->get();
         return response()->json(['success' => true, 'data' => $users]);
     }
 
@@ -1431,6 +1512,7 @@ class MobileApiController extends Controller
             'email' => 'required|email|max:100|unique:users,email',
             'password' => 'required|string|min:6',
             'role' => 'required|in:super_admin,admin,toko',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
         ]);
@@ -1440,6 +1522,7 @@ class MobileApiController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
+            'outlet_id' => $validated['outlet_id'] ?? null,
             'store_name' => $validated['store_name'],
             'phone' => $validated['phone'],
             'is_active' => true,
@@ -1455,7 +1538,7 @@ class MobileApiController extends Controller
             ],
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Pengguna berhasil dibuat!', 'data' => $newUser]);
+        return response()->json(['success' => true, 'message' => 'Pengguna berhasil dibuat!', 'data' => $newUser->load('outlet')]);
     }
 
     public function updateUser(Request $request, $id)
@@ -1469,6 +1552,7 @@ class MobileApiController extends Controller
             'email' => 'required|email|max:100|unique:users,email,' . $targetUser->id,
             'password' => 'nullable|string|min:6',
             'role' => 'required|in:super_admin,admin,toko',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
         ]);
@@ -1479,11 +1563,12 @@ class MobileApiController extends Controller
             $targetUser->password = Hash::make($validated['password']);
         }
         $targetUser->role = $validated['role'];
+        $targetUser->outlet_id = $validated['outlet_id'] ?? null;
         $targetUser->store_name = $validated['store_name'];
         $targetUser->phone = $validated['phone'];
         $targetUser->save();
 
-        return response()->json(['success' => true, 'message' => "Pengguna [{$targetUser->name}] berhasil diperbarui!", 'data' => $targetUser]);
+        return response()->json(['success' => true, 'message' => "Pengguna [{$targetUser->name}] berhasil diperbarui!", 'data' => $targetUser->load('outlet')]);
     }
 
     public function destroyUser(Request $request, $id)
@@ -1518,11 +1603,89 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'message' => "Akun [{$targetUser->name}] berhasil {$statusText}!", 'data' => $targetUser]);
     }
 
-    public function storeSettings(Request $request)
+    // ==========================================
+    // 11. MASTER DATA OUTLET (CABANG TOKO)
+    // ==========================================
+
+    public function outlets(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $outlets = Outlet::withCount(['users', 'sales'])->orderBy('name')->get();
+        return response()->json(['success' => true, 'data' => $outlets]);
+    }
+
+    public function storeOutlet(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $validated = $request->validate([
+            'code' => 'required|string|max:20|unique:outlets,code',
+            'name' => 'required|string|max:100',
+            'address' => 'nullable|string',
+            'phone' => 'nullable|string|max:30',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $outlet = Outlet::create($validated);
+        return response()->json(['success' => true, 'message' => 'Cabang toko berhasil ditambahkan!', 'data' => $outlet]);
+    }
+
+    public function updateOutlet(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $outlet = Outlet::findOrFail($id);
+        $validated = $request->validate([
+            'code' => 'required|string|max:20|unique:outlets,code,' . $outlet->id,
+            'name' => 'required|string|max:100',
+            'address' => 'nullable|string',
+            'phone' => 'nullable|string|max:30',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $outlet->update($validated);
+        return response()->json(['success' => true, 'message' => 'Cabang toko berhasil diperbarui!', 'data' => $outlet]);
+    }
+
+    public function destroyOutlet(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $outlet = Outlet::findOrFail($id);
+
+        if ($outlet->users()->count() > 0 || $outlet->sales()->count() > 0 || $outlet->transfers()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cabang [{$outlet->name}] tidak dapat dihapus karena sudah memiliki data transaksi atau kasir terhubung.",
+            ], 422);
+        }
+
+        $name = $outlet->name;
+        $outlet->delete();
+        return response()->json(['success' => true, 'message' => "Cabang [{$name}] berhasil dihapus!"]);
+    }
+
+    public function toggleOutletStatus(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $outlet = Outlet::findOrFail($id);
+        $outlet->status = $outlet->status === 'active' ? 'inactive' : 'active';
+        $outlet->save();
+
+        return response()->json(['success' => true, 'message' => "Status cabang [{$outlet->name}] diubah menjadi {$outlet->status}!", 'data' => $outlet]);
+    }
+
+    public function storeSettings(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $setting = StoreSetting::first();
         $closingHistory = YearlyClosing::latest()->take(5)->get();

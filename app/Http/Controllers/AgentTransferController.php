@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\AgentTransfer;
 use App\Models\JournalEntry;
 use App\Models\JournalItem;
+use App\Models\Outlet;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,21 +19,41 @@ class AgentTransferController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        $outlets = Outlet::orderBy('name')->get();
+        $selectedOutletId = $request->query('outlet_id');
+        $selectedStatus = $request->query('status');
 
-        // Query transfers
-        $query = AgentTransfer::with(['user', 'processedBy', 'sourceAccount'])
+        // Query transfers with outlet, user, processedBy, and approvedBy
+        $query = AgentTransfer::with(['user', 'outlet', 'processedBy', 'approvedBy', 'sourceAccount'])
             ->latest();
 
-        // If user is Toko, only see their store's transfers
+        // If user is Toko, only see their outlet's transfers
         if ($user->isToko()) {
-            $query->where('user_id', $user->id);
+            if ($user->outlet_id) {
+                $query->where('outlet_id', $user->outlet_id);
+            } else {
+                $query->where('user_id', $user->id);
+            }
+        } elseif (!empty($selectedOutletId)) {
+            $query->where('outlet_id', $selectedOutletId);
         }
 
-        $transfers = $query->paginate(20);
+        if (!empty($selectedStatus)) {
+            $query->where('status', $selectedStatus);
+        }
 
-        // Stats
-        $pendingCount = AgentTransfer::where('status', 'pending')->count();
-        $approvedTodayTotal = AgentTransfer::where('status', 'approved')
+        $transfers = $query->paginate(20)->withQueryString();
+
+        // Stats (respecting scope)
+        $statsQuery = AgentTransfer::query();
+        if ($user->isToko() && $user->outlet_id) {
+            $statsQuery->where('outlet_id', $user->outlet_id);
+        } elseif (!empty($selectedOutletId)) {
+            $statsQuery->where('outlet_id', $selectedOutletId);
+        }
+
+        $pendingCount = (clone $statsQuery)->where('status', 'pending')->count();
+        $approvedTodayTotal = (clone $statsQuery)->where('status', 'approved')
             ->whereDate('processed_at', Carbon::today())
             ->sum('total_amount');
 
@@ -45,7 +66,15 @@ class AgentTransferController extends Controller
             $bankAccounts = Account::where('group', 'like', '%AKTIVA%')->where('type', 'D')->take(8)->get();
         }
 
-        return view('transfer.index', compact('transfers', 'pendingCount', 'approvedTodayTotal', 'bankAccounts'));
+        return view('transfer.index', compact(
+            'transfers',
+            'pendingCount',
+            'approvedTodayTotal',
+            'bankAccounts',
+            'outlets',
+            'selectedOutletId',
+            'selectedStatus'
+        ));
     }
 
     public function store(Request $request)
@@ -68,10 +97,13 @@ class AgentTransferController extends Controller
         // Generate clean reference
         $refNo = 'TF-' . date('Ymd') . '-' . strtoupper(Str::random(5));
 
+        $outletName = $user->outlet?->name ?? $user->store_name ?? 'Toko Tambun';
+
         $transfer = AgentTransfer::create([
             'reference_no' => $refNo,
             'user_id' => $user->id,
-            'store_name' => $user->store_name ?? 'Toko Tambun',
+            'outlet_id' => $user->outlet_id,
+            'store_name' => $outletName,
             'bank_name' => strtoupper($validated['bank_name']),
             'account_number' => $validated['account_number'],
             'account_holder' => strtoupper($validated['account_holder']),
@@ -98,16 +130,21 @@ class AgentTransferController extends Controller
             return back()->with('error', 'Pengajuan transfer ini sudah diproses sebelumnya.');
         }
 
+        // Bukti transfer bersifat OPSIONAL (nullable), mimes: jpeg, png, jpg, webp, max 5MB (5120KB)
         $request->validate([
             'source_account_id' => 'required|exists:accounts,id',
-            'proof_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120', // 5MB limit
+            'proof_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'notes' => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
         try {
-            // Upload proof of transfer (from phone camera or gallery)
-            $path = $request->file('proof_image')->store('transfer_proofs', 'public');
+            // Upload proof of transfer jika ada (disimpan ke transfers/proofs/YYYY/MM/)
+            $path = null;
+            if ($request->hasFile('proof_image')) {
+                $dir = 'transfers/proofs/' . date('Y/m');
+                $path = $request->file('proof_image')->store($dir, 'public');
+            }
 
             $sourceAccount = Account::findOrFail($request->source_account_id);
 
@@ -115,10 +152,12 @@ class AgentTransferController extends Controller
             $transfer->update([
                 'status' => 'approved',
                 'processed_by' => $user->id,
+                'approved_by' => $user->id,
                 'source_account_id' => $sourceAccount->id,
-                'proof_image' => $path,
+                'proof_image' => $path ?? $transfer->proof_image,
                 'notes' => $request->notes ?? $transfer->notes,
                 'processed_at' => Carbon::now(),
+                'approved_at' => Carbon::now(),
             ]);
 
             // Deduct source bank balance in accounts table
@@ -216,10 +255,19 @@ class AgentTransferController extends Controller
     /**
      * Polling endpoint for real-time notification on admin dashboard
      */
-    public function checkPending()
+    public function checkPending(Request $request)
     {
-        $pendingCount = AgentTransfer::where('status', 'pending')->count();
-        $latestPending = AgentTransfer::where('status', 'pending')->latest()->first();
+        $user = Auth::user();
+        $query = AgentTransfer::where('status', 'pending');
+
+        if ($user && $user->isToko() && $user->outlet_id) {
+            $query->where('outlet_id', $user->outlet_id);
+        } elseif ($request->filled('outlet_id')) {
+            $query->where('outlet_id', $request->outlet_id);
+        }
+
+        $pendingCount = $query->count();
+        $latestPending = $query->latest()->first();
 
         return response()->json([
             'count' => $pendingCount,

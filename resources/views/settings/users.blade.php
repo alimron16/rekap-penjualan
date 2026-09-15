@@ -92,7 +92,12 @@
                                 @endif
                             </td>
                             <td class="py-3 px-4 font-medium text-slate-800">
-                                {{ $u->store_name ?? '-' }}
+                                @if($u->outlet)
+                                    <div class="font-bold text-emerald-800">{{ $u->outlet->name }}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">{{ $u->outlet->code }}</div>
+                                @else
+                                    <span>{{ $u->store_name ?? 'Kantor Pusat' }}</span>
+                                @endif
                             </td>
                             <td class="py-3 px-4">
                                 @if($u->isSuperAdmin())
@@ -211,10 +216,16 @@
                         <option value="toko" selected>Kasir Toko (Cabang)</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1">Nama Toko / Cabang</label>
-                    <input type="text" id="formStoreName" name="store_name" placeholder="Contoh: Toko Tambun"
-                           class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                <div id="outletContainer">
+                    <label class="block font-semibold text-slate-700 mb-1">Pilih Cabang Toko *</label>
+                    <select id="formOutletId" name="outlet_id"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                        <option value="">-- Pilih Cabang --</option>
+                        @foreach($outlets as $outlet)
+                            <option value="{{ $outlet->id }}">{{ $outlet->code }} - {{ $outlet->name }}</option>
+                        @endforeach
+                    </select>
+                    <input type="hidden" id="formStoreName" name="store_name" value="">
                 </div>
             </div>
 
@@ -301,7 +312,7 @@
         
         document.getElementById('formName').value = '';
         document.getElementById('formEmail').value = '';
-        document.getElementById('formStoreName').value = 'Toko Tambun';
+        document.getElementById('formOutletId').value = "{{ $outlets->first()?->id ?? '' }}";
         document.getElementById('formPhone').value = '';
         document.getElementById('formPassword').value = '';
         document.getElementById('formPassword').required = true;
@@ -320,12 +331,14 @@
 
         document.getElementById('formName').value = user.name;
         document.getElementById('formEmail').value = user.email;
-        document.getElementById('formStoreName').value = user.store_name || '';
+        document.getElementById('formOutletId').value = user.outlet_id || '';
         document.getElementById('formPhone').value = user.phone || '';
         document.getElementById('formPassword').value = '';
         document.getElementById('formPassword').required = false;
         document.getElementById('passwordHelp').classList.remove('hidden');
         document.getElementById('formRole').value = user.role;
+
+        onRoleChanged(user.role);
 
         // Set permissions
         permKeys.forEach(key => {
@@ -349,6 +362,13 @@
     }
 
     function onRoleChanged(role) {
+        const outletContainer = document.getElementById('outletContainer');
+        if (role === 'toko') {
+            if (outletContainer) outletContainer.style.display = 'block';
+        } else {
+            if (outletContainer) outletContainer.style.display = 'none';
+        }
+
         if (role === 'super_admin') {
             permKeys.forEach(k => {
                 const el = document.getElementById('perm_' + k);
