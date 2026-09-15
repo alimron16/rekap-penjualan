@@ -675,6 +675,54 @@ class MobileApiController extends Controller
         ]);
     }
 
+    public function rejectTransfer(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || (!$user->isAdmin() && !$user->isSuperAdmin())) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $transfer = AgentTransfer::findOrFail($id);
+        $request->validate([
+            'notes' => 'required|string|max:255',
+        ]);
+
+        $transfer->update([
+            'status' => 'rejected',
+            'processed_by' => $user->id,
+            'notes' => $request->notes,
+            'processed_at' => Carbon::now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengajuan transfer telah ditolak.',
+            'data' => $transfer,
+        ]);
+    }
+
+    public function checkPendingTransfers(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $pendingCount = AgentTransfer::where('status', 'pending')->count();
+        $latest = AgentTransfer::where('status', 'pending')->with('user')->latest()->first();
+
+        return response()->json([
+            'success' => true,
+            'count' => $pendingCount,
+            'latest' => $latest ? [
+                'id' => $latest->id,
+                'ref' => $latest->reference_no,
+                'user' => $latest->user?->name ?? 'Kasir Agen',
+                'bank' => $latest->bank_name,
+                'amount' => (float) $latest->amount,
+                'time' => $latest->created_at->diffForHumans(),
+            ] : null,
+        ]);
+    }
+
     // ==========================================
     // 8. AKUNTANSI & KAS
     // ==========================================

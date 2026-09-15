@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class PosScreen extends StatefulWidget {
@@ -19,6 +19,7 @@ class _PosScreenState extends State<PosScreen> {
   List<dynamic> _customers = [];
   List<dynamic> _accounts = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   // Cart: Map of productId -> {product, qty, price}
   final Map<int, Map<String, dynamic>> _cart = {};
@@ -33,8 +34,6 @@ class _PosScreenState extends State<PosScreen> {
   String _paymentMethod = 'cash';
   bool _isCheckingOut = false;
 
-  final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-
   @override
   void initState() {
     super.initState();
@@ -42,23 +41,36 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _loadPosData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
       final res = await ApiService.getPosData();
-      if (mounted && res['success'] == true) {
+      if (mounted) {
         setState(() {
-          _products = res['products'] ?? [];
-          _filteredProducts = _products;
-          _customers = res['customers'] ?? [];
-          _accounts = res['accounts'] ?? [];
-          if (_accounts.isNotEmpty) {
-            _selectedAccountId = _accounts[0]['id'];
+          if (res['success'] == true) {
+            _products = res['products'] ?? [];
+            _filteredProducts = _products;
+            _customers = res['customers'] ?? [];
+            _accounts = res['accounts'] ?? [];
+            if (_accounts.isNotEmpty && _selectedAccountId == null) {
+              _selectedAccountId = _accounts[0]['id'];
+            }
+          } else {
+            _errorMessage = res['message'] ?? 'Gagal memuat katalog barang';
           }
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Koneksi gagal: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -79,14 +91,16 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _addToCart(dynamic product) {
-    final int id = product['id'];
+    final int id = Formatters.parseInt(product['id']);
+    if (id <= 0) return;
+
     final double price = widget.saleType == 'grosir'
-        ? (double.tryParse((product['selling_price_grosir'] ?? product['selling_price']).toString()) ?? 0)
-        : (double.tryParse((product['selling_price'] ?? 0).toString()) ?? 0);
+        ? Formatters.parseDouble(product['selling_price_grosir'] ?? product['selling_price'])
+        : Formatters.parseDouble(product['selling_price']);
 
     setState(() {
       if (_cart.containsKey(id)) {
-        _cart[id]!['qty'] += 1;
+        _cart[id]!['qty'] = (_cart[id]!['qty'] as double) + 1.0;
       } else {
         _cart[id] = {
           'product': product,
@@ -100,7 +114,8 @@ class _PosScreenState extends State<PosScreen> {
   void _updateCartQty(int id, double delta) {
     setState(() {
       if (!_cart.containsKey(id)) return;
-      final newQty = _cart[id]!['qty'] + delta;
+      final currentQty = _cart[id]!['qty'] as double;
+      final newQty = currentQty + delta;
       if (newQty <= 0) {
         _cart.remove(id);
       } else {
@@ -112,13 +127,15 @@ class _PosScreenState extends State<PosScreen> {
   double get _subtotal {
     double sum = 0;
     _cart.forEach((_, item) {
-      sum += (item['qty'] as double) * (item['price'] as double);
+      final qty = Formatters.parseDouble(item['qty']);
+      final price = Formatters.parseDouble(item['price']);
+      sum += qty * price;
     });
     return sum;
   }
 
   double get _discount {
-    return double.tryParse(_discountController.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
+    return Formatters.parseDouble(_discountController.text);
   }
 
   double get _grandTotal {
@@ -134,7 +151,7 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
 
-    final double paid = double.tryParse(_paidController.text.replaceAll('.', '').replaceAll(',', '')) ?? 0;
+    final double paid = Formatters.parseDouble(_paidController.text);
     if (_paymentMethod == 'cash' && paid < _grandTotal) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nominal pembayaran kurang!'), backgroundColor: Colors.red),
@@ -172,7 +189,7 @@ class _PosScreenState extends State<PosScreen> {
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
           title: '✅ Transaksi POS Selesai!',
-          body: 'Penjualan senilai ${currencyFormatter.format(_grandTotal)} berhasil disimpan!',
+          body: 'Penjualan senilai ${Formatters.formatRupiah(_grandTotal)} berhasil disimpan!',
         );
 
         if (!mounted) return;
@@ -183,6 +200,7 @@ class _PosScreenState extends State<PosScreen> {
           _discountController.text = '0';
           _notesController.clear();
         });
+        _loadPosData();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['message'] ?? 'Gagal memproses transaksi'), backgroundColor: Colors.red),
@@ -210,10 +228,10 @@ class _PosScreenState extends State<PosScreen> {
               const SizedBox(height: 14),
               const Text('Transaksi Sukses!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Total: ${currencyFormatter.format(_grandTotal)}', style: const TextStyle(fontSize: 14)),
+              Text('Total: ${Formatters.formatRupiah(_grandTotal)}', style: const TextStyle(fontSize: 14)),
               if (change > 0) ...[
                 const SizedBox(height: 6),
-                Text('Kembalian: ${currencyFormatter.format(change)}',
+                Text('Kembalian: ${Formatters.formatRupiah(change)}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green)),
               ],
               const SizedBox(height: 20),
@@ -247,188 +265,201 @@ class _PosScreenState extends State<PosScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-          : Column(
-              children: [
-                // Live Product Search Bar
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  color: Colors.white,
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _filterProducts,
-                    decoration: InputDecoration(
-                      hintText: 'Cari nama barang / barcode...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _filterProducts('');
-                              },
-                            )
-                          : null,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    ),
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 12),
+                      ElevatedButton(onPressed: _loadPosData, child: const Text('Coba Lagi')),
+                    ],
                   ),
-                ),
-
-                // Main Content: Product Catalog List
-                Expanded(
-                  child: _filteredProducts.isEmpty
-                      ? const Center(child: Text('Barang tidak ditemukan'))
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: _filteredProducts.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final p = _filteredProducts[index];
-                            final int id = p['id'];
-                            final String name = p['name'] ?? '-';
-                            final String code = p['code'] ?? '';
-                            final double stock = (p['stock'] ?? 0).toDouble();
-                            final double price = widget.saleType == 'grosir'
-                                ? (double.tryParse((p['selling_price_grosir'] ?? p['selling_price']).toString()) ?? 0)
-                                : (double.tryParse((p['selling_price'] ?? 0).toString()) ?? 0);
-
-                            final int inCartQty = (_cart[id]?['qty'] ?? 0).toInt();
-
-                            return Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: inCartQty > 0 ? ThemeConfig.accent : Colors.grey.shade200,
-                                  width: inCartQty > 0 ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          name,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Kode: $code • Stok: $stock',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: stock <= 3 ? Colors.red : Colors.grey.shade600,
-                                            fontWeight: stock <= 3 ? FontWeight.bold : FontWeight.normal,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          currencyFormatter.format(price),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                            color: ThemeConfig.primary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (inCartQty > 0) ...[
-                                    IconButton(
-                                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                      onPressed: () => _updateCartQty(id, -1),
-                                    ),
-                                    Text('$inCartQty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                    IconButton(
-                                      icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                                      onPressed: () => _updateCartQty(id, 1),
-                                    ),
-                                  ] else
-                                    ElevatedButton(
-                                      onPressed: () => _addToCart(p),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: ThemeConfig.primary,
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                      ),
-                                      child: const Text('+ Tambah', style: TextStyle(fontSize: 12)),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-
-                // Bottom Cart Summary Bar
-                if (_cart.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
+                )
+              : Column(
+                  children: [
+                    // Live Product Search Bar
+                    Container(
+                      padding: const EdgeInsets.all(12),
                       color: Colors.white,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -4)),
-                      ],
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('${_cart.length} Jenis Item', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                              Text(
-                                currencyFormatter.format(_grandTotal),
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ThemeConfig.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _paidController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Uang Bayar',
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              ElevatedButton(
-                                onPressed: _isCheckingOut ? null : _handleCheckout,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ThemeConfig.accent,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                ),
-                                child: _isCheckingOut
-                                    ? const SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                      )
-                                    : const Row(
-                                        children: [
-                                          Icon(Icons.payment, size: 18),
-                                          SizedBox(width: 6),
-                                          Text('Bayar', style: TextStyle(fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _filterProducts,
+                        decoration: InputDecoration(
+                          hintText: 'Cari nama barang / barcode...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _filterProducts('');
+                                  },
+                                )
+                              : null,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
+
+                    // Main Content: Product Catalog List
+                    Expanded(
+                      child: _filteredProducts.isEmpty
+                          ? const Center(child: Text('Barang tidak ditemukan'))
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(12),
+                              itemCount: _filteredProducts.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (context, index) {
+                                final p = _filteredProducts[index];
+                                final int id = Formatters.parseInt(p['id']);
+                                final String name = p['name'] ?? '-';
+                                final String code = p['code'] ?? '';
+                                final double stock = Formatters.parseDouble(p['stock']);
+                                final double price = widget.saleType == 'grosir'
+                                    ? Formatters.parseDouble(p['selling_price_grosir'] ?? p['selling_price'])
+                                    : Formatters.parseDouble(p['selling_price']);
+
+                                final int inCartQty = _cart.containsKey(id)
+                                    ? Formatters.parseInt(_cart[id]!['qty'])
+                                    : 0;
+
+                                return Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: inCartQty > 0 ? ThemeConfig.accent : Colors.grey.shade200,
+                                      width: inCartQty > 0 ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Kode: $code • Stok: $stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: stock <= 3 ? Colors.red : Colors.grey.shade600,
+                                                fontWeight: stock <= 3 ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              Formatters.formatRupiah(price),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: ThemeConfig.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (inCartQty > 0) ...[
+                                        IconButton(
+                                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                          onPressed: () => _updateCartQty(id, -1),
+                                        ),
+                                        Text('$inCartQty', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        IconButton(
+                                          icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                          onPressed: () => _updateCartQty(id, 1),
+                                        ),
+                                      ] else
+                                        ElevatedButton(
+                                          onPressed: () => _addToCart(p),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: ThemeConfig.primary,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          ),
+                                          child: const Text('+ Tambah', style: TextStyle(fontSize: 12)),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+
+                    // Bottom Cart Summary Bar
+                    if (_cart.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -4)),
+                          ],
+                        ),
+                        child: SafeArea(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${_cart.length} Jenis Item', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  Text(
+                                    Formatters.formatRupiah(_grandTotal),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ThemeConfig.primary),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _paidController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Uang Bayar',
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton(
+                                    onPressed: _isCheckingOut ? null : _handleCheckout,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: ThemeConfig.accent,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    ),
+                                    child: _isCheckingOut
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                          )
+                                        : const Row(
+                                            children: [
+                                              Icon(Icons.payment, size: 18),
+                                              SizedBox(width: 6),
+                                              Text('Bayar', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
     );
   }
 }

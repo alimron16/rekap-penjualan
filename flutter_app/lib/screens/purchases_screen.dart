@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class PurchasesScreen extends StatefulWidget {
@@ -21,8 +22,6 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   List<dynamic> _suppliers = [];
   List<dynamic> _products = [];
   List<dynamic> _accounts = [];
-
-  final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
   @override
   void initState() {
@@ -82,7 +81,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
       cartItems.add({
         'product_id': firstProd['id'],
         'qty': 1.0,
-        'buy_price': (firstProd['buy_price'] ?? 0).toDouble(),
+        'buy_price': Formatters.parseDouble(firstProd['buy_price']),
       });
     }
 
@@ -92,7 +91,10 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
-          double totalAmount = cartItems.fold(0, (sum, it) => sum + ((it['qty'] ?? 0) * (it['buy_price'] ?? 0)));
+          double totalAmount = cartItems.fold(
+            0,
+            (sum, it) => sum + (Formatters.parseDouble(it['qty']) * Formatters.parseDouble(it['buy_price'])),
+          );
 
           return Container(
             padding: EdgeInsets.only(
@@ -113,7 +115,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'Faktur Pembelian Baru',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
                       ),
@@ -149,7 +151,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                               cartItems.add({
                                 'product_id': _products.first['id'],
                                 'qty': 1.0,
-                                'buy_price': (_products.first['buy_price'] ?? 0).toDouble(),
+                                'buy_price': Formatters.parseDouble(_products.first['buy_price']),
                               });
                             });
                           }
@@ -189,7 +191,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                                       item['product_id'] = val;
                                       final prod = _products.firstWhere((p) => p['id'] == val, orElse: () => null);
                                       if (prod != null) {
-                                        item['buy_price'] = (prod['buy_price'] ?? 0).toDouble();
+                                        item['buy_price'] = Formatters.parseDouble(prod['buy_price']);
                                       }
                                     });
                                   },
@@ -215,7 +217,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   ),
                                   onChanged: (v) => setModalState(() {
-                                    item['qty'] = double.tryParse(v) ?? 1.0;
+                                    item['qty'] = Formatters.parseDouble(v);
                                   }),
                                 ),
                               ),
@@ -223,14 +225,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                               Expanded(
                                 flex: 2,
                                 child: TextFormField(
-                                  initialValue: item['buy_price'].toStringAsFixed(0),
+                                  initialValue: Formatters.parseDouble(item['buy_price']).toStringAsFixed(0),
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(
                                     labelText: 'Harga Beli (Satuan)',
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   ),
                                   onChanged: (v) => setModalState(() {
-                                    item['buy_price'] = double.tryParse(v) ?? 0.0;
+                                    item['buy_price'] = Formatters.parseDouble(v);
                                   }),
                                 ),
                               ),
@@ -252,7 +254,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       children: [
                         const Text('Total Pembelian:', style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(
-                          currencyFormatter.format(totalAmount),
+                          Formatters.formatRupiah(totalAmount),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ThemeConfig.primary),
                         ),
                       ],
@@ -327,7 +329,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
 
                         final paidAmt = paymentMethod == 'cash'
                             ? totalAmount
-                            : (double.tryParse(paidAmountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0);
+                            : Formatters.parseDouble(paidAmountController.text);
 
                         final res = await ApiService.storePurchase(
                           date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
@@ -345,7 +347,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                           NotificationService.showNotification(
                             id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
                             title: 'Faktur Pembelian Disimpan! 📦',
-                            body: 'Pembelian barang dari supplier sebesar ${currencyFormatter.format(totalAmount)} berhasil dicatat.',
+                            body: 'Pembelian barang dari supplier sebesar ${Formatters.formatRupiah(totalAmount)} berhasil dicatat.',
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(res['message'] ?? 'Faktur pembelian berhasil!'), backgroundColor: ThemeConfig.accent),
@@ -369,7 +371,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   }
 
   void _showPayDebtModal(dynamic debt) {
-    final remainingDebt = (debt['remaining_debt'] ?? (debt['grand_total'] - (debt['paid_amount'] ?? 0))).toDouble();
+    final grandTotal = Formatters.parseDouble(debt['grand_total']);
+    final paidTotal = Formatters.parseDouble(debt['paid_amount']);
+    final remainingDebt = debt['remaining_debt'] != null
+        ? Formatters.parseDouble(debt['remaining_debt'])
+        : (grandTotal - paidTotal);
+
     final amountController = TextEditingController(text: remainingDebt.toStringAsFixed(0));
     final notesController = TextEditingController();
     int? selectedAccountId = _accounts.isNotEmpty ? _accounts.first['id'] : null;
@@ -397,7 +404,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Bayar Hutang Supplier', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                  const Text('Bayar Hutang Supplier', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                 ],
               ),
@@ -422,7 +429,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         const Text('Sisa Hutang', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        Text(currencyFormatter.format(remainingDebt), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14)),
+                        Text(Formatters.formatRupiah(remainingDebt), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14)),
                       ],
                     ),
                   ],
@@ -456,7 +463,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final amt = double.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                    final amt = Formatters.parseDouble(amountController.text);
                     if (amt <= 0 || selectedAccountId == null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Isi nominal dan pilih akun kas')));
                       return;
@@ -477,7 +484,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       NotificationService.showNotification(
                         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
                         title: 'Pembayaran Hutang Berhasil! 💸',
-                        body: 'Hutang supplier sebesar ${currencyFormatter.format(amt)} berhasil dibayarkan.',
+                        body: 'Hutang supplier sebesar ${Formatters.formatRupiah(amt)} berhasil dibayarkan.',
                       );
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(res['message'] ?? 'Pembayaran hutang berhasil!'), backgroundColor: ThemeConfig.accent),
@@ -556,7 +563,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
         itemCount: _purchases.length,
         itemBuilder: (ctx, i) {
           final p = _purchases[i];
-          final total = (p['grand_total'] ?? 0).toDouble();
+          final total = Formatters.parseDouble(p['grand_total']);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -573,7 +580,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       Expanded(
                         child: Text(
                           p['supplier']?['name'] ?? 'Supplier',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
                         ),
                       ),
                       Container(
@@ -596,14 +603,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                   const SizedBox(height: 6),
                   Text(
                     'No: ${p['invoice_no'] ?? '-'} • Tgl: ${p['date'] ?? '-'}',
-                    style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
+                    style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
                   ),
                   const Divider(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('${(p['items'] as List?)?.length ?? 0} Jenis Item', style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted)),
-                      Text(currencyFormatter.format(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.primary)),
+                      Text('${(p['items'] as List?)?.length ?? 0} Jenis Item', style: const TextStyle(fontSize: 12, color: ThemeConfig.textMuted)),
+                      Text(Formatters.formatRupiah(total), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.primary)),
                     ],
                   ),
                 ],
@@ -636,8 +643,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
         itemCount: _debts.length,
         itemBuilder: (ctx, i) {
           final d = _debts[i];
-          final total = (d['grand_total'] ?? 0).toDouble();
-          final paid = (d['paid_amount'] ?? 0).toDouble();
+          final total = Formatters.parseDouble(d['grand_total']);
+          final paid = Formatters.parseDouble(d['paid_amount']);
           final remaining = total - paid;
 
           return Card(
@@ -655,17 +662,17 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       Expanded(
                         child: Text(
                           d['supplier']?['name'] ?? 'Supplier',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
                         ),
                       ),
                       Text(
-                        'Sisa: ${currencyFormatter.format(remaining)}',
+                        'Sisa: ${Formatters.formatRupiah(remaining)}',
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text('Faktur: ${d['invoice_no'] ?? '-'} • Tgl: ${d['date'] ?? '-'}', style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12)),
+                  Text('Faktur: ${d['invoice_no'] ?? '-'} • Tgl: ${d['date'] ?? '-'}', style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12)),
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,

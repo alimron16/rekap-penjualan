@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -301,9 +302,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             final item = _products[index];
                             final name = item['name'] ?? '-';
                             final code = item['code'] ?? '-';
-                            final price = (item['selling_price'] ?? item['retail_price'] ?? item['price'] ?? 0).toDouble();
-                            final grosirPrice = (item['selling_price_grosir'] ?? 0).toDouble();
-                            final stock = item['stock'] ?? item['current_stock'] ?? 0;
+                            final price = Formatters.parseDouble(item['selling_price'] ?? item['retail_price'] ?? item['price']);
+                            final grosirPrice = Formatters.parseDouble(item['selling_price_grosir']);
+                            final stock = Formatters.parseDouble(item['stock'] ?? item['current_stock']);
 
                             return Container(
                               padding: const EdgeInsets.all(12),

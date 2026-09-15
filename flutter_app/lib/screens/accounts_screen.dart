@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class AccountsScreen extends StatefulWidget {
@@ -253,8 +254,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               itemCount: filtered.length,
                               itemBuilder: (ctx, i) {
                                 final a = filtered[i];
-                                final isHeader = (a['type'] ?? 'D') == 'H';
-                                final balance = (a['current_balance'] ?? a['initial_balance'] ?? 0).toDouble();
+                                final isHeader = (a['type'] ?? 'D').toString().toUpperCase() == 'H';
+                                final balance = Formatters.parseDouble(a['current_balance'] ?? a['initial_balance']);
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 10),

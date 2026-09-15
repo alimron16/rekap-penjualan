@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class ReturnsScreen extends StatefulWidget {
@@ -19,8 +20,6 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
   List<dynamic> _products = [];
   List<dynamic> _accounts = [];
   List<dynamic> _customers = [];
-
-  final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
   @override
   void initState() {
@@ -72,7 +71,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
     if (selectedProductId != null) {
       final prod = _products.firstWhere((p) => p['id'] == selectedProductId, orElse: () => null);
       if (prod != null) {
-        refundController.text = (prod['selling_price'] ?? 0).toString();
+        refundController.text = Formatters.parseDouble(prod['selling_price']).toStringAsFixed(0);
       }
     }
 
@@ -100,7 +99,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Catat Retur Penjualan',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
                     ),
@@ -120,7 +119,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                   items: _products.map<DropdownMenuItem<int>>((p) {
                     return DropdownMenuItem<int>(
                       value: p['id'],
-                      child: Text('${p['name']} (${currencyFormatter.format(p['selling_price'] ?? 0)})', style: const TextStyle(fontSize: 13)),
+                      child: Text('${p['name']} (${Formatters.formatRupiah(p['selling_price'])})', style: const TextStyle(fontSize: 13)),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -128,8 +127,9 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                       selectedProductId = val;
                       final prod = _products.firstWhere((p) => p['id'] == val, orElse: () => null);
                       if (prod != null) {
-                        final q = double.tryParse(qtyController.text) ?? 1;
-                        refundController.text = ((prod['selling_price'] ?? 0) * q).toStringAsFixed(0);
+                        final q = Formatters.parseDouble(qtyController.text);
+                        final price = Formatters.parseDouble(prod['selling_price']);
+                        refundController.text = (price * (q > 0 ? q : 1)).toStringAsFixed(0);
                       }
                     });
                   },
@@ -149,10 +149,11 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(hintText: '1'),
                             onChanged: (val) {
-                              final q = double.tryParse(val) ?? 0;
+                              final q = Formatters.parseDouble(val);
                               final prod = _products.firstWhere((p) => p['id'] == selectedProductId, orElse: () => null);
                               if (prod != null) {
-                                refundController.text = ((prod['selling_price'] ?? 0) * q).toStringAsFixed(0);
+                                final price = Formatters.parseDouble(prod['selling_price']);
+                                refundController.text = (price * q).toStringAsFixed(0);
                               }
                             },
                           ),
@@ -230,8 +231,8 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                               );
                               return;
                             }
-                            final qty = double.tryParse(qtyController.text) ?? 0;
-                            final refund = double.tryParse(refundController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                            final qty = Formatters.parseDouble(qtyController.text);
+                            final refund = Formatters.parseDouble(refundController.text);
                             if (qty <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Jumlah qty harus lebih dari 0')),
@@ -264,7 +265,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                 NotificationService.showNotification(
                                   id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
                                   title: 'Retur Berhasil Dicatat! 🔄',
-                                  body: 'Retur barang senilai ${currencyFormatter.format(refund)} berhasil disimpan dan stok telah disesuaikan.',
+                                  body: 'Retur barang senilai ${Formatters.formatRupiah(refund)} berhasil disimpan dan stok telah disesuaikan.',
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -344,7 +345,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                         itemCount: _returns.length,
                         itemBuilder: (ctx, i) {
                           final r = _returns[i];
-                          final refund = (r['refund_amount'] ?? 0).toDouble();
+                          final refund = Formatters.parseDouble(r['refund_amount']);
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -361,7 +362,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                       Expanded(
                                         child: Text(
                                           r['product']?['name'] ?? 'Produk',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark),
                                         ),
                                       ),
                                       Text(
@@ -373,7 +374,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                   const SizedBox(height: 6),
                                   Text(
                                     'Pelanggan: ${r['customer']?['name'] ?? 'Pelanggan Umum'} • Tgl: ${r['date'] ?? '-'}',
-                                    style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
+                                    style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
                                   ),
                                   const Divider(height: 20),
                                   Row(
@@ -381,10 +382,10 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                     children: [
                                       Text(
                                         'Akun: ${r['account']?['name'] ?? '-'}',
-                                        style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted),
+                                        style: const TextStyle(fontSize: 12, color: ThemeConfig.textMuted),
                                       ),
                                       Text(
-                                        '-${currencyFormatter.format(refund)}',
+                                        '-${Formatters.formatRupiah(refund)}',
                                         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
                                       ),
                                     ],

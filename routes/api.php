@@ -42,8 +42,10 @@ Route::post('/inventory/adjustments', [MobileApiController::class, 'storeInvento
 
 // 7. Transfer Agen
 Route::get('/transfers', [MobileApiController::class, 'transfers']);
+Route::get('/transfers/pending-check', [MobileApiController::class, 'checkPendingTransfers']);
 Route::post('/transfers', [MobileApiController::class, 'storeTransfer']);
 Route::post('/transfers/{id}/approve', [MobileApiController::class, 'approveTransfer']);
+Route::post('/transfers/{id}/reject', [MobileApiController::class, 'rejectTransfer']);
 
 // 8. Kas & Akuntansi
 Route::get('/cash-transactions', [MobileApiController::class, 'cashTransactions']);

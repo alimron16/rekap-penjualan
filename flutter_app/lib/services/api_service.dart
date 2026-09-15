@@ -222,6 +222,27 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> rejectTransfer(int id, {required String notes}) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/transfers/$id/reject'),
+      headers: headers,
+      body: jsonEncode({
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> checkPendingTransfers() async {
+    final headers = await _headers();
+    final res = await http.get(
+      Uri.parse('$baseUrl/transfers/pending-check'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
   // Kas & Akuntansi
   static Future<Map<String, dynamic>> getCashTransactions({String? type}) async {
     final headers = await _headers();

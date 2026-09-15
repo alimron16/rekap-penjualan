@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
 class ReceivablesScreen extends StatefulWidget {
@@ -19,9 +20,6 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
   List<dynamic> _unpaidSales = [];
   List<dynamic> _payments = [];
   List<dynamic> _accounts = [];
-
-  final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
-  final dateFormatter = DateFormat('dd MMM yyyy');
 
   @override
   void initState() {
@@ -67,7 +65,12 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
   }
 
   void _showPayModal(dynamic sale) {
-    final remainingDebt = (sale['remaining_debt'] ?? (sale['grand_total'] - (sale['paid_amount'] ?? 0))).toDouble();
+    final grandTotal = Formatters.parseDouble(sale['grand_total']);
+    final paidTotal = Formatters.parseDouble(sale['paid_amount']);
+    final remainingDebt = sale['remaining_debt'] != null
+        ? Formatters.parseDouble(sale['remaining_debt'])
+        : (grandTotal - paidTotal);
+
     final amountController = TextEditingController(text: remainingDebt.toStringAsFixed(0));
     final notesController = TextEditingController();
     int? selectedAccountId = _accounts.isNotEmpty ? _accounts.first['id'] : null;
@@ -98,7 +101,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Pelunasan Piutang',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
                     ),
@@ -133,7 +136,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                         children: [
                           const Text('Sisa Piutang', style: TextStyle(fontSize: 11, color: Colors.grey)),
                           Text(
-                            currencyFormatter.format(remainingDebt),
+                            Formatters.formatRupiah(remainingDebt),
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 14),
                           ),
                         ],
@@ -178,7 +181,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                     onPressed: isSubmitting
                         ? null
                         : () async {
-                            final amt = double.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                            final amt = Formatters.parseDouble(amountController.text);
                             if (amt <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Nominal harus lebih dari 0')),
@@ -210,7 +213,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                                 NotificationService.showNotification(
                                   id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
                                   title: 'Pelunasan Piutang Berhasil! 💰',
-                                  body: 'Pembayaran sebesar ${currencyFormatter.format(amt)} untuk ${sale['customer']?['name'] ?? 'Pelanggan'} berhasil dicatat.',
+                                  body: 'Pembayaran sebesar ${Formatters.formatRupiah(amt)} untuk ${sale['customer']?['name'] ?? 'Pelanggan'} berhasil dicatat.',
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -308,8 +311,8 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
         itemCount: _unpaidSales.length,
         itemBuilder: (ctx, i) {
           final s = _unpaidSales[i];
-          final total = (s['grand_total'] ?? 0).toDouble();
-          final paid = (s['paid_amount'] ?? 0).toDouble();
+          final total = Formatters.parseDouble(s['grand_total']);
+          final paid = Formatters.parseDouble(s['paid_amount']);
           final remaining = total - paid;
 
           return Card(
@@ -327,7 +330,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                       Expanded(
                         child: Text(
                           s['customer']?['name'] ?? 'Pelanggan Umum',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ThemeConfig.textDark),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ThemeConfig.textDark),
                         ),
                       ),
                       Container(
@@ -346,7 +349,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                   const SizedBox(height: 6),
                   Text(
                     'No. Faktur: ${s['invoice_no'] ?? '-'} • Tanggal: ${s['date'] ?? s['sale_date'] ?? '-'}',
-                    style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
+                    style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
                   ),
                   const Divider(height: 24),
                   Row(
@@ -355,8 +358,8 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total Tagihan', style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted)),
-                          Text(currencyFormatter.format(total), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Total Tagihan', style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted)),
+                          Text(Formatters.formatRupiah(total), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         ],
                       ),
                       Column(
@@ -364,7 +367,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                         children: [
                           const Text('Sisa Piutang', style: TextStyle(fontSize: 12, color: Colors.red)),
                           Text(
-                            currencyFormatter.format(remaining),
+                            Formatters.formatRupiah(remaining),
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 15),
                           ),
                         ],
@@ -405,7 +408,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
         itemCount: _payments.length,
         itemBuilder: (ctx, i) {
           final p = _payments[i];
-          final amt = (p['amount'] ?? 0).toDouble();
+          final amt = Formatters.parseDouble(p['amount']);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -431,11 +434,11 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                       children: [
                         Text(
                           p['customer']?['name'] ?? 'Pelanggan',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ThemeConfig.textDark),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ThemeConfig.textDark),
                         ),
                         Text(
                           '${p['date'] ?? '-'} • Kas: ${p['account']?['name'] ?? '-'}',
-                          style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
+                          style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
                         ),
                         if (p['notes'] != null && p['notes'].toString().isNotEmpty)
                           Text('Catatan: ${p['notes']}', style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
@@ -443,7 +446,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                     ),
                   ),
                   Text(
-                    '+${currencyFormatter.format(amt)}',
+                    '+${Formatters.formatRupiah(amt)}',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: ThemeConfig.accent, fontSize: 14),
                   ),
                 ],
