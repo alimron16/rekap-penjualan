@@ -95,99 +95,112 @@ class MobileApiController extends Controller
     public function dashboard(Request $request)
     {
         $user = $this->getUserFromToken($request);
-        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'is_auth_error' => true,
+                'message' => 'Sesi login tidak valid atau telah berakhir. Silakan login kembali.',
+            ], 401);
+        }
 
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        try {
+            $startDate = $request->query('start_date', date('Y-m-01'));
+            $endDate = $request->query('end_date', date('Y-m-d'));
 
-        // Financial report for period
-        $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
+            // Financial report for period (using optimized SQL)
+            $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
 
-        // Core KPI Cards (matching the 8 Excel green boxes)
-        $totalPersediaan = Product::all()->sum(fn($p) => (float)$p->stock * (float)$p->hpp);
-        $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')->sum('remaining_debt');
-        $totalPiutang = (float) Sale::where('status', 'BELUM LUNAS')->sum('remaining_receivable');
+            // Core KPI Cards (fast pure SQL aggregates)
+            $totalPersediaan = (float) DB::table('products')->selectRaw('COALESCE(SUM(stock * hpp), 0) as val')->value('val');
+            $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')->sum('remaining_debt');
+            $totalPiutang = (float) Sale::where('status', 'BELUM LUNAS')->sum('remaining_receivable');
 
-        $totalKasBank = (float) Account::where('group', 'AKTIVA')
-            ->whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130', '1-1131', '1-1190'])
-            ->sum('current_balance');
+            $totalKasBank = (float) Account::where('group', 'AKTIVA')
+                ->whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130', '1-1131', '1-1190'])
+                ->sum('current_balance');
 
-        $salesCount = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
-        $retailSalesCount = Sale::where('sale_type', 'retail')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
-        $grosirSalesCount = Sale::where('sale_type', 'grosir')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
+            $salesCount = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
+            $retailSalesCount = Sale::where('sale_type', 'retail')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
+            $grosirSalesCount = Sale::where('sale_type', 'grosir')->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->count();
 
-        // Top 10 Best-selling items (URUTAN PRODUK TERLARIS)
-        $topProducts = SaleItem::select('product_id', DB::raw('SUM(qty) as total_sold'))
-            ->whereHas('sale', function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
-            })
-            ->groupBy('product_id')
-            ->orderByDesc('total_sold')
-            ->limit(10)
-            ->with('product')
-            ->get();
+            // Top 10 Best-selling items (URUTAN PRODUK TERLARIS)
+            $topProducts = SaleItem::select('product_id', DB::raw('SUM(qty) as total_sold'))
+                ->whereHas('sale', function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
+                })
+                ->groupBy('product_id')
+                ->orderByDesc('total_sold')
+                ->limit(10)
+                ->with('product')
+                ->get();
 
-        // Target Profit for current month
-        $currentYear = (int) date('Y', strtotime($startDate));
-        $currentMonth = (int) date('m', strtotime($startDate));
-        $target = MonthlyTarget::where('year', $currentYear)->where('month', $currentMonth)->first();
-        $targetProfit = $target ? (float)$target->target_profit : 15000000.0;
-        $realizedProfit = (float)($pl['net_profit'] ?? 0);
-        $remainingTarget = max(0, $targetProfit - $realizedProfit);
-        $progressPct = $targetProfit > 0 ? min(100, round(($realizedProfit / $targetProfit) * 100, 1)) : 0;
+            // Target Profit for current month
+            $currentYear = (int) date('Y', strtotime($startDate));
+            $currentMonth = (int) date('m', strtotime($startDate));
+            $target = MonthlyTarget::where('year', $currentYear)->where('month', $currentMonth)->first();
+            $targetProfit = $target ? (float)$target->target_profit : 15000000.0;
+            $realizedProfit = (float)($pl['net_profit'] ?? 0);
+            $remainingTarget = max(0, $targetProfit - $realizedProfit);
+            $progressPct = $targetProfit > 0 ? min(100, round(($realizedProfit / $targetProfit) * 100, 1)) : 0;
 
-        // Daily trend data for Chart
-        $dailySales = Sale::select(DB::raw("DATE(date) as day"), DB::raw("SUM(total) as revenue"))
-            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
-            ->groupBy('day')
-            ->orderBy('day')
-            ->pluck('revenue', 'day')
-            ->toArray();
+            // Daily trend data for Chart
+            $dailySales = Sale::select(DB::raw("DATE(date) as day"), DB::raw("SUM(total) as revenue"))
+                ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->groupBy('day')
+                ->orderBy('day')
+                ->pluck('revenue', 'day')
+                ->toArray();
 
-        // Accounts list for cash & bank breakdown
-        $cashAccounts = Account::whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1131'])
-            ->get()
-            ->map(function ($acc) {
-                return [
-                    'id' => $acc->id,
-                    'code' => $acc->code,
-                    'name' => $acc->name,
-                    'current_balance' => (float)$acc->current_balance,
-                ];
-            });
+            // Accounts list for cash & bank breakdown
+            $cashAccounts = Account::whereIn('code', ['1-1110', '1-1111', '1-1112', '1-1113', '1-1120', '1-1131'])
+                ->get()
+                ->map(function ($acc) {
+                    return [
+                        'id' => $acc->id,
+                        'code' => $acc->code,
+                        'name' => $acc->name,
+                        'current_balance' => (float)$acc->current_balance,
+                    ];
+                });
 
-        $pendingTransfers = AgentTransfer::where('status', 'pending')->count();
-        $totalProducts = Product::count();
+            $pendingTransfers = AgentTransfer::where('status', 'pending')->count();
+            $totalProducts = Product::count();
 
-        $recentTransfers = AgentTransfer::with(['user', 'processedBy'])
-            ->latest()
-            ->take(5)
-            ->get();
+            $recentTransfers = AgentTransfer::with(['user', 'processedBy'])
+                ->latest()
+                ->take(5)
+                ->get();
 
-        return response()->json([
-            'success' => true,
-            'user' => $user,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
-            'totalPersediaan' => (float)$totalPersediaan,
-            'totalHutang' => (float)$totalHutang,
-            'totalPiutang' => (float)$totalPiutang,
-            'totalKasBank' => (float)$totalKasBank,
-            'pl' => $pl,
-            'salesCount' => $salesCount,
-            'retailSalesCount' => $retailSalesCount,
-            'grosirSalesCount' => $grosirSalesCount,
-            'targetProfit' => (float)$targetProfit,
-            'realizedProfit' => (float)$realizedProfit,
-            'remainingTarget' => (float)$remainingTarget,
-            'progressPct' => (float)$progressPct,
-            'cashAccounts' => $cashAccounts,
-            'topProducts' => $topProducts,
-            'dailySales' => $dailySales,
-            'pending_transfers' => $pendingTransfers,
-            'total_products' => $totalProducts,
-            'recent_transfers' => $recentTransfers,
-        ]);
+            return response()->json([
+                'success' => true,
+                'user' => $user,
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+                'totalPersediaan' => (float)$totalPersediaan,
+                'totalHutang' => (float)$totalHutang,
+                'totalPiutang' => (float)$totalPiutang,
+                'totalKasBank' => (float)$totalKasBank,
+                'pl' => $pl,
+                'salesCount' => $salesCount,
+                'retailSalesCount' => $retailSalesCount,
+                'grosirSalesCount' => $grosirSalesCount,
+                'targetProfit' => (float)$targetProfit,
+                'realizedProfit' => (float)$realizedProfit,
+                'remainingTarget' => (float)$remainingTarget,
+                'progressPct' => (float)$progressPct,
+                'cashAccounts' => $cashAccounts,
+                'topProducts' => $topProducts,
+                'dailySales' => $dailySales,
+                'pending_transfers' => $pendingTransfers,
+                'total_products' => $totalProducts,
+                'recent_transfers' => $recentTransfers,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses data dashboard: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -196,7 +209,13 @@ class MobileApiController extends Controller
     public function pollNotifications(Request $request)
     {
         $user = $this->getUserFromToken($request);
-        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'is_auth_error' => true,
+                'message' => 'Sesi login tidak valid atau telah berakhir. Silakan login kembali.',
+            ], 401);
+        }
 
         $pendingTransfersCount = AgentTransfer::where('status', 'pending')->count();
         $latestPending = AgentTransfer::where('status', 'pending')->with('user')->latest()->first();

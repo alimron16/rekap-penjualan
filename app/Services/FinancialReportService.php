@@ -20,27 +20,53 @@ class FinancialReportService
      */
     public function getProfitAndLoss(string $startDate, string $endDate): array
     {
-        $sales = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->get();
-        $digitalSales = DigitalSale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
-            ->where('status', 'SUKSES')
-            ->get();
-        $transfers = CashTransaction::where('type', 'TRANSFER')
+        // 1. Revenue components via fast SQL aggregation
+        $retailRevenue = (float) DB::table('sales')
+            ->where('sale_type', 'retail')
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
-            ->get();
+            ->sum('total');
 
-        // 1. Revenue components
-        $retailRevenue = (float) $sales->where('sale_type', 'retail')->sum('total');
-        $wholesaleRevenue = (float) $sales->where('sale_type', 'grosir')->sum('total');
-        $transferFeeRevenue = (float) $transfers->sum('admin_fee');
-        $multiRevenue = (float) $digitalSales->sum('selling_price');
-        $salesDiscount = (float) $sales->sum('discount');
+        $wholesaleRevenue = (float) DB::table('sales')
+            ->where('sale_type', 'grosir')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('total');
+
+        $transferFeeRevenue = (float) DB::table('cash_transactions')
+            ->where('type', 'TRANSFER')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('admin_fee');
+
+        $multiRevenue = (float) DB::table('digital_sales')
+            ->where('status', 'SUKSES')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('selling_price');
+
+        $salesDiscount = (float) DB::table('sales')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('discount');
 
         $totalRevenue = $retailRevenue + $wholesaleRevenue + $transferFeeRevenue + $multiRevenue;
 
-        // 2. COGS (HPP)
-        $retailHpp = (float) $sales->where('sale_type', 'retail')->sum(fn($s) => $s->total_hpp);
-        $wholesaleHpp = (float) $sales->where('sale_type', 'grosir')->sum(fn($s) => $s->total_hpp);
-        $multiHpp = (float) $digitalSales->sum('hpp');
+        // 2. COGS (HPP) via fast SQL join aggregation
+        $retailHpp = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->where('sales.sale_type', 'retail')
+            ->whereBetween('sales.date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->selectRaw('COALESCE(SUM(sale_items.qty * sale_items.hpp), 0) as val')
+            ->value('val');
+
+        $wholesaleHpp = (float) DB::table('sale_items')
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->where('sales.sale_type', 'grosir')
+            ->whereBetween('sales.date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->selectRaw('COALESCE(SUM(sale_items.qty * sale_items.hpp), 0) as val')
+            ->value('val');
+
+        $multiHpp = (float) DB::table('digital_sales')
+            ->where('status', 'SUKSES')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('hpp');
+
         $totalHpp = $retailHpp + $wholesaleHpp + $multiHpp;
 
         // 3. Gross Profit
@@ -116,8 +142,8 @@ class FinancialReportService
             ->where('type', '!=', 'H')
             ->get();
 
-        // Calculate actual inventory valuation from physical stock & HPP
-        $actualInventoryValuation = Product::all()->sum(fn($p) => (float)$p->stock * (float)$p->hpp);
+        // Calculate actual inventory valuation from physical stock & HPP via fast SQL
+        $actualInventoryValuation = (float) DB::table('products')->selectRaw('COALESCE(SUM(stock * hpp), 0) as val')->value('val');
 
         $aktivaList = [];
         $totalAktiva = 0;

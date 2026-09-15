@@ -41,6 +41,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? _userData;
   Map<String, dynamic>? _dashboardData;
   bool _isLoading = true;
+  bool _isSyncing = false;
+  bool _isOfflineMode = false;
+  bool _isPolling = false;
   String? _errorMessage;
 
   late String _startDate;
@@ -57,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _endDate = DateFormat('yyyy-MM-dd').format(now);
 
     NotificationService.requestPermission();
-    _loadDashboardData();
+    _initDashboardWithCache();
     _startPendingTransferPolling();
   }
 
@@ -67,10 +70,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  void _initDashboardWithCache() async {
+    // 1. Instantly load cached user and cached dashboard in 0 milliseconds!
+    final user = await ApiService.getUser();
+    final cached = await ApiService.getCachedDashboard();
+
+    if (mounted) {
+      setState(() {
+        _userData = user;
+        if (cached != null) {
+          _dashboardData = cached;
+          _isLoading = false; // ZERO DELAY: Display dashboard immediately!
+          _isSyncing = true;
+          final pendingCount = Formatters.parseInt(cached['pending_transfers']);
+          _lastPendingTransferCount = pendingCount;
+        }
+      });
+    }
+
+    // 2. Fetch fresh live data from server in the background
+    _loadDashboardData(isBackgroundSync: cached != null);
+  }
+
   void _startPendingTransferPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (_isPolling) return;
       final role = _userData?['role']?.toString().toLowerCase();
       if (role == 'admin' || role == 'super_admin' || role == 'superadmin') {
+        _isPolling = true;
         try {
           final res = await ApiService.pollNotifications();
           if (res['success'] == true) {
@@ -87,52 +114,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 body: '$sender mengajukan transfer $bank sebesar ${Formatters.formatRupiah(amount)}. Menunggu persetujuan Anda.',
               );
             }
-            _lastPendingTransferCount = currentCount;
+            if (mounted) {
+              setState(() {
+                _lastPendingTransferCount = currentCount;
+              });
+            }
           }
-        } catch (_) {}
+        } catch (_) {} finally {
+          _isPolling = false;
+        }
       }
     });
   }
 
-  void _loadDashboardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  void _loadDashboardData({bool isBackgroundSync = false}) async {
+    if (!mounted) return;
+
+    if (!isBackgroundSync) {
+      setState(() {
+        _isLoading = _dashboardData == null;
+        _isSyncing = true;
+        _errorMessage = null;
+      });
+    } else {
+      setState(() {
+        _isSyncing = true;
+      });
+    }
 
     try {
       final user = await ApiService.getUser();
       final data = await ApiService.getDashboard(startDate: _startDate, endDate: _endDate);
 
-      if (mounted) {
-        setState(() {
-          _userData = user;
-          if (data['success'] == true) {
-            _dashboardData = data;
-            final pendingCount = Formatters.parseInt(data['pending_transfers']);
-            _lastPendingTransferCount = pendingCount;
-            final role = (_userData?['role'] ?? '').toString().toLowerCase();
+      if (!mounted) return;
 
-            if (pendingCount > 0 && (role == 'admin' || role == 'super_admin' || role == 'superadmin')) {
-              NotificationService.showNotification(
-                id: 101,
-                title: '⚠️ Pengajuan Transfer Menunggu ACC',
-                body: 'Ada $pendingCount pengajuan transfer agen yang butuh persetujuan Anda.',
-              );
-            }
+      // Handle 401 Session Expiry
+      if (data['is_auth_error'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesi login telah berakhir. Silakan masuk kembali.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        return;
+      }
+
+      setState(() {
+        _userData = user;
+        _isSyncing = false;
+
+        if (data['success'] == true) {
+          _dashboardData = data;
+          _errorMessage = null;
+          _isOfflineMode = false;
+
+          final pendingCount = Formatters.parseInt(data['pending_transfers']);
+          _lastPendingTransferCount = pendingCount;
+          final role = (_userData?['role'] ?? '').toString().toLowerCase();
+
+          if (pendingCount > 0 && (role == 'admin' || role == 'super_admin' || role == 'superadmin')) {
+            NotificationService.showNotification(
+              id: 101,
+              title: '⚠️ Pengajuan Transfer Menunggu ACC',
+              body: 'Ada $pendingCount pengajuan transfer agen yang butuh persetujuan Anda.',
+            );
+          }
+        } else {
+          // If we already have cached data, don't wipe the screen!
+          if (_dashboardData != null) {
+            _isOfflineMode = true;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(data['message'] ?? 'Koneksi lambat. Menampilkan data tersimpan.')),
+                  ],
+                ),
+                backgroundColor: Colors.amber.shade900,
+                duration: const Duration(seconds: 3),
+              ),
+            );
           } else {
             _errorMessage = data['message'] ?? 'Gagal memuat ringkasan dashboard';
           }
-          _isLoading = false;
-        });
-      }
+        }
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
+      if (!mounted) return;
+      setState(() {
+        _isSyncing = false;
+        if (_dashboardData != null) {
+          _isOfflineMode = true;
+        } else {
           _errorMessage = 'Koneksi gagal: $e';
-          _isLoading = false;
-        });
-      }
+        }
+        _isLoading = false;
+      });
     }
   }
 
@@ -187,9 +269,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: _isSyncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.refresh),
             tooltip: 'Segarkan Dashboard',
-            onPressed: _loadDashboardData,
+            onPressed: () => _loadDashboardData(isBackgroundSync: false),
           ),
           IconButton(
             icon: Stack(
@@ -219,15 +307,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
       drawer: _buildAppDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-          : _errorMessage != null
+          : (_errorMessage != null && _dashboardData == null)
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _loadDashboardData, child: const Text('Coba Lagi')),
-                    ],
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(28.0),
+                    child: Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.cloud_off_rounded, size: 48, color: Colors.red.shade700),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Koneksi Bermasalah',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: ThemeConfig.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => _loadDashboardData(isBackgroundSync: false),
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: const Text('Coba Lagi', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF64748B),
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () async {
+                                  await ApiService.logout();
+                                  if (context.mounted) {
+                                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                                  }
+                                },
+                                icon: const Icon(Icons.logout_rounded, size: 16),
+                                label: const Text('Masuk Kembali / Ganti Akun'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 )
               : LayoutBuilder(
@@ -235,7 +385,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     final isTablet = constraints.maxWidth >= 700;
 
                     return RefreshIndicator(
-                      onRefresh: () async => _loadDashboardData(),
+                      onRefresh: () async => _loadDashboardData(isBackgroundSync: false),
                       child: ListView(
                         padding: EdgeInsets.only(
                           left: 14,
@@ -244,6 +394,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           bottom: bottomInset + 30, // Anti-cut navbar padding
                         ),
                         children: [
+                          if (_isOfflineMode)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.amber.shade300),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.wifi_off_rounded, size: 18, color: Colors.amber.shade800),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Mode Offline: Menampilkan data tersimpan di HP.',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => _loadDashboardData(isBackgroundSync: false),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      child: Text(
+                                        'Segarkan',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary, decoration: TextDecoration.underline),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           // 1. TOP FILTER & INSTRUCTION PANEL
                           _buildTopFilterPanel(),
                           const SizedBox(height: 14),
