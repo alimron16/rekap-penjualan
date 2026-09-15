@@ -97,8 +97,8 @@ class MobileApiController extends Controller
 
         $today = Carbon::today();
 
-        $totalSalesToday = Sale::whereDate('sale_date', $today)->sum('grand_total');
-        $trxCountToday = Sale::whereDate('sale_date', $today)->count();
+        $totalSalesToday = Sale::whereDate('date', $today)->sum('total');
+        $trxCountToday = Sale::whereDate('date', $today)->count();
         $pendingTransfers = AgentTransfer::where('status', 'pending')->count();
         $totalProducts = Product::count();
 
@@ -786,8 +786,8 @@ class MobileApiController extends Controller
         $profitLoss = $this->reportService->getProfitLossData($startDate, $endDate);
         $balanceSheet = $this->reportService->getBalanceSheetData($endDate);
 
-        $salesSummary = Sale::whereBetween('date', [$startDate, $endDate])->sum('grand_total');
-        $purchaseSummary = Purchase::whereBetween('date', [$startDate, $endDate])->sum('grand_total');
+        $salesSummary = Sale::whereBetween('date', [$startDate, $endDate])->sum('total');
+        $purchaseSummary = Purchase::whereBetween('date', [$startDate, $endDate])->sum('total');
 
         return response()->json([
             'success' => true,
