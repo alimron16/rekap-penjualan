@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'api_service.dart';
 import '../utils/formatters.dart';
 
+// ============================================================
+// WORKMANAGER BACKGROUND TASK (fallback polling when FCM not received)
+// ============================================================
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
     try {
-      // In background isolate, re-initialize notifications
       await NotificationService.init();
 
       final prefs = await SharedPreferences.getInstance();
@@ -62,25 +65,27 @@ void callbackDispatcher() {
   });
 }
 
+// ============================================================
+// NOTIFICATION SERVICE
+// ============================================================
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static const String channelId = 'elephant_pos_channel_high';
   static const String channelName = 'Elephant POS Notifikasi Penting';
-  static const String channelDesc = 'Pemberitahuan real-time transfer agen, kasir, dan persediaan';
+  static const String channelDesc =
+      'Pemberitahuan real-time transfer agen, kasir, dan persediaan';
 
+  // ─── INIT: Local Notifications ────────────────────────────────
   static Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
 
-    await _notificationsPlugin.initialize(
-      settings: initializationSettings,
-    );
+    await _notificationsPlugin.initialize(settings: initializationSettings);
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       channelId,
@@ -93,21 +98,62 @@ class NotificationService {
     );
 
     final androidPlugin = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(channel);
   }
 
+  // ─── SETUP FCM: Call once after app is fully mounted ──────────
+  static Future<void> setupFcm({Function(RemoteMessage)? onTap}) async {
+    final messaging = FirebaseMessaging.instance;
+
+    // Request permission (Android 13+ / iOS)
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+    // Foreground FCM → display as local notification
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final title = message.notification?.title ??
+          message.data['title'] ??
+          '🔔 Elephant POS';
+      final body = message.notification?.body ??
+          message.data['body'] ??
+          'Ada notifikasi baru.';
+      await showNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: title,
+        body: body,
+        payload: message.data['route'],
+      );
+    });
+
+    // Notification tapped while app is BACKGROUND (not killed)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      onTap?.call(message);
+    });
+
+    // Get FCM token and send to server
+    try {
+      final fcmToken = await messaging.getToken();
+      if (fcmToken != null) {
+        await ApiService.updateFcmToken(fcmToken);
+        debugPrint('FCM Token sent to server: ${fcmToken.substring(0, 20)}...');
+      }
+    } catch (e) {
+      debugPrint('FCM token retrieval error: $e');
+    }
+
+    // Re-send token on refresh
+    messaging.onTokenRefresh.listen((newToken) async {
+      await ApiService.updateFcmToken(newToken);
+    });
+  }
+
+  // ─── PERMISSION ────────────────────────────────────────────────
   static Future<bool> requestPermission() async {
     try {
       final androidPlugin = _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       final granted = await androidPlugin?.requestNotificationsPermission();
       if (granted == true) return true;
-
       final status = await Permission.notification.request();
       return status.isGranted;
     } catch (e) {
@@ -116,6 +162,7 @@ class NotificationService {
     }
   }
 
+  // ─── SHOW LOCAL NOTIFICATION ───────────────────────────────────
   static Future<void> showNotification({
     required int id,
     required String title,
@@ -124,8 +171,7 @@ class NotificationService {
   }) async {
     await requestPermission();
 
-    final AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
       channelName,
       channelDescription: channelDesc,
@@ -143,15 +189,17 @@ class NotificationService {
       ),
     );
 
-    final NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
+    final NotificationDetails platformDetails =
+        NotificationDetails(android: androidDetails);
 
     await _notificationsPlugin.show(
       id: id,
       title: title,
       body: body,
-      notificationDetails: platformChannelSpecifics,
+      notificationDetails: platformDetails,
       payload: payload,
     );
   }
 }
+
+

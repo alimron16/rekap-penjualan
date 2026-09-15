@@ -60,6 +60,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _endDate = DateFormat('yyyy-MM-dd').format(now);
 
     NotificationService.requestPermission();
+    // Setup FCM: register device token + handle foreground messages
+    NotificationService.setupFcm();
     _initDashboardWithCache();
     _startPendingTransferPolling();
   }
@@ -1213,6 +1215,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
                   }),
+                  const Divider(),
+                  // ── LOGOUT ────────────────────────────────────────
+                  ListTile(
+                    leading: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                    title: const Text(
+                      'Keluar / Logout',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
+                    ),
+                    dense: true,
+                    onTap: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: const Row(
+                            children: [
+                              Icon(Icons.logout_rounded, color: Colors.red, size: 22),
+                              SizedBox(width: 8),
+                              Text('Konfirmasi Logout'),
+                            ],
+                          ),
+                          content: const Text(
+                            'Apakah Anda yakin ingin keluar dari aplikasi? Semua sesi akan dihapus.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Batal'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Ya, Keluar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && context.mounted) {
+                        await ApiService.logout();
+                        if (context.mounted) {
+                          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                        }
+                      }
+                    },
+                  ),
                 ],
               ),
             ),

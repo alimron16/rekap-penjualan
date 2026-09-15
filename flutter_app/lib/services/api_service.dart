@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 class ApiService {
   static const String baseUrl = 'https://pos.moonbyte.my.id/api';
@@ -666,4 +668,38 @@ class ApiService {
   static Future<Map<String, dynamic>> getSettings() async {
     return await _get('$baseUrl/settings');
   }
+
+  /// Save updated store settings (name, phone, address, receipt_footer)
+  static Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> data) async {
+    return await _put('$baseUrl/settings', data);
+  }
+
+  /// Upload store logo as multipart/form-data
+  static Future<Map<String, dynamic>> uploadSettingsLogo(String filePath) async {
+    try {
+      final token = await getToken();
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/settings/logo'),
+      );
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+      request.files.add(await http.MultipartFile.fromPath('logo', filePath));
+      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamed);
+      return await _handleResponse(response);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal unggah logo: $e'};
+    }
+  }
+
+  /// Send FCM device token to server so backend can push notifications
+  static Future<void> updateFcmToken(String fcmToken) async {
+    try {
+      await _post('$baseUrl/fcm-token', {'fcm_token': fcmToken});
+    } catch (e) {
+      debugPrint('updateFcmToken error: $e');
+    }
+  }
 }
+
