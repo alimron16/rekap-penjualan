@@ -129,19 +129,41 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $search = $request->query('q');
-        $query = Product::with('category');
+        $search = $request->query('q') ?? $request->query('search');
+        $type = $request->query('type');
+        $brand = $request->query('brand');
+
+        $query = Product::query();
 
         if ($search) {
-            $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('barcode', 'like', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('item_code', 'like', "%{$search}%")
+                  ->orWhere('brand', 'like', "%{$search}%")
+                  ->orWhere('type', 'like', "%{$search}%");
+            });
+        }
+
+        if ($type && $type !== 'ALL' && $type !== 'SEMUA') {
+            $query->where('type', $type);
+        }
+
+        if ($brand && $brand !== 'ALL') {
+            $query->where('brand', $brand);
         }
 
         $products = $query->orderBy('name')->get();
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::whereIn('type', ['physical_type', 'physical_brand'])->orderBy('type')->orderBy('name')->get();
+        $types = Category::where('type', 'physical_type')->pluck('name');
+        $brands = Category::where('type', 'physical_brand')->pluck('name');
 
-        return response()->json(['success' => true, 'data' => $products, 'categories' => $categories]);
+        return response()->json([
+            'success' => true,
+            'data' => $products,
+            'categories' => $categories,
+            'types' => $types,
+            'brands' => $brands,
+        ]);
     }
 
     public function storeProduct(Request $request)
@@ -150,18 +172,29 @@ class MobileApiController extends Controller
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $data = $request->validate([
-            'code' => 'required|string|unique:products,code',
+            'item_code' => 'required|string|unique:products,item_code',
             'name' => 'required|string|max:255',
-            'barcode' => 'nullable|string|max:50',
-            'category_id' => 'nullable|exists:categories,id',
-            'buy_price' => 'nullable|numeric|min:0',
-            'selling_price' => 'required|numeric|min:0',
-            'selling_price_grosir' => 'nullable|numeric|min:0',
-            'stock' => 'nullable|numeric|min:0',
-            'min_stock' => 'nullable|numeric|min:0',
-            'unit' => 'nullable|string|max:20',
+            'type' => 'required|string',
+            'brand' => 'nullable|string',
+            'stock' => 'required|numeric|min:0',
+            'min_stock' => 'nullable|integer|min:0',
+            'hpp' => 'required|numeric|min:0',
+            'retail_price' => 'required|numeric|min:0',
+            'wholesale_price' => 'nullable|numeric|min:0',
             'status' => 'required|string|in:Masih Dijual,Tidak Dijual',
         ]);
+
+        if (empty($data['wholesale_price'])) {
+            $data['wholesale_price'] = $data['retail_price'];
+        }
+
+        // Auto create category if not exists
+        if (!empty($data['type'])) {
+            Category::firstOrCreate(['type' => 'physical_type', 'name' => strtoupper(trim($data['type']))]);
+        }
+        if (!empty($data['brand'])) {
+            Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
+        }
 
         $product = Product::create($data);
         return response()->json(['success' => true, 'message' => 'Produk berhasil ditambahkan!', 'data' => $product]);
@@ -772,7 +805,7 @@ class MobileApiController extends Controller
     }
 
     // ==========================================
-    // 9. LAPORAN KEUANGAN LENGKAP
+    // 9. LAPORAN KEUANGAN LENGKAP & CEPAT
     // ==========================================
 
     public function financialReports(Request $request)
@@ -783,11 +816,11 @@ class MobileApiController extends Controller
         $startDate = $request->query('start_date', date('Y-m-01'));
         $endDate = $request->query('end_date', date('Y-m-d'));
 
-        $profitLoss = $this->reportService->getProfitLossData($startDate, $endDate);
-        $balanceSheet = $this->reportService->getBalanceSheetData($endDate);
+        $profitLoss = $this->reportService->getProfitAndLoss($startDate, $endDate);
+        $balanceSheet = $this->reportService->getBalanceSheet($endDate);
 
-        $salesSummary = Sale::whereBetween('date', [$startDate, $endDate])->sum('total');
-        $purchaseSummary = Purchase::whereBetween('date', [$startDate, $endDate])->sum('total');
+        $salesSummary = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->sum('total');
+        $purchaseSummary = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])->sum('total');
 
         return response()->json([
             'success' => true,
@@ -795,6 +828,182 @@ class MobileApiController extends Controller
             'balance_sheet' => $balanceSheet,
             'sales_summary' => (float) $salesSummary,
             'purchase_summary' => (float) $purchaseSummary,
+        ]);
+    }
+
+    public function reportSales(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $startDate = $request->query('start_date', date('Y-m-01'));
+        $endDate = $request->query('end_date', date('Y-m-d'));
+        $saleType = $request->query('sale_type', 'all');
+
+        $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->with(['customer', 'items.product']);
+
+        if ($saleType !== 'all') {
+            $query->where('sale_type', $saleType);
+        }
+
+        $sales = $query->orderByDesc('date')->take(100)->get();
+
+        $totalQty = 0;
+        $totalSubtotal = 0;
+        $totalDiscount = 0;
+        $totalFinal = 0;
+        $totalPaid = 0;
+        $totalReceivable = 0;
+
+        foreach ($sales as $s) {
+            $totalQty += $s->items->sum('qty');
+            $totalSubtotal += $s->subtotal;
+            $totalDiscount += $s->discount;
+            $totalFinal += $s->total;
+            $totalPaid += $s->paid_amount;
+            $totalReceivable += $s->remaining_receivable;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $sales,
+            'summary' => [
+                'total_qty' => $totalQty,
+                'total_subtotal' => (float) $totalSubtotal,
+                'total_discount' => (float) $totalDiscount,
+                'total_final' => (float) $totalFinal,
+                'total_paid' => (float) $totalPaid,
+                'total_receivable' => (float) $totalReceivable,
+            ]
+        ]);
+    }
+
+    public function reportPurchases(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $startDate = $request->query('start_date', date('Y-m-01'));
+        $endDate = $request->query('end_date', date('Y-m-d'));
+
+        $purchases = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->with(['supplier', 'items.product'])
+            ->orderByDesc('date')
+            ->take(100)
+            ->get();
+
+        $totalQty = 0;
+        $totalSubtotal = 0;
+        $totalDiscount = 0;
+        $totalPaid = 0;
+        $totalDebt = 0;
+
+        foreach ($purchases as $p) {
+            $totalQty += $p->items->sum('qty');
+            $totalSubtotal += $p->subtotal;
+            $totalDiscount += $p->discount;
+            $totalPaid += $p->paid_amount;
+            $totalDebt += $p->remaining_debt;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $purchases,
+            'summary' => [
+                'total_qty' => $totalQty,
+                'total_subtotal' => (float) $totalSubtotal,
+                'total_discount' => (float) $totalDiscount,
+                'total_paid' => (float) $totalPaid,
+                'total_debt' => (float) $totalDebt,
+            ]
+        ]);
+    }
+
+    public function reportCash(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $startDate = $request->query('start_date', date('Y-m-01'));
+        $endDate = $request->query('end_date', date('Y-m-d'));
+
+        $kasMasuk = CashTransaction::where('type', 'IN')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->with(['debitAccount', 'creditAccount'])
+            ->orderByDesc('date')
+            ->get();
+
+        $kasKeluar = CashTransaction::where('type', 'OUT')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->with(['debitAccount', 'creditAccount'])
+            ->orderByDesc('date')
+            ->get();
+
+        $kasTransfer = CashTransaction::where('type', 'TRANSFER')
+            ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->with(['debitAccount', 'creditAccount'])
+            ->orderByDesc('date')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'kas_masuk' => $kasMasuk,
+            'kas_keluar' => $kasKeluar,
+            'kas_transfer' => $kasTransfer,
+            'summary' => [
+                'total_masuk' => (float) $kasMasuk->sum('amount'),
+                'total_keluar' => (float) $kasKeluar->sum('amount'),
+                'total_transfer' => (float) $kasTransfer->sum('amount'),
+            ]
+        ]);
+    }
+
+    public function reportProfitLoss(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $startDate = $request->query('start_date', date('Y-m-01'));
+        $endDate = $request->query('end_date', date('Y-m-d'));
+
+        $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
+        return response()->json(['success' => true, 'data' => $pl]);
+    }
+
+    public function reportBalanceSheet(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $asOfDate = $request->query('as_of_date', date('Y-m-d'));
+        $bs = $this->reportService->getBalanceSheet($asOfDate);
+        return response()->json(['success' => true, 'data' => $bs]);
+    }
+
+    public function reportDebtsReceivables(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $debts = Purchase::where('status', 'BELUM LUNAS')
+            ->where('remaining_debt', '>', 0)
+            ->with('supplier')
+            ->orderByDesc('date')
+            ->get();
+
+        $receivables = Sale::where('status', 'BELUM LUNAS')
+            ->where('remaining_receivable', '>', 0)
+            ->with('customer')
+            ->orderByDesc('date')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'debts' => $debts,
+            'total_debts' => (float) $debts->sum('remaining_debt'),
+            'receivables' => $receivables,
+            'total_receivables' => (float) $receivables->sum('remaining_receivable'),
         ]);
     }
 

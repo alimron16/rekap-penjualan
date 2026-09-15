@@ -15,6 +15,9 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   List<dynamic> _products = [];
+  List<dynamic> _filteredProducts = [];
+  List<dynamic> _types = [];
+  String _selectedType = 'ALL';
   bool _isLoading = true;
   final _searchController = TextEditingController();
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -39,6 +42,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         setState(() {
           if (res['success'] == true) {
             _products = res['data'] ?? [];
+            _filteredProducts = _products;
+            _types = res['types'] ?? [];
           }
           _isLoading = false;
         });
@@ -52,15 +57,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  void _filterByType(String type) {
+    setState(() {
+      _selectedType = type;
+      if (type == 'ALL') {
+        _filteredProducts = _products;
+      } else {
+        _filteredProducts = _products.where((p) {
+          final t = (p['type'] ?? '').toString().toUpperCase();
+          return t == type.toUpperCase();
+        }).toList();
+      }
+    });
+  }
+
   void _showAddProductModal() {
     final codeController = TextEditingController(text: 'PRD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
     final nameController = TextEditingController();
-    final barcodeController = TextEditingController();
-    final buyPriceController = TextEditingController(text: '0');
-    final sellPriceController = TextEditingController(text: '0');
-    final grosirPriceController = TextEditingController(text: '0');
+    final typeController = TextEditingController(text: 'VOCER');
+    final brandController = TextEditingController(text: 'TELKOMSEL');
+    final hppController = TextEditingController(text: '0');
+    final retailPriceController = TextEditingController(text: '0');
+    final wholesalePriceController = TextEditingController(text: '0');
     final stockController = TextEditingController(text: '0');
-    final unitController = TextEditingController(text: 'PCS');
+    final minStockController = TextEditingController(text: '5');
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -87,7 +107,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Tambah Produk Baru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                    Text('Tambah Item Produk Baru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                   ],
                 ),
@@ -109,9 +129,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Barcode (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Jenis / Tipe', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           const SizedBox(height: 6),
-                          TextField(controller: barcodeController, decoration: const InputDecoration(hintText: 'Scan/Ketik')),
+                          TextField(controller: typeController, decoration: const InputDecoration(hintText: 'VOCER/ACC/KABEL')),
                         ],
                       ),
                     ),
@@ -128,9 +148,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Harga Beli (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Merek / Brand', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           const SizedBox(height: 6),
-                          TextField(controller: buyPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(controller: brandController, decoration: const InputDecoration(hintText: 'TELKOMSEL/ROBOT')),
                         ],
                       ),
                     ),
@@ -139,9 +159,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Harga Jual Ritel (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Harga Modal (HPP)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           const SizedBox(height: 6),
-                          TextField(controller: sellPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(controller: hppController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
                         ],
                       ),
                     ),
@@ -154,9 +174,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Harga Grosir (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Harga Eceran (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           const SizedBox(height: 6),
-                          TextField(controller: grosirPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(controller: retailPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
                         ],
                       ),
                     ),
@@ -165,21 +185,35 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Stok Awal & Satuan', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const Text('Harga Grosir (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                flex: 1,
-                                child: TextField(controller: unitController, decoration: const InputDecoration(hintText: 'PCS')),
-                              ),
-                            ],
-                          ),
+                          TextField(controller: wholesalePriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Stok Awal', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Min. Stok', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 6),
+                          TextField(controller: minStockController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '5')),
                         ],
                       ),
                     ),
@@ -193,21 +227,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     onPressed: isSubmitting
                         ? null
                         : () async {
-                            if (nameController.text.trim().isEmpty || sellPriceController.text.trim().isEmpty) {
+                            if (nameController.text.trim().isEmpty || retailPriceController.text.trim().isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nama dan harga jual wajib diisi')));
                               return;
                             }
                             setModalState(() => isSubmitting = true);
 
                             final res = await ApiService.storeProduct({
-                              'code': codeController.text.trim(),
+                              'item_code': codeController.text.trim(),
                               'name': nameController.text.trim(),
-                              'barcode': barcodeController.text.trim().isEmpty ? null : barcodeController.text.trim(),
-                              'buy_price': double.tryParse(buyPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-                              'selling_price': double.tryParse(sellPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-                              'selling_price_grosir': double.tryParse(grosirPriceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-                              'stock': double.tryParse(stockController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-                              'unit': unitController.text.trim(),
+                              'type': typeController.text.trim().toUpperCase(),
+                              'brand': brandController.text.trim().toUpperCase(),
+                              'hpp': Formatters.parseDouble(hppController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+                              'retail_price': Formatters.parseDouble(retailPriceController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+                              'wholesale_price': Formatters.parseDouble(wholesalePriceController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+                              'stock': Formatters.parseDouble(stockController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+                              'min_stock': Formatters.parseInt(minStockController.text),
                               'status': 'Masih Dijual',
                             });
 
@@ -217,7 +252,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
                                 title: 'Produk Baru Disimpan! 🛍️',
-                                body: 'Item "${nameController.text}" berhasil ditambahkan ke katalog.',
+                                body: 'Item "${nameController.text}" berhasil ditambahkan ke katalog stok.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(res['message'] ?? 'Produk berhasil ditambahkan!'), backgroundColor: ThemeConfig.accent),
@@ -245,8 +280,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: Text(widget.isMulti ? 'Master Produk Multi' : 'Master Katalog Barang', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: ThemeConfig.primary,
+        title: Text(widget.isMulti ? 'Master Produk Multi (Digital)' : 'Master Data Stok Barang', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => _loadProducts()),
+        ],
       ),
       floatingActionButton: widget.isMulti
           ? null
@@ -254,64 +294,88 @@ class _ProductsScreenState extends State<ProductsScreen> {
               backgroundColor: ThemeConfig.primary,
               onPressed: _showAddProductModal,
               icon: const Icon(Icons.add_circle, color: Colors.white),
-              label: const Text('Tambah Produk', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Tambah Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
       body: Column(
         children: [
-          // Search Input
+          // Search & Filter Box
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             color: Colors.white,
-            child: TextField(
-              controller: _searchController,
-              onChanged: (val) {
-                _loadProducts(search: val);
-              },
-              decoration: InputDecoration(
-                hintText: 'Cari nama barang, barcode, merek...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _loadProducts();
-                        },
-                      )
-                    : null,
-              ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: (val) => _loadProducts(search: val),
+                  decoration: InputDecoration(
+                    hintText: 'Cari nama barang, kode, merek...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              _loadProducts();
+                            },
+                          )
+                        : null,
+                  ),
+                ),
+                if (!widget.isMulti && _types.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('ALL', 'SEMUA'),
+                        ..._types.map((t) => _buildFilterChip(t.toString(), t.toString())),
+                      ],
+                    ),
+                  ),
+                ]
+              ],
             ),
           ),
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-                : _products.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Tidak ada barang ditemukan',
-                          style: TextStyle(color: ThemeConfig.textMuted),
+                : _filteredProducts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            const Text('Tidak ada item stok ditemukan', style: TextStyle(color: ThemeConfig.textMuted, fontSize: 13)),
+                          ],
                         ),
                       )
                     : RefreshIndicator(
                         onRefresh: () async => _loadProducts(),
                         child: ListView.separated(
-                          padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                          itemCount: _products.length,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _filteredProducts.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
-                            final item = _products[index];
+                            final item = _filteredProducts[index];
                             final name = item['name'] ?? '-';
-                            final code = item['code'] ?? '-';
-                            final price = Formatters.parseDouble(item['selling_price'] ?? item['retail_price'] ?? item['price']);
-                            final grosirPrice = Formatters.parseDouble(item['selling_price_grosir']);
+                            final code = item['item_code'] ?? item['code'] ?? '-';
+                            final type = item['type'] ?? 'FISIK';
+                            final brand = item['brand'] ?? '-';
+                            final retailPrice = Formatters.parseDouble(item['retail_price'] ?? item['selling_price']);
+                            final wholesalePrice = Formatters.parseDouble(item['wholesale_price'] ?? item['selling_price_grosir']);
                             final stock = Formatters.parseDouble(item['stock'] ?? item['current_stock']);
+                            final isOutOfStock = stock <= 0;
 
                             return Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade300),
+                                border: Border.all(color: Colors.grey.shade200),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
                               ),
                               child: Row(
                                 children: [
@@ -319,47 +383,70 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     width: 44,
                                     height: 44,
                                     decoration: BoxDecoration(
-                                      color: ThemeConfig.primary.withOpacity(0.08),
+                                      color: isOutOfStock ? Colors.red.shade50 : ThemeConfig.primary.withOpacity(0.08),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: const Icon(Icons.inventory_2_outlined, color: ThemeConfig.primary),
+                                    child: Icon(
+                                      Icons.inventory_2_outlined,
+                                      color: isOutOfStock ? Colors.red : ThemeConfig.primary,
+                                      size: 22,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade50,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                type.toString().toUpperCase(),
+                                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              code,
+                                              style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.primary),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
                                         Text(
                                           name,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: ThemeConfig.textDark,
-                                          ),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Kode: $code • Stok: $stock ${item['unit'] ?? ''}',
-                                          style: const TextStyle(
+                                          'Brand: $brand • Stok: ${stock.toStringAsFixed(0)}',
+                                          style: TextStyle(
                                             fontSize: 11,
-                                            color: ThemeConfig.textMuted,
+                                            fontWeight: FontWeight.w600,
+                                            color: isOutOfStock ? Colors.red : ThemeConfig.textMuted,
                                           ),
                                         ),
-                                        if (grosirPrice > 0)
-                                          Text(
-                                            'Grosir: ${currencyFormatter.format(grosirPrice)}',
-                                            style: const TextStyle(fontSize: 11, color: Colors.teal, fontWeight: FontWeight.w600),
-                                          ),
                                       ],
                                     ),
                                   ),
-                                  Text(
-                                    currencyFormatter.format(price),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: ThemeConfig.primary,
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        Formatters.formatRupiah(retailPrice),
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: ThemeConfig.primary),
+                                      ),
+                                      if (wholesalePrice > 0 && wholesalePrice != retailPrice)
+                                        Text(
+                                          'Grosir: ${Formatters.formatRupiah(wholesalePrice)}',
+                                          style: TextStyle(fontSize: 10, color: Colors.teal.shade800, fontWeight: FontWeight.bold),
+                                        ),
+                                    ],
                                   )
                                 ],
                               ),
@@ -372,4 +459,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
     );
   }
+
+  Widget _buildFilterChip(String key, String label) {
+    final isSelected = _selectedType == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.grey.shade700)),
+        selected: isSelected,
+        selectedColor: ThemeConfig.primary,
+        backgroundColor: Colors.grey.shade100,
+        onSelected: (_) => _filterByType(key),
+      ),
+    );
+  }
 }
+

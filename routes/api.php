@@ -53,6 +53,12 @@ Route::post('/cash-transactions', [MobileApiController::class, 'storeCashTransac
 
 // 9. Laporan Keuangan
 Route::get('/reports', [MobileApiController::class, 'financialReports']);
+Route::get('/reports/sales', [MobileApiController::class, 'reportSales']);
+Route::get('/reports/purchases', [MobileApiController::class, 'reportPurchases']);
+Route::get('/reports/cash', [MobileApiController::class, 'reportCash']);
+Route::get('/reports/profit-loss', [MobileApiController::class, 'reportProfitLoss']);
+Route::get('/reports/balance-sheet', [MobileApiController::class, 'reportBalanceSheet']);
+Route::get('/reports/debts-receivables', [MobileApiController::class, 'reportDebtsReceivables']);
 
 // 10. Pengaturan & User
 Route::get('/users', [MobileApiController::class, 'users']);

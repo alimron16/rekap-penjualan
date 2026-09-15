@@ -438,6 +438,69 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> getSalesReport({String? startDate, String? endDate, String saleType = 'all'}) async {
+    final headers = await _headers();
+    final s = startDate ?? '';
+    final e = endDate ?? '';
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/sales?start_date=$s&end_date=$e&sale_type=$saleType'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getPurchasesReport({String? startDate, String? endDate}) async {
+    final headers = await _headers();
+    final s = startDate ?? '';
+    final e = endDate ?? '';
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/purchases?start_date=$s&end_date=$e'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getCashReport({String? startDate, String? endDate}) async {
+    final headers = await _headers();
+    final s = startDate ?? '';
+    final e = endDate ?? '';
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/cash?start_date=$s&end_date=$e'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getProfitLossReport({String? startDate, String? endDate}) async {
+    final headers = await _headers();
+    final s = startDate ?? '';
+    final e = endDate ?? '';
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/profit-loss?start_date=$s&end_date=$e'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getBalanceSheetReport({String? asOfDate}) async {
+    final headers = await _headers();
+    final d = asOfDate ?? '';
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/balance-sheet?as_of_date=$d'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getDebtsReceivablesReport() async {
+    final headers = await _headers();
+    final res = await http.get(
+      Uri.parse('$baseUrl/reports/debts-receivables'),
+      headers: headers,
+    );
+    return jsonDecode(res.body);
+  }
+
   // Users & Settings
   static Future<Map<String, dynamic>> getUsers() async {
     final headers = await _headers();
