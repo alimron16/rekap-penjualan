@@ -6,17 +6,26 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\AgentTransfer;
 use App\Models\CashTransaction;
+use App\Models\Category;
 use App\Models\Customer;
+use App\Models\DebtPayment;
 use App\Models\DigitalProduct;
 use App\Models\DigitalSale;
+use App\Models\InventoryAdjustment;
+use App\Models\MonthlyTarget;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\ReceivablePayment;
 use App\Models\Sale;
+use App\Models\SaleReturn;
+use App\Models\StoreSetting;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\YearlyClosing;
 use App\Services\AccountingService;
 use App\Services\FinancialReportService;
 use App\Services\PosTransactionService;
+use App\Services\YearlyClosingService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
@@ -28,7 +37,8 @@ class MobileApiController extends Controller
     public function __construct(
         protected PosTransactionService $posService,
         protected AccountingService $accountingService,
-        protected FinancialReportService $reportService
+        protected FinancialReportService $reportService,
+        protected YearlyClosingService $closingService
     ) {}
 
     /**
@@ -57,7 +67,6 @@ class MobileApiController extends Controller
             ], 403);
         }
 
-        // Generate simple API token
         $token = bin2hex(random_bytes(32));
         $user->remember_token = $token;
         $user->save();
@@ -111,16 +120,17 @@ class MobileApiController extends Controller
         ]);
     }
 
-    /**
-     * Master Data: Products Catalog
-     */
+    // ==========================================
+    // 1. MASTER DATA CRUD ENDPOINTS
+    // ==========================================
+
     public function products(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $search = $request->query('q');
-        $query = Product::query();
+        $query = Product::with('category');
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
@@ -128,17 +138,44 @@ class MobileApiController extends Controller
                   ->orWhere('barcode', 'like', "%{$search}%");
         }
 
-        $products = $query->orderBy('name')->take(200)->get();
+        $products = $query->orderBy('name')->get();
+        $categories = Category::orderBy('name')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-        ]);
+        return response()->json(['success' => true, 'data' => $products, 'categories' => $categories]);
     }
 
-    /**
-     * Master Data: Customers
-     */
+    public function storeProduct(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'code' => 'required|string|unique:products,code',
+            'name' => 'required|string|max:255',
+            'barcode' => 'nullable|string|max:50',
+            'category_id' => 'nullable|exists:categories,id',
+            'buy_price' => 'nullable|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
+            'selling_price_grosir' => 'nullable|numeric|min:0',
+            'stock' => 'nullable|numeric|min:0',
+            'min_stock' => 'nullable|numeric|min:0',
+            'unit' => 'nullable|string|max:20',
+            'status' => 'required|string|in:Masih Dijual,Tidak Dijual',
+        ]);
+
+        $product = Product::create($data);
+        return response()->json(['success' => true, 'message' => 'Produk berhasil ditambahkan!', 'data' => $product]);
+    }
+
+    public function multiProducts(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $products = DigitalProduct::orderBy('name')->get();
+        return response()->json(['success' => true, 'data' => $products]);
+    }
+
     public function customers(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -148,9 +185,25 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'data' => $customers]);
     }
 
-    /**
-     * Master Data: Suppliers
-     */
+    public function storeCustomer(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:100',
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'account_number' => 'nullable|string',
+            'notes' => 'nullable|string',
+            'status' => 'required|string|in:Aktif,Nonaktif',
+        ]);
+
+        $customer = Customer::create($data);
+        return response()->json(['success' => true, 'message' => 'Pelanggan berhasil disimpan!', 'data' => $customer]);
+    }
+
     public function suppliers(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -160,9 +213,24 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'data' => $suppliers]);
     }
 
-    /**
-     * Master Data: Accounts (Bagan Akun / Kas)
-     */
+    public function storeSupplier(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:100',
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'account_number' => 'nullable|string',
+            'account_name' => 'nullable|string',
+        ]);
+
+        $supplier = Supplier::create($data);
+        return response()->json(['success' => true, 'message' => 'Supplier berhasil disimpan!', 'data' => $supplier]);
+    }
+
     public function accounts(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -172,9 +240,37 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'data' => $accounts]);
     }
 
-    /**
-     * POS Data Helper (For Retail & Wholesale checkout form)
-     */
+    public function storeAccount(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'code' => 'required|string|unique:accounts,code|max:20',
+            'name' => 'required|string|max:100',
+            'group' => 'required|string|in:AKTIVA,KEWAJIBAN,MODAL,PENDAPATAN,HPP,BIAYA,PENDAPATAN LAIN,BIAYA LAIN',
+            'type' => 'required|string|in:H,D,K',
+            'initial_balance' => 'nullable|numeric|min:0',
+        ]);
+
+        $initial = (float) ($data['initial_balance'] ?? 0);
+        $account = Account::create([
+            'code' => strtoupper($data['code']),
+            'name' => strtoupper($data['name']),
+            'group' => $data['group'],
+            'type' => $data['type'],
+            'initial_balance' => $initial,
+            'current_balance' => $initial,
+            'is_system_locked' => false,
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Akun COA berhasil dibuat!', 'data' => $account]);
+    }
+
+    // ==========================================
+    // 2. POS & PENJUALAN
+    // ==========================================
+
     public function posData(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -192,9 +288,6 @@ class MobileApiController extends Controller
         ]);
     }
 
-    /**
-     * POS Checkout (Retail / Grosir)
-     */
     public function posCheckout(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -229,9 +322,10 @@ class MobileApiController extends Controller
         }
     }
 
-    /**
-     * Digital / Pulsa Product List & Balance
-     */
+    // ==========================================
+    // 3. DIGITAL PULSA & PPOB
+    // ==========================================
+
     public function digitalData(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -240,7 +334,6 @@ class MobileApiController extends Controller
         $products = DigitalProduct::where('status', 'OPEN')->orderBy('name')->get();
         $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])->get();
         $cashAccounts = Account::whereIn('code', ['1-1110', '1-1112'])->get();
-
         $saldoMulti = Account::where('code', '1-1131')->value('current_balance') ?? 0;
 
         return response()->json([
@@ -252,9 +345,6 @@ class MobileApiController extends Controller
         ]);
     }
 
-    /**
-     * Digital / Pulsa Checkout
-     */
     public function digitalCheckout(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -272,21 +362,216 @@ class MobileApiController extends Controller
 
         try {
             $this->posService->processDigitalSale($data);
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaksi Pulsa / Elektrik berhasil!',
-            ]);
+            return response()->json(['success' => true, 'message' => 'Transaksi Pulsa / Elektrik berhasil!']);
         } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
 
-    /**
-     * Agent Transfer List
-     */
+    // ==========================================
+    // 4. PIUTANG & RETUR PENJUALAN
+    // ==========================================
+
+    public function receivables(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $unpaidSales = Sale::where('status', 'BELUM LUNAS')->with('customer')->orderByDesc('date')->get();
+        $payments = ReceivablePayment::with(['customer', 'account'])->latest()->take(30)->get();
+        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+
+        return response()->json([
+            'success' => true,
+            'unpaid_sales' => $unpaidSales,
+            'payments' => $payments,
+            'accounts' => $accounts,
+        ]);
+    }
+
+    public function storeReceivablePayment(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'date' => 'required|date',
+            'sale_id' => 'required|exists:sales,id',
+            'customer_id' => 'required|exists:customers,id',
+            'amount' => 'required|numeric|min:1',
+            'account_id' => 'required|exists:accounts,id',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $this->posService->processReceivablePayment($data);
+            return response()->json(['success' => true, 'message' => 'Pembayaran piutang berhasil dicatat!']);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function returns(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $returns = SaleReturn::with(['sale', 'customer', 'product', 'account'])->latest()->take(30)->get();
+        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+
+        return response()->json([
+            'success' => true,
+            'returns' => $returns,
+            'products' => $products,
+            'accounts' => $accounts,
+            'customers' => $customers,
+        ]);
+    }
+
+    public function storeReturn(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'date' => 'required|date',
+            'sale_id' => 'nullable|exists:sales,id',
+            'customer_id' => 'nullable|exists:customers,id',
+            'product_id' => 'required|exists:products,id',
+            'qty' => 'required|numeric|min:0.01',
+            'refund_amount' => 'required|numeric|min:0',
+            'account_id' => 'required|exists:accounts,id',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $this->posService->processSaleReturn($data);
+            return response()->json(['success' => true, 'message' => 'Retur penjualan berhasil dicatat!']);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    // ==========================================
+    // 5. PEMBELIAN & PEMBAYARAN HUTANG
+    // ==========================================
+
+    public function purchases(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $purchases = Purchase::with(['supplier', 'items.product'])->latest()->take(30)->get();
+        $suppliers = Supplier::orderBy('name')->get();
+        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $debts = Purchase::where('status', 'BELUM LUNAS')->with('supplier')->get();
+
+        return response()->json([
+            'success' => true,
+            'purchases' => $purchases,
+            'suppliers' => $suppliers,
+            'products' => $products,
+            'accounts' => $accounts,
+            'debts' => $debts,
+        ]);
+    }
+
+    public function storePurchase(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'date' => 'required|date',
+            'supplier_id' => 'required|exists:suppliers,id',
+            'payment_method' => 'required|string',
+            'account_id' => 'nullable|exists:accounts,id',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.buy_price' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $purchase = $this->posService->processPurchase($data);
+            return response()->json(['success' => true, 'message' => 'Faktur pembelian berhasil disimpan!', 'data' => $purchase]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function storeDebtPayment(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'date' => 'required|date',
+            'purchase_id' => 'required|exists:purchases,id',
+            'supplier_id' => 'required|exists:suppliers,id',
+            'amount' => 'required|numeric|min:1',
+            'account_id' => 'required|exists:accounts,id',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $this->posService->processDebtPayment($data);
+            return response()->json(['success' => true, 'message' => 'Pembayaran hutang berhasil dicatat!']);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    // ==========================================
+    // 6. PERSEDIAAN STOK (INVENTORY)
+    // ==========================================
+
+    public function inventoryAdjustments(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $adjustments = InventoryAdjustment::with('product')->latest()->take(50)->get();
+        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+
+        return response()->json([
+            'success' => true,
+            'adjustments' => $adjustments,
+            'products' => $products,
+        ]);
+    }
+
+    public function storeInventoryAdjustment(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'qty' => 'required|numeric|min:0.01',
+            'type' => 'required|in:IN,OUT',
+            'cost_price' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            $this->posService->processInventoryAdjustment($data);
+            return response()->json(['success' => true, 'message' => 'Penyesuaian stok berhasil disimpan!']);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    // ==========================================
+    // 7. TRANSFER ANTAR AGEN & BANK
+    // ==========================================
+
     public function transfers(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -313,9 +598,6 @@ class MobileApiController extends Controller
         ]);
     }
 
-    /**
-     * Store Agent Transfer Request
-     */
     public function storeTransfer(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -353,15 +635,56 @@ class MobileApiController extends Controller
         ]);
     }
 
-    /**
-     * Cash Flow: Kas Masuk / Kas Keluar
-     */
+    public function approveTransfer(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || (!$user->isAdmin() && !$user->isSuperAdmin())) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $transfer = AgentTransfer::findOrFail($id);
+
+        $request->validate([
+            'source_account_id' => 'required|exists:accounts,id',
+            'proof_image' => 'nullable|image|max:10240',
+            'notes' => 'nullable|string|max:255',
+        ]);
+
+        $path = $request->hasFile('proof_image')
+            ? $request->file('proof_image')->store('proofs', 'public')
+            : null;
+
+        $sourceAccount = Account::findOrFail($request->source_account_id);
+
+        $transfer->update([
+            'status' => 'approved',
+            'processed_by' => $user->id,
+            'source_account_id' => $sourceAccount->id,
+            'proof_image' => $path ?? $transfer->proof_image,
+            'notes' => $request->notes ?? $transfer->notes,
+            'processed_at' => Carbon::now(),
+        ]);
+
+        $sourceAccount->current_balance -= $transfer->total_amount;
+        $sourceAccount->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transfer berhasil disetujui & bukti tersimpan!',
+            'data' => $transfer,
+        ]);
+    }
+
+    // ==========================================
+    // 8. AKUNTANSI & KAS
+    // ==========================================
+
     public function cashTransactions(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $type = $request->query('type'); // in / out / transfer
+        $type = $request->query('type');
         $query = CashTransaction::with(['account', 'oppositeAccount'])->latest();
 
         if ($type) {
@@ -372,9 +695,6 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'data' => $transactions]);
     }
 
-    /**
-     * Cash Transaction Store (Kas Masuk & Kas Keluar)
-     */
     public function storeCashTransaction(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -399,16 +719,14 @@ class MobileApiController extends Controller
                 'data' => $trx,
             ]);
         } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
 
-    /**
-     * Financial Report: Summary Overview
-     */
+    // ==========================================
+    // 9. LAPORAN KEUANGAN LENGKAP
+    // ==========================================
+
     public function financialReports(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -420,11 +738,77 @@ class MobileApiController extends Controller
         $profitLoss = $this->reportService->getProfitLossData($startDate, $endDate);
         $balanceSheet = $this->reportService->getBalanceSheetData($endDate);
 
+        $salesSummary = Sale::whereBetween('date', [$startDate, $endDate])->sum('grand_total');
+        $purchaseSummary = Purchase::whereBetween('date', [$startDate, $endDate])->sum('grand_total');
+
         return response()->json([
             'success' => true,
             'profit_loss' => $profitLoss,
             'balance_sheet' => $balanceSheet,
+            'sales_summary' => (float) $salesSummary,
+            'purchase_summary' => (float) $purchaseSummary,
         ]);
+    }
+
+    // ==========================================
+    // 10. PENGATURAN, TUTUP BUKU & USERS
+    // ==========================================
+
+    public function users(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $users = User::orderByRaw("FIELD(role, 'super_admin', 'admin', 'toko')")->orderBy('name')->get();
+        return response()->json(['success' => true, 'data' => $users]);
+    }
+
+    public function storeUser(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:100|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:super_admin,admin,toko',
+            'store_name' => 'nullable|string|max:100',
+            'phone' => 'nullable|string|max:30',
+        ]);
+
+        $newUser = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role' => $validated['role'],
+            'store_name' => $validated['store_name'],
+            'phone' => $validated['phone'],
+            'is_active' => true,
+            'permissions' => [
+                'master' => true,
+                'purchase' => true,
+                'pos' => true,
+                'transfer' => true,
+                'accounting' => true,
+                'reports' => true,
+                'settings' => true,
+                'users' => true,
+            ],
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Pengguna berhasil dibuat!', 'data' => $newUser]);
+    }
+
+    public function storeSettings(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $setting = StoreSetting::first();
+        $closingHistory = YearlyClosing::latest()->take(5)->get();
+
+        return response()->json(['success' => true, 'setting' => $setting, 'closing_history' => $closingHistory]);
     }
 
     /**

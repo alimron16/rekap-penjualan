@@ -63,9 +63,27 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> storeProduct(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/products'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMultiProducts() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/multi-products'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getCustomers() async {
     final headers = await _headers();
     final res = await http.get(Uri.parse('$baseUrl/customers'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeCustomer(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/customers'), headers: headers, body: jsonEncode(data));
     return jsonDecode(res.body);
   }
 
@@ -75,9 +93,21 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> storeSupplier(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/suppliers'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getAccounts() async {
     final headers = await _headers();
     final res = await http.get(Uri.parse('$baseUrl/accounts'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeAccount(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/accounts'), headers: headers, body: jsonEncode(data));
     return jsonDecode(res.body);
   }
 
@@ -179,6 +209,19 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> approveTransfer(int id, {required int sourceAccountId, String? notes}) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/transfers/$id/approve'),
+      headers: headers,
+      body: jsonEncode({
+        'source_account_id': sourceAccountId,
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
   // Kas & Akuntansi
   static Future<Map<String, dynamic>> getCashTransactions({String? type}) async {
     final headers = await _headers();
@@ -209,13 +252,187 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  // Piutang & Retur
+  static Future<Map<String, dynamic>> getReceivables() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/receivables'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> payReceivable({
+    required String date,
+    required int saleId,
+    required int customerId,
+    required double amount,
+    required int accountId,
+    String? notes,
+  }) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/receivables/pay'),
+      headers: headers,
+      body: jsonEncode({
+        'date': date,
+        'sale_id': saleId,
+        'customer_id': customerId,
+        'amount': amount,
+        'account_id': accountId,
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getReturns() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/returns'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeReturn({
+    required String date,
+    int? saleId,
+    int? customerId,
+    required int productId,
+    required double qty,
+    required double refundAmount,
+    required int accountId,
+    String? notes,
+  }) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/returns'),
+      headers: headers,
+      body: jsonEncode({
+        'date': date,
+        'sale_id': saleId,
+        'customer_id': customerId,
+        'product_id': productId,
+        'qty': qty,
+        'refund_amount': refundAmount,
+        'account_id': accountId,
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // Pembelian & Hutang
+  static Future<Map<String, dynamic>> getPurchases() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/purchases'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storePurchase({
+    required String date,
+    required int supplierId,
+    required String paymentMethod,
+    int? accountId,
+    double paidAmount = 0,
+    double discount = 0,
+    String? notes,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/purchases'),
+      headers: headers,
+      body: jsonEncode({
+        'date': date,
+        'supplier_id': supplierId,
+        'payment_method': paymentMethod,
+        'account_id': accountId,
+        'paid_amount': paidAmount,
+        'discount': discount,
+        'notes': notes,
+        'items': items,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> payDebt({
+    required String date,
+    required int purchaseId,
+    required int supplierId,
+    required double amount,
+    required int accountId,
+    String? notes,
+  }) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/purchases/pay-debt'),
+      headers: headers,
+      body: jsonEncode({
+        'date': date,
+        'purchase_id': purchaseId,
+        'supplier_id': supplierId,
+        'amount': amount,
+        'account_id': accountId,
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // Persediaan / Penyesuaian Stok
+  static Future<Map<String, dynamic>> getInventoryAdjustments() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/inventory/adjustments'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeInventoryAdjustment({
+    required int productId,
+    required double qty,
+    required String type,
+    double? costPrice,
+    String? notes,
+  }) async {
+    final headers = await _headers();
+    final res = await http.post(
+      Uri.parse('$baseUrl/inventory/adjustments'),
+      headers: headers,
+      body: jsonEncode({
+        'product_id': productId,
+        'qty': qty,
+        'type': type,
+        'cost_price': costPrice,
+        'notes': notes,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
+
   // Laporan Keuangan
   static Future<Map<String, dynamic>> getReports({String? startDate, String? endDate}) async {
     final headers = await _headers();
+    final s = startDate ?? '';
+    final e = endDate ?? '';
     final res = await http.get(
-      Uri.parse('$baseUrl/reports?start_date=$startDate&end_date=$endDate'),
+      Uri.parse('$baseUrl/reports?start_date=$s&end_date=$e'),
       headers: headers,
     );
+    return jsonDecode(res.body);
+  }
+
+  // Users & Settings
+  static Future<Map<String, dynamic>> getUsers() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/users'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeUser(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/users'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getSettings() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/settings'), headers: headers);
     return jsonDecode(res.body);
   }
 }

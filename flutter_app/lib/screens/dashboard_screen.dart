@@ -3,8 +3,23 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/theme_config.dart';
-import 'web_feature_screen.dart';
+
+// Native Screens
+import 'pos_screen.dart';
+import 'digital_screen.dart';
+import 'receivables_screen.dart';
+import 'returns_screen.dart';
 import 'transfer_screen.dart';
+import 'products_screen.dart';
+import 'customers_screen.dart';
+import 'suppliers_screen.dart';
+import 'purchases_screen.dart';
+import 'inventory_screen.dart';
+import 'accounts_screen.dart';
+import 'cash_screen.dart';
+import 'reports_screen.dart';
+import 'users_screen.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -80,12 +95,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _openPage(String title, String path) {
+  void _navigate(Widget screen) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => WebFeatureScreen(title: title, path: path),
-      ),
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -225,11 +238,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Kasir Retail (Eceran)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () => _openPage('Kasir Retail', '/pos/retail')),
-                        _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () => _openPage('Kasir Grosir', '/pos/wholesale')),
-                        _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () => _openPage('Produk Elektrik', '/digital')),
-                        _buildMenuCard('Pembayaran Piutang', 'Pelunasan piutang', Icons.credit_score, Colors.indigo, () => _openPage('Pembayaran Piutang', '/receivable/payments')),
-                        _buildMenuCard('Retur Penjualan', 'Pengembalian barang', Icons.assignment_return, Colors.red.shade700, () => _openPage('Retur Penjualan', '/receivable/returns')),
+                        _buildMenuCard('Kasir Retail (Eceran)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () => _navigate(const PosScreen(saleType: 'retail'))),
+                        _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () => _navigate(const PosScreen(saleType: 'grosir'))),
+                        _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () => _navigate(const DigitalScreen())),
+                        _buildMenuCard('Pembayaran Piutang', 'Pelunasan piutang', Icons.credit_score, Colors.indigo, () => _navigate(const ReceivablesScreen())),
+                        _buildMenuCard('Retur Penjualan', 'Pengembalian barang', Icons.assignment_return, Colors.red.shade700, () => _navigate(const ReturnsScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -247,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Transfer Agen & Bank', 'Pengajuan & persetujuan', Icons.swap_horiz_rounded, Colors.green.shade800, () => _openPage('Transfer Agen & Bank', '/transfer')),
+                        _buildMenuCard('Transfer Agen & Bank', 'Pengajuan & persetujuan', Icons.swap_horiz_rounded, Colors.green.shade800, () => _navigate(const TransferScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -265,10 +278,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Daftar Item / Produk', 'Kelola stok barang', Icons.inventory_2_outlined, Colors.blue.shade700, () => _openPage('Daftar Item', '/master/items')),
-                        _buildMenuCard('Produk Multi', 'Paket data & voucher', Icons.category_outlined, Colors.cyan.shade700, () => _openPage('Produk Multi', '/master/multi')),
-                        _buildMenuCard('Supplier', 'Mitra distributor', Icons.local_shipping_outlined, Colors.orange.shade800, () => _openPage('Supplier', '/master/suppliers')),
-                        _buildMenuCard('Pelanggan', 'Data pembeli', Icons.people_alt_outlined, Colors.purple.shade700, () => _openPage('Pelanggan', '/master/customers')),
+                        _buildMenuCard('Daftar Item / Produk', 'Kelola stok barang', Icons.inventory_2_outlined, Colors.blue.shade700, () => _navigate(const ProductsScreen(isMulti: false))),
+                        _buildMenuCard('Produk Multi', 'Paket data & voucher', Icons.category_outlined, Colors.cyan.shade700, () => _navigate(const ProductsScreen(isMulti: true))),
+                        _buildMenuCard('Supplier', 'Mitra distributor', Icons.local_shipping_outlined, Colors.orange.shade800, () => _navigate(const SuppliersScreen())),
+                        _buildMenuCard('Pelanggan', 'Data pembeli', Icons.people_alt_outlined, Colors.purple.shade700, () => _navigate(const CustomersScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -286,8 +299,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Daftar Pembelian', 'Faktur beli supplier', Icons.receipt_outlined, Colors.brown, () => _openPage('Daftar Pembelian', '/purchase')),
-                        _buildMenuCard('Pembayaran Hutang', 'Bayar tagihan agen', Icons.payment_outlined, Colors.deepOrange, () => _openPage('Pembayaran Hutang', '/purchase/debt-payments')),
+                        _buildMenuCard('Daftar Pembelian', 'Faktur beli supplier', Icons.receipt_outlined, Colors.brown, () => _navigate(const PurchasesScreen())),
+                        _buildMenuCard('Pembayaran Hutang', 'Bayar tagihan supplier', Icons.payment_outlined, Colors.deepOrange, () => _navigate(const PurchasesScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -305,8 +318,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Penyesuaian Stok', 'Koreksi stok barang', Icons.tune_rounded, Colors.teal.shade800, () => _openPage('Penyesuaian Stok', '/inventory/adjustments')),
-                        _buildMenuCard('Stok Opname', 'Audit fisik barang', Icons.fact_check_outlined, Colors.blueGrey, () => _openPage('Stok Opname', '/inventory/opname')),
+                        _buildMenuCard('Penyesuaian Stok', 'Koreksi stok barang', Icons.tune_rounded, Colors.teal.shade800, () => _navigate(const InventoryScreen())),
+                        _buildMenuCard('Stok Opname', 'Audit fisik barang', Icons.fact_check_outlined, Colors.blueGrey, () => _navigate(const InventoryScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -324,10 +337,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Bagan Akun (COA)', 'Daftar rekening', Icons.menu_book_outlined, Colors.indigo.shade800, () => _openPage('Bagan Akun (COA)', '/accounting/accounts')),
-                        _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () => _openPage('Kas Masuk', '/accounting/cash-in')),
-                        _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () => _openPage('Kas Keluar', '/accounting/cash-out')),
-                        _buildMenuCard('Kas Transfer Antar Bank', 'Pindah buku bank', Icons.sync_alt_rounded, Colors.purple.shade800, () => _openPage('Kas Transfer', '/accounting/cash-transfer')),
+                        _buildMenuCard('Bagan Akun (COA)', 'Daftar rekening', Icons.menu_book_outlined, Colors.indigo.shade800, () => _navigate(const AccountsScreen())),
+                        _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () => _navigate(const CashScreen(initialType: 'in'))),
+                        _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () => _navigate(const CashScreen(initialType: 'out'))),
+                        _buildMenuCard('Kas Transfer Antar Bank', 'Pindah buku bank', Icons.sync_alt_rounded, Colors.purple.shade800, () => _navigate(const CashScreen(initialType: 'transfer'))),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -345,11 +358,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Laba Rugi', 'Performa laba bersih', Icons.show_chart_rounded, Colors.green.shade800, () => _openPage('Laba Rugi', '/reports/profit-loss')),
-                        _buildMenuCard('Neraca Keuangan', 'Posisi aktiva & pasiva', Icons.balance, Colors.blue.shade900, () => _openPage('Neraca Keuangan', '/reports/balance-sheet')),
-                        _buildMenuCard('Lap. Penjualan', 'Histori rincian sales', Icons.description_outlined, Colors.teal.shade700, () => _openPage('Laporan Penjualan', '/reports/sales')),
-                        _buildMenuCard('Lap. Pembelian', 'Histori beli barang', Icons.receipt_long, Colors.amber.shade900, () => _openPage('Laporan Pembelian', '/reports/purchases')),
-                        _buildMenuCard('Lap. Kas & Bank', 'Mutasi arus kas', Icons.account_balance_wallet, Colors.deepPurple, () => _openPage('Laporan Kas', '/reports/cash')),
+                        _buildMenuCard('Laba Rugi', 'Performa laba bersih', Icons.show_chart_rounded, Colors.green.shade800, () => _navigate(const ReportsScreen())),
+                        _buildMenuCard('Neraca Keuangan', 'Posisi aktiva & pasiva', Icons.balance, Colors.blue.shade900, () => _navigate(const ReportsScreen())),
+                        _buildMenuCard('Lap. Penjualan', 'Histori rincian sales', Icons.description_outlined, Colors.teal.shade700, () => _navigate(const ReportsScreen())),
+                        _buildMenuCard('Lap. Pembelian', 'Histori beli barang', Icons.receipt_long, Colors.amber.shade900, () => _navigate(const ReportsScreen())),
+                        _buildMenuCard('Lap. Kas & Bank', 'Mutasi arus kas', Icons.account_balance_wallet, Colors.deepPurple, () => _navigate(const ReportsScreen())),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -367,8 +380,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 2.1,
                       children: [
-                        _buildMenuCard('Kelola Pengguna', 'Hak akses kasir/admin', Icons.manage_accounts_outlined, Colors.grey.shade700, () => _openPage('Kelola Pengguna', '/settings/users')),
-                        _buildMenuCard('Tutup Buku Tahunan', 'Finalisasi pembukuan', Icons.event_available, Colors.red.shade900, () => _openPage('Tutup Buku', '/settings/yearly-closing')),
+                        _buildMenuCard('Kelola Pengguna', 'Hak akses kasir/admin', Icons.manage_accounts_outlined, Colors.grey.shade700, () => _navigate(const UsersScreen())),
+                        _buildMenuCard('Tutup Buku Tahunan', 'Finalisasi pembukuan', Icons.event_available, Colors.red.shade900, () => _navigate(const SettingsScreen())),
                       ],
                     ),
                     const SizedBox(height: 30),
