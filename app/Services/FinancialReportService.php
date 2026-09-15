@@ -97,7 +97,7 @@ class FinancialReportService
             ],
             'gross_profit' => $grossProfit,
             'expenses' => [
-                'breakdown' => $expensesBreakdown,
+                'breakdown' => (object) $expensesBreakdown,
                 'total' => $totalExpense,
             ],
             'net_profit' => $netProfit,

@@ -200,13 +200,170 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Produk berhasil ditambahkan!', 'data' => $product]);
     }
 
+    public function updateProduct(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $product = Product::findOrFail($id);
+
+        $data = $request->validate([
+            'item_code' => 'required|string|unique:products,item_code,' . $product->id,
+            'name' => 'required|string|max:255',
+            'type' => 'required|string',
+            'brand' => 'nullable|string',
+            'stock' => 'required|numeric|min:0',
+            'min_stock' => 'nullable|integer|min:0',
+            'hpp' => 'required|numeric|min:0',
+            'retail_price' => 'required|numeric|min:0',
+            'wholesale_price' => 'nullable|numeric|min:0',
+            'status' => 'required|string|in:Masih Dijual,Tidak Dijual',
+        ]);
+
+        if (empty($data['wholesale_price'])) {
+            $data['wholesale_price'] = $data['retail_price'];
+        }
+
+        if (!empty($data['type'])) {
+            Category::firstOrCreate(['type' => 'physical_type', 'name' => strtoupper(trim($data['type']))]);
+        }
+        if (!empty($data['brand'])) {
+            Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
+        }
+
+        $product->update($data);
+        return response()->json(['success' => true, 'message' => "Item [{$product->name}] berhasil diperbarui!", 'data' => $product]);
+    }
+
+    public function destroyProduct(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $product = Product::findOrFail($id);
+        $name = $product->name;
+
+        if ($product->saleItems()->exists() || $product->purchaseItems()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Item [{$name}] tidak dapat dihapus karena sudah memiliki riwayat transaksi! Ubah status menjadi 'Tidak Dijual' jika ingin menonaktifkan.",
+            ], 422);
+        }
+
+        $product->delete();
+        return response()->json(['success' => true, 'message' => "Item [{$name}] berhasil dihapus!"]);
+    }
+
     public function multiProducts(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $products = DigitalProduct::orderBy('name')->get();
-        return response()->json(['success' => true, 'data' => $products]);
+        $search = $request->query('q') ?? $request->query('search');
+        $trxType = $request->query('trx_type');
+        $category = $request->query('category');
+
+        $query = DigitalProduct::query();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('product_code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%")
+                  ->orWhere('category', 'like', "%{$search}%");
+            });
+        }
+
+        if ($trxType && $trxType !== 'ALL' && $trxType !== 'SEMUA') {
+            $query->where('trx_type', $trxType);
+        }
+
+        if ($category && $category !== 'ALL' && $category !== 'SEMUA') {
+            $query->where('category', $category);
+        }
+
+        $products = $query->orderBy('trx_type')->orderBy('name')->get();
+        $trxTypes = Category::where('type', 'digital_type')->pluck('name');
+        $categories = Category::where('type', 'digital_category')->pluck('name');
+
+        return response()->json([
+            'success' => true,
+            'data' => $products,
+            'trx_types' => $trxTypes,
+            'categories' => $categories,
+        ]);
+    }
+
+    public function storeMultiProduct(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'product_code' => 'required|string|unique:digital_products,product_code',
+            'name' => 'required|string',
+            'trx_type' => 'required|string',
+            'category' => 'required|string',
+            'hpp' => 'required|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
+            'status' => 'required|string|in:OPEN,CLOSE',
+        ]);
+
+        if (!empty($data['trx_type'])) {
+            Category::firstOrCreate(['type' => 'digital_type', 'name' => strtoupper(trim($data['trx_type']))]);
+        }
+        if (!empty($data['category'])) {
+            Category::firstOrCreate(['type' => 'digital_category', 'name' => strtoupper(trim($data['category']))]);
+        }
+
+        $product = DigitalProduct::create($data);
+        return response()->json(['success' => true, 'message' => 'Produk multi berhasil ditambahkan!', 'data' => $product]);
+    }
+
+    public function updateMultiProduct(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $product = DigitalProduct::findOrFail($id);
+
+        $data = $request->validate([
+            'product_code' => 'required|string|unique:digital_products,product_code,' . $product->id,
+            'name' => 'required|string',
+            'trx_type' => 'required|string',
+            'category' => 'required|string',
+            'hpp' => 'required|numeric|min:0',
+            'selling_price' => 'required|numeric|min:0',
+            'status' => 'required|string|in:OPEN,CLOSE',
+        ]);
+
+        if (!empty($data['trx_type'])) {
+            Category::firstOrCreate(['type' => 'digital_type', 'name' => strtoupper(trim($data['trx_type']))]);
+        }
+        if (!empty($data['category'])) {
+            Category::firstOrCreate(['type' => 'digital_category', 'name' => strtoupper(trim($data['category']))]);
+        }
+
+        $product->update($data);
+        return response()->json(['success' => true, 'message' => "Produk Multi [{$product->name}] berhasil diperbarui!", 'data' => $product]);
+    }
+
+    public function destroyMultiProduct(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $product = DigitalProduct::findOrFail($id);
+        $name = $product->name;
+
+        if ($product->sales()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Produk [{$name}] tidak dapat dihapus karena sudah memiliki riwayat penjualan elektrik! Ubah status menjadi 'CLOSE' jika ingin menonaktifkan.",
+            ], 422);
+        }
+
+        $product->delete();
+        return response()->json(['success' => true, 'message' => "Produk Multi [{$name}] berhasil dihapus!"]);
     }
 
     public function customers(Request $request)
@@ -237,6 +394,45 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Pelanggan berhasil disimpan!', 'data' => $customer]);
     }
 
+    public function updateCustomer(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $customer = Customer::findOrFail($id);
+        $data = $request->validate([
+            'name' => 'required|string|max:100',
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'account_number' => 'nullable|string',
+            'notes' => 'nullable|string',
+            'status' => 'required|string|in:Aktif,Nonaktif',
+        ]);
+
+        $customer->update($data);
+        return response()->json(['success' => true, 'message' => "Pelanggan [{$customer->name}] berhasil diperbarui!", 'data' => $customer]);
+    }
+
+    public function destroyCustomer(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $customer = Customer::findOrFail($id);
+        $name = $customer->name;
+
+        if ($customer->sales()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Pelanggan [{$name}] tidak dapat dihapus karena sudah memiliki riwayat transaksi! Ubah status menjadi 'Nonaktif'.",
+            ], 422);
+        }
+
+        $customer->delete();
+        return response()->json(['success' => true, 'message' => "Pelanggan [{$name}] berhasil dihapus!"]);
+    }
+
     public function suppliers(Request $request)
     {
         $user = $this->getUserFromToken($request);
@@ -262,6 +458,44 @@ class MobileApiController extends Controller
 
         $supplier = Supplier::create($data);
         return response()->json(['success' => true, 'message' => 'Supplier berhasil disimpan!', 'data' => $supplier]);
+    }
+
+    public function updateSupplier(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $supplier = Supplier::findOrFail($id);
+        $data = $request->validate([
+            'name' => 'required|string|max:100',
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'account_number' => 'nullable|string',
+            'account_name' => 'nullable|string',
+        ]);
+
+        $supplier->update($data);
+        return response()->json(['success' => true, 'message' => "Supplier [{$supplier->name}] berhasil diperbarui!", 'data' => $supplier]);
+    }
+
+    public function destroySupplier(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $supplier = Supplier::findOrFail($id);
+        $name = $supplier->name;
+
+        if ($supplier->purchases()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Supplier [{$name}] tidak dapat dihapus karena sudah memiliki riwayat faktur pembelian!",
+            ], 422);
+        }
+
+        $supplier->delete();
+        return response()->json(['success' => true, 'message' => "Supplier [{$name}] berhasil dihapus!"]);
     }
 
     public function accounts(Request $request)
@@ -298,6 +532,55 @@ class MobileApiController extends Controller
         ]);
 
         return response()->json(['success' => true, 'message' => 'Akun COA berhasil dibuat!', 'data' => $account]);
+    }
+
+    public function updateAccount(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $account = Account::findOrFail($id);
+        if ($account->is_system_locked) {
+            return response()->json(['success' => false, 'message' => 'Akun sistem tidak dapat diubah.'], 403);
+        }
+
+        $data = $request->validate([
+            'code' => 'required|string|max:20|unique:accounts,code,' . $account->id,
+            'name' => 'required|string|max:100',
+            'group' => 'required|string|in:AKTIVA,KEWAJIBAN,MODAL,PENDAPATAN,HPP,BIAYA,PENDAPATAN LAIN,BIAYA LAIN',
+            'type' => 'required|string|in:H,D,K',
+            'initial_balance' => 'nullable|numeric|min:0',
+        ]);
+
+        $account->update([
+            'code' => strtoupper($data['code']),
+            'name' => strtoupper($data['name']),
+            'group' => $data['group'],
+            'type' => $data['type'],
+            'initial_balance' => (float) ($data['initial_balance'] ?? 0),
+        ]);
+
+        return response()->json(['success' => true, 'message' => "Akun [{$account->name}] berhasil diperbarui!", 'data' => $account]);
+    }
+
+    public function destroyAccount(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $account = Account::findOrFail($id);
+        $name = $account->name;
+
+        if ($account->is_system_locked) {
+            return response()->json(['success' => false, 'message' => 'Akun sistem terkunci dan tidak dapat dihapus!'], 403);
+        }
+
+        if ($account->journalLines()->exists()) {
+            return response()->json(['success' => false, 'message' => "Akun [{$name}] tidak dapat dihapus karena sudah memiliki riwayat mutasi jurnal akuntansi!"], 422);
+        }
+
+        $account->delete();
+        return response()->json(['success' => true, 'message' => "Akun [{$name}] berhasil dihapus!"]);
     }
 
     // ==========================================

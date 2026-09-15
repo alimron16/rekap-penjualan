@@ -9,13 +9,29 @@ Route::get('/dashboard', [MobileApiController::class, 'dashboard']);
 // 1. Master Data
 Route::get('/products', [MobileApiController::class, 'products']);
 Route::post('/products', [MobileApiController::class, 'storeProduct']);
+Route::put('/products/{id}', [MobileApiController::class, 'updateProduct']);
+Route::delete('/products/{id}', [MobileApiController::class, 'destroyProduct']);
+
 Route::get('/multi-products', [MobileApiController::class, 'multiProducts']);
+Route::post('/multi-products', [MobileApiController::class, 'storeMultiProduct']);
+Route::put('/multi-products/{id}', [MobileApiController::class, 'updateMultiProduct']);
+Route::delete('/multi-products/{id}', [MobileApiController::class, 'destroyMultiProduct']);
+
 Route::get('/customers', [MobileApiController::class, 'customers']);
 Route::post('/customers', [MobileApiController::class, 'storeCustomer']);
+Route::put('/customers/{id}', [MobileApiController::class, 'updateCustomer']);
+Route::delete('/customers/{id}', [MobileApiController::class, 'destroyCustomer']);
+
 Route::get('/suppliers', [MobileApiController::class, 'suppliers']);
 Route::post('/suppliers', [MobileApiController::class, 'storeSupplier']);
+Route::put('/suppliers/{id}', [MobileApiController::class, 'updateSupplier']);
+Route::delete('/suppliers/{id}', [MobileApiController::class, 'destroySupplier']);
+
 Route::get('/accounts', [MobileApiController::class, 'accounts']);
 Route::post('/accounts', [MobileApiController::class, 'storeAccount']);
+Route::put('/accounts/{id}', [MobileApiController::class, 'updateAccount']);
+Route::delete('/accounts/{id}', [MobileApiController::class, 'destroyAccount']);
+
 
 // 2. POS Kasir
 Route::get('/pos/data', [MobileApiController::class, 'posData']);

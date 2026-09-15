@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
+
 
 class PosScreen extends StatefulWidget {
   final String saleType; // 'retail' or 'grosir'
@@ -565,7 +567,169 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
+  void _openReceiptUrl(String path) async {
+    final uri = Uri.parse('https://pos.moonbyte.my.id$path');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tidak dapat membuka nota: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _showThermalReceiptModal(dynamic saleData, double change, List<Map<String, dynamic>> itemsPurchased, double grandTotal) {
+    final inv = saleData?['invoice_number'] ?? 'PR-NOTA';
+    final date = DateTime.now();
+    final formattedDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Preview Struk Thermal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const Divider(height: 12),
+              // Thermal Paper Preview Box
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAF9F6),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('ELEPHANT CELL POS', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 15)),
+                    const Text('REKAP & KASIR PENJUALAN', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('No: $inv', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(formattedDate, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                      ],
+                    ),
+                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    ...itemsPurchased.map((it) {
+                      final name = it['product']?['name'] ?? 'Item';
+                      final qty = it['qty'] ?? 1;
+                      final price = Formatters.parseDouble(it['price']);
+                      final total = qty * price;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('$qty x ${Formatters.formatRupiah(price)}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                                Text(Formatters.formatRupiah(total), style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('TOTAL TAGIHAN:', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
+                        Text(Formatters.formatRupiah(grandTotal), style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Uang Diterima:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                        Text(Formatters.formatRupiah(grandTotal + change), style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Kembalian:', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(Formatters.formatRupiah(change), style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                      ],
+                    ),
+                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    const Text('Terima Kasih Atas Kunjungan Anda!', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                    const Text('Barang yang dibeli tidak dapat ditukar', style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (saleData?['id'] != null) {
+                          _openReceiptUrl('/receipt/thermal/${saleData['id']}');
+                        }
+                      },
+                      icon: const Icon(Icons.print, size: 16),
+                      label: const Text('Cetak / Buka Web'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (saleData?['id'] != null) {
+                          _openReceiptUrl('/receipt/invoice/${saleData['id']}');
+                        }
+                      },
+                      icon: const Icon(Icons.picture_as_pdf, size: 16),
+                      label: const Text('Faktur A4'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ThemeConfig.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showSuccessDialog(double change, dynamic saleData) {
+    final saleId = saleData?['id'];
+    final itemsPurchased = _cart.values.toList();
+    final grandTotal = _grandTotal;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -575,20 +739,20 @@ class _PosScreenState extends State<PosScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 60),
-              const SizedBox(height: 12),
+              const Icon(Icons.check_circle, color: Colors.green, size: 56),
+              const SizedBox(height: 10),
               const Text('Transaksi Berhasil!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               Text(
                 'Nota: ${saleData?['invoice_number'] ?? 'PR-SUCCESS'}',
                 style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, color: ThemeConfig.primary, fontSize: 13),
               ),
-              const Divider(height: 20),
+              const Divider(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Total Belanja:', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                  Text(Formatters.formatRupiah(_grandTotal), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text(Formatters.formatRupiah(grandTotal), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 4),
@@ -599,7 +763,42 @@ class _PosScreenState extends State<PosScreen> {
                   Text(Formatters.formatRupiah(change), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.green)),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // Action Buttons: Print Thermal & Invoice
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _showThermalReceiptModal(saleData, change, itemsPurchased, grandTotal);
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 16, color: ThemeConfig.primary),
+                      label: const Text('Struk Thermal', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        side: BorderSide(color: ThemeConfig.primary.withOpacity(0.5)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (saleId != null) {
+                          _openReceiptUrl('/receipt/invoice/$saleId');
+                        }
+                      },
+                      icon: const Icon(Icons.print, size: 16, color: Colors.white),
+                      label: const Text('Faktur A4', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ThemeConfig.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

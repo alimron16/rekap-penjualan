@@ -183,32 +183,13 @@ Route::middleware('auth')->group(function () {
             Route::post('/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('toggle_status');
         });
     });
-
-    // Cetak Struk & Faktur
-    Route::prefix('receipt')->name('receipt.')->group(function () {
-        Route::get('/thermal/{sale}', [ReceiptController::class, 'thermal'])->name('thermal');
-        Route::get('/invoice/{sale}', [ReceiptController::class, 'invoice'])->name('invoice');
-    });
-
 });
 
-// Mobile App REST API Endpoints
-Route::prefix('api')->group(function () {
-    Route::post('/login', [\App\Http\Controllers\Api\MobileApiController::class, 'login']);
-    Route::get('/dashboard', [\App\Http\Controllers\Api\MobileApiController::class, 'dashboard']);
-    Route::get('/products', [\App\Http\Controllers\Api\MobileApiController::class, 'products']);
-    Route::get('/customers', [\App\Http\Controllers\Api\MobileApiController::class, 'customers']);
-    Route::get('/suppliers', [\App\Http\Controllers\Api\MobileApiController::class, 'suppliers']);
-    Route::get('/accounts', [\App\Http\Controllers\Api\MobileApiController::class, 'accounts']);
-    Route::get('/pos/data', [\App\Http\Controllers\Api\MobileApiController::class, 'posData']);
-    Route::post('/pos/checkout', [\App\Http\Controllers\Api\MobileApiController::class, 'posCheckout']);
-    Route::get('/digital/data', [\App\Http\Controllers\Api\MobileApiController::class, 'digitalData']);
-    Route::post('/digital/checkout', [\App\Http\Controllers\Api\MobileApiController::class, 'digitalCheckout']);
-    Route::get('/transfers', [\App\Http\Controllers\Api\MobileApiController::class, 'transfers']);
-    Route::post('/transfers', [\App\Http\Controllers\Api\MobileApiController::class, 'storeTransfer']);
-    Route::get('/cash-transactions', [\App\Http\Controllers\Api\MobileApiController::class, 'cashTransactions']);
-    Route::post('/cash-transactions', [\App\Http\Controllers\Api\MobileApiController::class, 'storeCashTransaction']);
-    Route::get('/reports', [\App\Http\Controllers\Api\MobileApiController::class, 'financialReports']);
+// Cetak Struk & Faktur (Bisa diakses langsung dari Mobile App / Printer tanpa hambatan session)
+Route::prefix('receipt')->name('receipt.')->group(function () {
+    Route::get('/thermal/{sale}', [ReceiptController::class, 'thermal'])->name('thermal');
+    Route::get('/invoice/{sale}', [ReceiptController::class, 'invoice'])->name('invoice');
 });
+
 
 

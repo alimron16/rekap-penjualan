@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
+
 
 class ReportsScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -174,95 +176,160 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     );
   }
 
+  void _openReceiptUrl(String path) async {
+    final uri = Uri.parse('https://pos.moonbyte.my.id$path');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tidak dapat membuka nota: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   // 1. LABA RUGI TAB
   Widget _buildProfitLossTab() {
-    if (_plData == null) return const Center(child: Text('Data tidak tersedia'));
-    final netProfit = Formatters.parseDouble(_plData?['net_profit']);
-    final revenues = _plData?['revenues'] ?? {};
-    final hpp = _plData?['hpp'] ?? {};
-    final expenses = _plData?['expenses'] ?? {};
-    final breakdown = expenses['breakdown'] as Map<String, dynamic>? ?? {};
+    try {
+      if (_plData == null) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.analytics_outlined, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              const Text('Data Laba Rugi belum dimuat', style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: _loadCurrentTabData,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Muat Ulang'),
+              ),
+            ],
+          ),
+        );
+      }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          _buildCard(
-            title: 'PENDAPATAN USAHA (REVENUE)',
-            icon: Icons.trending_up,
-            color: Colors.green,
-            child: Column(
-              children: [
-                _buildRow('Penjualan Retail (Eceran)', revenues['retail']),
-                _buildRow('Penjualan Grosir (Partai)', revenues['grosir']),
-                _buildRow('Produk Multi / Elektrik', revenues['multi']),
-                _buildRow('Jasa Transfer Agen & Bank', revenues['jasa_transfer']),
-                const Divider(height: 16),
-                _buildRow('TOTAL OMZET BRUTO', revenues['total'], isBold: true),
-              ],
+      final netProfit = Formatters.parseDouble(_plData?['net_profit']);
+      final revenues = _plData?['revenues'] is Map ? _plData!['revenues'] as Map<String, dynamic> : {};
+      final hpp = _plData?['hpp'] is Map ? _plData!['hpp'] as Map<String, dynamic> : {};
+      final expenses = _plData?['expenses'] is Map ? _plData!['expenses'] as Map<String, dynamic> : {};
+      
+      Map<String, dynamic> breakdown = {};
+      if (expenses['breakdown'] is Map) {
+        breakdown = Map<String, dynamic>.from(expenses['breakdown']);
+      }
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            _buildCard(
+              title: 'PENDAPATAN USAHA (REVENUE)',
+              icon: Icons.trending_up,
+              color: Colors.green,
+              child: Column(
+                children: [
+                  _buildRow('Penjualan Retail (Eceran)', revenues['retail']),
+                  _buildRow('Penjualan Grosir (Partai)', revenues['grosir']),
+                  _buildRow('Produk Multi / Elektrik', revenues['multi']),
+                  _buildRow('Jasa Transfer Agen & Bank', revenues['jasa_transfer']),
+                  const Divider(height: 16),
+                  _buildRow('TOTAL OMZET BRUTO', revenues['total'], isBold: true),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _buildCard(
-            title: 'HARGA POKOK PENJUALAN (HPP)',
-            icon: Icons.inventory_2_outlined,
-            color: Colors.amber.shade800,
-            child: Column(
-              children: [
-                _buildRow('HPP Retail', hpp['retail']),
-                _buildRow('HPP Grosir', hpp['grosir']),
-                _buildRow('HPP Multi', hpp['multi']),
-                const Divider(height: 16),
-                _buildRow('TOTAL HPP MODAL', hpp['total'], isBold: true),
-              ],
+            const SizedBox(height: 12),
+            _buildCard(
+              title: 'HARGA POKOK PENJUALAN (HPP)',
+              icon: Icons.inventory_2_outlined,
+              color: Colors.amber.shade800,
+              child: Column(
+                children: [
+                  _buildRow('HPP Retail', hpp['retail']),
+                  _buildRow('HPP Grosir', hpp['grosir']),
+                  _buildRow('HPP Multi', hpp['multi']),
+                  const Divider(height: 16),
+                  _buildRow('TOTAL HPP MODAL', hpp['total'], isBold: true),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          _buildCard(
-            title: 'LABA KOTOR (GROSS PROFIT)',
-            icon: Icons.account_balance_wallet,
-            color: Colors.teal,
-            child: _buildRow('Laba Kotor Penjualan', _plData?['gross_profit'], isBold: true),
-          ),
-          const SizedBox(height: 12),
-          _buildCard(
-            title: 'BIAYA OPERASIONAL (EXPENSES)',
-            icon: Icons.money_off,
-            color: Colors.red,
-            child: Column(
-              children: [
-                if (breakdown.isEmpty)
-                  const Text('Tidak ada beban operasional pada periode ini', style: TextStyle(fontSize: 11, color: Colors.grey))
-                else
-                  ...breakdown.entries.map((e) => _buildRow(e.key, e.value)),
-                const Divider(height: 16),
-                _buildRow('TOTAL BEBAN BIAYA', expenses['total'], isBold: true),
-              ],
+            const SizedBox(height: 12),
+            _buildCard(
+              title: 'LABA KOTOR (GROSS PROFIT)',
+              icon: Icons.account_balance_wallet,
+              color: Colors.teal,
+              child: _buildRow('Laba Kotor Penjualan', _plData?['gross_profit'], isBold: true),
             ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: netProfit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+            const SizedBox(height: 12),
+            _buildCard(
+              title: 'BIAYA OPERASIONAL (EXPENSES)',
+              icon: Icons.money_off,
+              color: Colors.red,
+              child: Column(
+                children: [
+                  if (breakdown.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Tidak ada beban operasional pada periode ini', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    )
+                  else
+                    ...breakdown.entries.map((e) => _buildRow(e.key, e.value)),
+                  const Divider(height: 16),
+                  _buildRow('TOTAL BEBAN BIAYA', expenses['total'], isBold: true),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('LABA BERSIH (NET PROFIT)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(
-                  Formatters.formatRupiah(netProfit),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                ),
-              ],
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: netProfit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('LABA BERSIH (NET PROFIT)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(
+                    Formatters.formatRupiah(netProfit),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                ],
+              ),
             ),
+          ],
+        ),
+      );
+    } catch (e) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text('Terjadi kendala saat menampilkan laporan Laba Rugi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 6),
+              Text('$e', style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadCurrentTabData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Coba Lagi'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
   }
+
 
   // 2. NERACA TAB
   Widget _buildBalanceSheetTab() {
@@ -403,6 +470,31 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                               Text('Dibayar: ${Formatters.formatRupiah(paid)}', style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600)),
                               if (receivable > 0)
                                 Text('Piutang: ${Formatters.formatRupiah(receivable)}', style: const TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _openReceiptUrl('/receipt/thermal/${item['id']}'),
+                                icon: const Icon(Icons.receipt_long, size: 14, color: ThemeConfig.primary),
+                                label: const Text('Cetak Struk', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.primary)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  side: BorderSide(color: ThemeConfig.primary.withOpacity(0.5)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: () => _openReceiptUrl('/receipt/invoice/${item['id']}'),
+                                icon: const Icon(Icons.print, size: 14, color: Colors.white),
+                                label: const Text('Cetak Faktur', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: ThemeConfig.accent,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                ),
+                              ),
                             ],
                           ),
                         ],

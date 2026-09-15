@@ -69,9 +69,44 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
-  static Future<Map<String, dynamic>> getMultiProducts() async {
+  static Future<Map<String, dynamic>> updateProduct(int id, Map<String, dynamic> data) async {
     final headers = await _headers();
-    final res = await http.get(Uri.parse('$baseUrl/multi-products'), headers: headers);
+    final res = await http.put(Uri.parse('$baseUrl/products/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteProduct(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/products/$id'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> getMultiProducts({String? search, String? trxType, String? category}) async {
+    final headers = await _headers();
+    final params = <String>[];
+    if (search != null && search.isNotEmpty) params.add('q=${Uri.encodeComponent(search)}');
+    if (trxType != null && trxType != 'ALL') params.add('trx_type=${Uri.encodeComponent(trxType)}');
+    if (category != null && category != 'ALL') params.add('category=${Uri.encodeComponent(category)}');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final res = await http.get(Uri.parse('$baseUrl/multi-products$query'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> storeMultiProduct(Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/multi-products'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> updateMultiProduct(int id, Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.put(Uri.parse('$baseUrl/multi-products/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteMultiProduct(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/multi-products/$id'), headers: headers);
     return jsonDecode(res.body);
   }
 
@@ -87,6 +122,18 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> updateCustomer(int id, Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.put(Uri.parse('$baseUrl/customers/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteCustomer(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/customers/$id'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getSuppliers() async {
     final headers = await _headers();
     final res = await http.get(Uri.parse('$baseUrl/suppliers'), headers: headers);
@@ -96,6 +143,18 @@ class ApiService {
   static Future<Map<String, dynamic>> storeSupplier(Map<String, dynamic> data) async {
     final headers = await _headers();
     final res = await http.post(Uri.parse('$baseUrl/suppliers'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> updateSupplier(int id, Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.put(Uri.parse('$baseUrl/suppliers/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteSupplier(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/suppliers/$id'), headers: headers);
     return jsonDecode(res.body);
   }
 
@@ -110,6 +169,19 @@ class ApiService {
     final res = await http.post(Uri.parse('$baseUrl/accounts'), headers: headers, body: jsonEncode(data));
     return jsonDecode(res.body);
   }
+
+  static Future<Map<String, dynamic>> updateAccount(int id, Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.put(Uri.parse('$baseUrl/accounts/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteAccount(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/accounts/$id'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
 
   // POS Kasir
   static Future<Map<String, dynamic>> getPosData() async {
