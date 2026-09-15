@@ -79,4 +79,8 @@ Route::get('/reports/debts-receivables', [MobileApiController::class, 'reportDeb
 // 10. Pengaturan & User
 Route::get('/users', [MobileApiController::class, 'users']);
 Route::post('/users', [MobileApiController::class, 'storeUser']);
+Route::put('/users/{id}', [MobileApiController::class, 'updateUser']);
+Route::delete('/users/{id}', [MobileApiController::class, 'destroyUser']);
+Route::post('/users/{id}/toggle-status', [MobileApiController::class, 'toggleUserStatus']);
 Route::get('/settings', [MobileApiController::class, 'storeSettings']);
+

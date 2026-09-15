@@ -14,6 +14,9 @@ class _UsersScreenState extends State<UsersScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _users = [];
+  String _searchQuery = '';
+  String _roleFilter = 'ALL';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -47,6 +50,22 @@ class _UsersScreenState extends State<UsersScreen> {
         });
       }
     }
+  }
+
+  List<dynamic> get _filteredUsers {
+    return _users.where((u) {
+      final role = (u['role'] ?? '').toString().toLowerCase();
+      if (_roleFilter != 'ALL' && role != _roleFilter.toLowerCase()) {
+        return false;
+      }
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      final name = (u['name'] ?? '').toString().toLowerCase();
+      final email = (u['email'] ?? '').toString().toLowerCase();
+      final phone = (u['phone'] ?? '').toString().toLowerCase();
+      final store = (u['store_name'] ?? '').toString().toLowerCase();
+      return name.contains(query) || email.contains(query) || phone.contains(query) || store.contains(query);
+    }).toList();
   }
 
   void _showAddUserModal() {
@@ -175,10 +194,201 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
+  void _showEditUserModal(Map<String, dynamic> user) {
+    final nameController = TextEditingController(text: user['name'] ?? '');
+    final emailController = TextEditingController(text: user['email'] ?? '');
+    final passwordController = TextEditingController();
+    final storeNameController = TextEditingController(text: user['store_name'] ?? '');
+    final phoneController = TextEditingController(text: user['phone'] ?? '');
+    String role = user['role'] ?? 'toko';
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            top: 24,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Edit Pengguna', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('Nama Lengkap', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nama lengkap')),
+                const SizedBox(height: 14),
+                const Text('Email Login', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'email@domain.com')),
+                const SizedBox(height: 14),
+                const Text('Kata Sandi Baru (Kosongkan jika tidak diubah)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: passwordController, obscureText: true, decoration: const InputDecoration(hintText: 'Biarkan kosong untuk mempertahankan password')),
+                const SizedBox(height: 14),
+                const Text('Peran (Role)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  decoration: const InputDecoration(),
+                  items: const [
+                    DropdownMenuItem(value: 'toko', child: Text('Toko / Kasir')),
+                    DropdownMenuItem(value: 'admin', child: Text('Administrator')),
+                    DropdownMenuItem(value: 'super_admin', child: Text('Super Admin / Pemilik')),
+                  ],
+                  onChanged: (val) => setModalState(() => role = val!),
+                ),
+                const SizedBox(height: 14),
+                const Text('Nama Toko / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: storeNameController, decoration: const InputDecoration(hintText: 'Nama toko/cabang')),
+                const SizedBox(height: 14),
+                const Text('Nomor HP', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08...')),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            if (nameController.text.trim().isEmpty || emailController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Nama dan email wajib diisi')),
+                              );
+                              return;
+                            }
+                            setModalState(() => isSubmitting = true);
+
+                            final payload = <String, dynamic>{
+                              'name': nameController.text.trim(),
+                              'email': emailController.text.trim(),
+                              'role': role,
+                              'store_name': storeNameController.text.trim(),
+                              'phone': phoneController.text.trim(),
+                            };
+                            if (passwordController.text.trim().isNotEmpty) {
+                              payload['password'] = passwordController.text.trim();
+                            }
+
+                            final res = await ApiService.updateUser(user['id'], payload);
+
+                            if (res['success'] == true) {
+                              Navigator.pop(context);
+                              _loadData();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Pengguna berhasil diperbarui!'), backgroundColor: ThemeConfig.accent),
+                              );
+                            } else {
+                              setModalState(() => isSubmitting = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Gagal memperbarui pengguna'), backgroundColor: Colors.red),
+                              );
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Simpan Perubahan'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteUser(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('Hapus Pengguna?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          ],
+        ),
+        content: Text('Apakah Anda yakin ingin menghapus akun "${user['name']}" (${user['email']})? Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await ApiService.deleteUser(user['id']);
+              if (res['success'] == true) {
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Pengguna berhasil dihapus!'), backgroundColor: Colors.red),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Gagal menghapus pengguna'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text('Hapus Akun', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleUserStatus(Map<String, dynamic> user) async {
+    final res = await ApiService.toggleUserStatus(user['id']);
+    if (res['success'] == true) {
+      _loadData();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Status pengguna berhasil diubah!'), backgroundColor: ThemeConfig.accent),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Gagal mengubah status pengguna'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredUsers;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Manajemen Pengguna', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+      appBar: AppBar(
+        title: const Text('Manajemen Pengguna', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Segarkan Data',
+            onPressed: _loadData,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: ThemeConfig.primary,
         onPressed: _showAddUserModal,
@@ -198,67 +408,249 @@ class _UsersScreenState extends State<UsersScreen> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: () async => _loadData(),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                    itemCount: _users.length,
-                    itemBuilder: (ctx, i) {
-                      final u = _users[i];
-                      final role = u['role'] ?? 'toko';
+              : Column(
+                  children: [
+                    // Search & Filter Box
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      color: Colors.white,
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Cari nama, email, hp, atau toko...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.grey.shade100,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                          ),
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _filterChip('Semua Peran', 'ALL'),
+                                const SizedBox(width: 8),
+                                _filterChip('Super Admin', 'super_admin'),
+                                const SizedBox(width: 8),
+                                _filterChip('Admin', 'admin'),
+                                const SizedBox(width: 8),
+                                _filterChip('Toko / Kasir', 'toko'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 1.5,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: role == 'super_admin'
-                                    ? Colors.amber.shade100
-                                    : role == 'admin'
-                                        ? Colors.blue.shade100
-                                        : Colors.green.shade100,
-                                foregroundColor: role == 'super_admin'
-                                    ? Colors.amber.shade900
-                                    : role == 'admin'
-                                        ? Colors.blue.shade900
-                                        : Colors.green.shade900,
-                                child: Icon(role == 'super_admin' ? Icons.stars : Icons.person),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
+                    // User List
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: () async => _loadData(),
+                        child: filtered.isEmpty
+                            ? Center(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(u['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark)),
-                                    const SizedBox(height: 2),
-                                    Text(u['email'] ?? '', style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12)),
-                                    if (u['store_name'] != null && u['store_name'].toString().isNotEmpty)
-                                      Text('Toko: ${u['store_name']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.person_off_outlined, size: 56, color: Colors.grey),
+                                    SizedBox(height: 12),
+                                    Text('Tidak ada pengguna yang cocok', style: TextStyle(color: Colors.grey, fontSize: 15)),
                                   ],
                                 ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(left: 14, right: 14, top: 12, bottom: 85),
+                                itemCount: filtered.length,
+                                itemBuilder: (ctx, i) {
+                                  final u = filtered[i];
+                                  final role = (u['role'] ?? 'toko').toString();
+                                  final isActive = u['is_active'] == true || u['is_active'] == 1 || u['is_active'] == '1';
+
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    elevation: 1.5,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: Column(
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 22,
+                                                backgroundColor: role == 'super_admin'
+                                                    ? Colors.amber.shade100
+                                                    : role == 'admin'
+                                                        ? Colors.blue.shade100
+                                                        : Colors.green.shade100,
+                                                foregroundColor: role == 'super_admin'
+                                                    ? Colors.amber.shade900
+                                                    : role == 'admin'
+                                                        ? Colors.blue.shade900
+                                                        : Colors.green.shade900,
+                                                child: Icon(role == 'super_admin' ? Icons.stars : Icons.person, size: 24),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            u['name'] ?? '',
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 15,
+                                                              color: ThemeConfig.textDark,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                          decoration: BoxDecoration(
+                                                            color: isActive ? Colors.green.shade50 : Colors.red.shade50,
+                                                            borderRadius: BorderRadius.circular(6),
+                                                            border: Border.all(color: isActive ? Colors.green.shade300 : Colors.red.shade300),
+                                                          ),
+                                                          child: Text(
+                                                            isActive ? 'AKTIF' : 'NONAKTIF',
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: isActive ? Colors.green.shade800 : Colors.red.shade800,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.email_outlined, size: 13, color: Colors.grey),
+                                                        const SizedBox(width: 4),
+                                                        Expanded(
+                                                          child: Text(
+                                                            u['email'] ?? '',
+                                                            style: TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    if (u['phone'] != null && u['phone'].toString().isNotEmpty) ...[
+                                                      const SizedBox(height: 2),
+                                                      Row(
+                                                        children: [
+                                                          const Icon(Icons.phone_outlined, size: 13, color: Colors.grey),
+                                                          const SizedBox(width: 4),
+                                                          Text(u['phone'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                    if (u['store_name'] != null && u['store_name'].toString().isNotEmpty) ...[
+                                                      const SizedBox(height: 2),
+                                                      Row(
+                                                        children: [
+                                                          const Icon(Icons.storefront_outlined, size: 13, color: Colors.grey),
+                                                          const SizedBox(width: 4),
+                                                          Text(u['store_name'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          const Divider(height: 1),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: ThemeConfig.primary.withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  role.replaceAll('_', ' ').toUpperCase(),
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: ThemeConfig.primary),
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              // Toggle Active
+                                              TextButton.icon(
+                                                style: TextButton.styleFrom(
+                                                  visualDensity: VisualDensity.compact,
+                                                  foregroundColor: isActive ? Colors.orange.shade800 : Colors.green.shade800,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                ),
+                                                icon: Icon(isActive ? Icons.block : Icons.check_circle_outline, size: 16),
+                                                label: Text(isActive ? 'Nonaktifkan' : 'Aktifkan', style: const TextStyle(fontSize: 12)),
+                                                onPressed: () => _toggleUserStatus(u),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              // Edit
+                                              IconButton(
+                                                icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
+                                                tooltip: 'Edit Pengguna',
+                                                constraints: const BoxConstraints(),
+                                                padding: const EdgeInsets.all(6),
+                                                onPressed: () => _showEditUserModal(u),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              // Delete
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                                tooltip: 'Hapus Pengguna',
+                                                constraints: const BoxConstraints(),
+                                                padding: const EdgeInsets.all(6),
+                                                onPressed: () => _confirmDeleteUser(u),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: ThemeConfig.primary.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  role.replaceAll('_', ' ').toUpperCase(),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: ThemeConfig.primary),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
+    );
+  }
+
+  Widget _filterChip(String title, String roleVal) {
+    final isSelected = _roleFilter == roleVal;
+    return ChoiceChip(
+      label: Text(title, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      selected: isSelected,
+      selectedColor: ThemeConfig.primary.withOpacity(0.15),
+      onSelected: (val) {
+        if (val) {
+          setState(() => _roleFilter = roleVal);
+        }
+      },
     );
   }
 }

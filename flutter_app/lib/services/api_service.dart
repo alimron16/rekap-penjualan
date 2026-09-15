@@ -586,9 +586,28 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> updateUser(int id, Map<String, dynamic> data) async {
+    final headers = await _headers();
+    final res = await http.put(Uri.parse('$baseUrl/users/$id'), headers: headers, body: jsonEncode(data));
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteUser(int id) async {
+    final headers = await _headers();
+    final res = await http.delete(Uri.parse('$baseUrl/users/$id'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> toggleUserStatus(int id) async {
+    final headers = await _headers();
+    final res = await http.post(Uri.parse('$baseUrl/users/$id/toggle-status'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
   static Future<Map<String, dynamic>> getSettings() async {
     final headers = await _headers();
     final res = await http.get(Uri.parse('$baseUrl/settings'), headers: headers);
     return jsonDecode(res.body);
   }
 }
+

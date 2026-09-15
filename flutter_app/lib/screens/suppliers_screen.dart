@@ -14,11 +14,19 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _suppliers = [];
+  List<dynamic> _filteredSuppliers = [];
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _loadData() async {
@@ -33,8 +41,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         setState(() {
           if (res['success'] == true) {
             _suppliers = res['data'] ?? [];
+            _applyFilter();
           } else {
-            _errorMessage = res['message'] ?? 'Gagal memuat data supplier';
+            _errorMessage = res['message'] ?? 'Gagal memuat supplier';
           }
           _isLoading = false;
         });
@@ -49,13 +58,31 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
   }
 
-  void _showAddSupplierModal() {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final bankNameController = TextEditingController();
-    final accountNumController = TextEditingController();
-    final accountNameController = TextEditingController();
+  void _applyFilter() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredSuppliers = _suppliers;
+      } else {
+        _filteredSuppliers = _suppliers.where((s) {
+          final name = (s['name'] ?? '').toString().toLowerCase();
+          final phone = (s['phone'] ?? '').toString().toLowerCase();
+          final address = (s['address'] ?? '').toString().toLowerCase();
+          final bank = (s['bank_name'] ?? '').toString().toLowerCase();
+          return name.contains(query) || phone.contains(query) || address.contains(query) || bank.contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  void _showSupplierFormModal({dynamic supplier}) {
+    final isEditing = supplier != null;
+    final nameController = TextEditingController(text: supplier?['name'] ?? '');
+    final phoneController = TextEditingController(text: supplier?['phone'] ?? '');
+    final addressController = TextEditingController(text: supplier?['address'] ?? '');
+    final bankNameController = TextEditingController(text: supplier?['bank_name'] ?? '');
+    final accountNumController = TextEditingController(text: supplier?['account_number'] ?? '');
+    final accountNameController = TextEditingController(text: supplier?['account_name'] ?? '');
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -65,14 +92,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           padding: EdgeInsets.only(
-            top: 24,
+            top: 20,
             left: 20,
             right: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -82,31 +109,34 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Tambah Supplier Baru', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                    Text(
+                      isEditing ? 'Edit Supplier: ${supplier['name']}' : 'Tambah Mitra Supplier Baru',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+                    ),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Text('Nama Supplier / Vendor', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 6),
-                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nama vendor/distributor')),
-                const SizedBox(height: 14),
-                const Text('Nomor Telepon / Kontak', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 6),
+                const Divider(height: 16),
+                const Text('Nama Supplier / Distributor', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
+                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nama supplier/grosir')),
+                const SizedBox(height: 10),
+                const Text('Nomor Telepon / Sales', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
                 TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08...')),
-                const SizedBox(height: 14),
-                const Text('Alamat Kantor / Gudang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
+                const Text('Alamat Gudang / Kantor', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
                 TextField(controller: addressController, decoration: const InputDecoration(hintText: 'Alamat')),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Nama Bank', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          const SizedBox(height: 6),
+                          const Text('Nama Bank', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(height: 4),
                           TextField(controller: bankNameController, decoration: const InputDecoration(hintText: 'BCA / Mandiri')),
                         ],
                       ),
@@ -116,22 +146,22 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('No. Rekening', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          const SizedBox(height: 6),
+                          const Text('No. Rekening', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(height: 4),
                           TextField(controller: accountNumController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Nomor rek')),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                const Text('Atas Nama Rekening', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
+                const Text('Atas Nama Rekening', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 4),
                 TextField(controller: accountNameController, decoration: const InputDecoration(hintText: 'Nama pemilik rekening')),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 46,
                   child: ElevatedButton(
                     onPressed: isSubmitting
                         ? null
@@ -142,25 +172,29 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                             }
                             setModalState(() => isSubmitting = true);
 
-                            final res = await ApiService.storeSupplier({
+                            final payload = {
                               'name': nameController.text.trim(),
                               'phone': phoneController.text.trim(),
                               'address': addressController.text.trim(),
                               'bank_name': bankNameController.text.trim(),
                               'account_number': accountNumController.text.trim(),
                               'account_name': accountNameController.text.trim(),
-                            });
+                            };
+
+                            final res = isEditing
+                                ? await ApiService.updateSupplier(supplier['id'], payload)
+                                : await ApiService.storeSupplier(payload);
 
                             if (res['success'] == true) {
                               Navigator.pop(context);
                               _loadData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: 'Supplier Baru Disimpan! 🏢',
-                                body: 'Supplier "${nameController.text}" berhasil ditambahkan.',
+                                title: isEditing ? 'Supplier Diperbarui! ✅' : 'Supplier Baru Disimpan! 🏢',
+                                body: 'Supplier "${nameController.text}" berhasil disimpan ke sistem.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(res['message'] ?? 'Supplier berhasil disimpan!'), backgroundColor: ThemeConfig.accent),
+                                SnackBar(content: Text(res['message'] ?? 'Berhasil disimpan!'), backgroundColor: ThemeConfig.accent),
                               );
                             } else {
                               setModalState(() => isSubmitting = false);
@@ -171,7 +205,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           },
                     child: isSubmitting
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Simpan Supplier'),
+                        : Text(isEditing ? 'Simpan Perubahan' : 'Simpan Supplier Baru'),
                   ),
                 ),
               ],
@@ -182,71 +216,169 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     );
   }
 
+  void _confirmDeleteSupplier(dynamic supplier) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('Hapus Supplier?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text('Yakin ingin menghapus mitra supplier [${supplier['name']}]?\n\nPerhatian: Supplier yang memiliki riwayat faktur pembelian tidak dapat dihapus.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await ApiService.deleteSupplier(supplier['id']);
+              if (res['success'] == true) {
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Supplier berhasil dihapus!'), backgroundColor: Colors.red),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(res['message'] ?? 'Gagal menghapus supplier'), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text('Hapus Sekarang'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Master Supplier', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        title: const Text('Master Supplier', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        backgroundColor: ThemeConfig.primary,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: ThemeConfig.primary,
-        onPressed: _showAddSupplierModal,
-        icon: const Icon(Icons.domain_add, color: Colors.white),
+        onPressed: () => _showSupplierFormModal(),
+        icon: const Icon(Icons.add_business, color: Colors.white),
         label: const Text('Supplier Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _loadData, child: const Text('Coba Lagi')),
-                    ],
-                  ),
-                )
-              : _suppliers.isEmpty
-                  ? const Center(child: Text('Belum ada data supplier', style: TextStyle(color: Colors.grey)))
-                  : RefreshIndicator(
-                      onRefresh: () async => _loadData(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                        itemCount: _suppliers.length,
-                        itemBuilder: (ctx, i) {
-                          final s = _suppliers[i];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 1.5,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: ThemeConfig.accent.withOpacity(0.12),
-                                    foregroundColor: ThemeConfig.accent,
-                                    child: const Icon(Icons.business),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(s['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeConfig.textDark)),
-                                        const SizedBox(height: 2),
-                                        Text(s['phone'] ?? 'Tidak ada nomor telp', style: TextStyle(color: ThemeConfig.textMuted, fontSize: 13)),
-                                        if (s['bank_name'] != null && s['account_number'] != null)
-                                          Text('${s['bank_name']}: ${s['account_number']} (${s['account_name'] ?? '-'})', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+      body: Column(
+        children: [
+          // Search Header
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.white,
+            child: TextField(
+              controller: _searchController,
+              onChanged: (_) => _applyFilter(),
+              decoration: InputDecoration(
+                hintText: 'Cari nama supplier, no. telp, bank...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          _applyFilter();
                         },
-                      ),
-                    ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
+                : _errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(onPressed: _loadData, child: const Text('Coba Lagi')),
+                          ],
+                        ),
+                      )
+                    : _filteredSuppliers.isEmpty
+                        ? const Center(child: Text('Belum ada data supplier', style: TextStyle(color: Colors.grey)))
+                        : RefreshIndicator(
+                            onRefresh: () async => _loadData(),
+                            child: ListView.separated(
+                              padding: const EdgeInsets.only(left: 12, right: 12, top: 12, bottom: 80),
+                              itemCount: _filteredSuppliers.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (ctx, i) {
+                                final s = _filteredSuppliers[i];
+                                return Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey.shade200),
+                                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: ThemeConfig.accent.withOpacity(0.12),
+                                        foregroundColor: ThemeConfig.accent,
+                                        child: const Icon(Icons.business),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(s['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ThemeConfig.textDark)),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              s['phone'] != null && s['phone'].toString().isNotEmpty ? '📞 ${s['phone']}' : '📞 Tidak ada telepon',
+                                              style: TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
+                                            ),
+                                            if (s['address'] != null && s['address'].toString().isNotEmpty)
+                                              Text('📍 ${s['address']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                            if (s['bank_name'] != null && s['account_number'] != null)
+                                              Text('🏦 ${s['bank_name']}: ${s['account_number']} a/n ${s['account_name'] ?? '-'}', style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 11)),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                                            onPressed: () => _showSupplierFormModal(supplier: s),
+                                            tooltip: 'Edit Supplier',
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                            onPressed: () => _confirmDeleteSupplier(s),
+                                            tooltip: 'Hapus Supplier',
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 }

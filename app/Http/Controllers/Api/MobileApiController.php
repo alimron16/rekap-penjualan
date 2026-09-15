@@ -1340,10 +1340,71 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'message' => 'Pengguna berhasil dibuat!', 'data' => $newUser]);
     }
 
+    public function updateUser(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $targetUser = User::findOrFail($id);
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:100|unique:users,email,' . $targetUser->id,
+            'password' => 'nullable|string|min:6',
+            'role' => 'required|in:super_admin,admin,toko',
+            'store_name' => 'nullable|string|max:100',
+            'phone' => 'nullable|string|max:30',
+        ]);
+
+        $targetUser->name = $validated['name'];
+        $targetUser->email = $validated['email'];
+        if (!empty($validated['password'])) {
+            $targetUser->password = Hash::make($validated['password']);
+        }
+        $targetUser->role = $validated['role'];
+        $targetUser->store_name = $validated['store_name'];
+        $targetUser->phone = $validated['phone'];
+        $targetUser->save();
+
+        return response()->json(['success' => true, 'message' => "Pengguna [{$targetUser->name}] berhasil diperbarui!", 'data' => $targetUser]);
+    }
+
+    public function destroyUser(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $targetUser = User::findOrFail($id);
+        if ($targetUser->id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'Tidak dapat menghapus akun Anda sendiri yang sedang login.'], 422);
+        }
+
+        $name = $targetUser->name;
+        $targetUser->delete();
+        return response()->json(['success' => true, 'message' => "Pengguna [{$name}] berhasil dihapus!"]);
+    }
+
+    public function toggleUserStatus(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
+
+        $targetUser = User::findOrFail($id);
+        if ($targetUser->id === $user->id) {
+            return response()->json(['success' => false, 'message' => 'Tidak dapat menonaktifkan akun sendiri.'], 422);
+        }
+
+        $targetUser->is_active = !$targetUser->is_active;
+        $targetUser->save();
+
+        $statusText = $targetUser->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        return response()->json(['success' => true, 'message' => "Akun [{$targetUser->name}] berhasil {$statusText}!", 'data' => $targetUser]);
+    }
+
     public function storeSettings(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
 
         $setting = StoreSetting::first();
         $closingHistory = YearlyClosing::latest()->take(5)->get();
