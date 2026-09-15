@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workmanager/workmanager.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/transfer_screen.dart';
@@ -12,8 +13,20 @@ void main() async {
   
   try {
     await NotificationService.init();
+    await Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: false,
+    );
+    await Workmanager().registerPeriodicTask(
+      "elephant_pos_bg_poll",
+      "elephant_pos_check_notifications",
+      frequency: const Duration(minutes: 15),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+      ),
+    );
   } catch (e) {
-    debugPrint('Notification init error: $e');
+    debugPrint('Notification & Workmanager init error: $e');
   }
 
   String initialRoute = '/login';

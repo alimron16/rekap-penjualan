@@ -47,9 +47,18 @@ class ApiService {
     return null;
   }
 
-  static Future<Map<String, dynamic>> getDashboard() async {
+  static Future<Map<String, dynamic>> getDashboard({String? startDate, String? endDate}) async {
     final headers = await _headers();
-    final res = await http.get(Uri.parse('$baseUrl/dashboard'), headers: headers);
+    final query = (startDate != null && endDate != null)
+        ? '?start_date=${Uri.encodeComponent(startDate)}&end_date=${Uri.encodeComponent(endDate)}'
+        : '';
+    final res = await http.get(Uri.parse('$baseUrl/dashboard$query'), headers: headers);
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> pollNotifications() async {
+    final headers = await _headers();
+    final res = await http.get(Uri.parse('$baseUrl/notifications/poll'), headers: headers);
     return jsonDecode(res.body);
   }
 

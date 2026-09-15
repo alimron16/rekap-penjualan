@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
-// Native Screens
+// Native Screens for Drawer Navigation
 import 'pos_screen.dart';
 import 'digital_screen.dart';
 import 'receivables_screen.dart';
@@ -22,6 +23,13 @@ import 'reports_screen.dart';
 import 'users_screen.dart';
 import 'settings_screen.dart';
 
+class AppColors {
+  static const Color slateBorder = Color(0xFFE2E8F0);
+  static const Color slateText = Color(0xFF64748B);
+  static const Color emeraldLight = Color(0xFFECFDF5);
+  static const Color emeraldIcon = Color(0xFF047857);
+}
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -31,9 +39,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? _userData;
-  Map<String, dynamic>? _stats;
+  Map<String, dynamic>? _dashboardData;
   bool _isLoading = true;
   String? _errorMessage;
+
+  late String _startDate;
+  late String _endDate;
 
   Timer? _pollingTimer;
   int _lastPendingTransferCount = 0;
@@ -41,6 +52,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _startDate = DateFormat('yyyy-MM-01').format(now);
+    _endDate = DateFormat('yyyy-MM-dd').format(now);
+
     NotificationService.requestPermission();
     _loadDashboardData();
     _startPendingTransferPolling();
@@ -57,13 +72,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final role = _userData?['role']?.toString().toLowerCase();
       if (role == 'admin' || role == 'super_admin' || role == 'superadmin') {
         try {
-          final res = await ApiService.checkPendingTransfers();
+          final res = await ApiService.pollNotifications();
           if (res['success'] == true) {
-            final int currentCount = Formatters.parseInt(res['count']);
+            final int currentCount = Formatters.parseInt(res['pending_transfers_count']);
             if (currentCount > _lastPendingTransferCount && currentCount > 0) {
-              final latest = res['latest'];
-              final String sender = latest?['user'] ?? 'Kasir Agen';
-              final String bank = latest?['bank'] ?? 'Bank';
+              final latest = res['latest_pending'];
+              final String sender = latest?['user']?['name'] ?? 'Kasir Agen';
+              final String bank = latest?['bank_name'] ?? 'Bank';
               final double amount = Formatters.parseDouble(latest?['amount']);
 
               NotificationService.showNotification(
@@ -87,15 +102,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       final user = await ApiService.getUser();
-      final data = await ApiService.getDashboard();
+      final data = await ApiService.getDashboard(startDate: _startDate, endDate: _endDate);
 
       if (mounted) {
         setState(() {
           _userData = user;
           if (data['success'] == true) {
-            _stats = data['stats'];
-
-            final pendingCount = Formatters.parseInt(_stats?['pending_transfers']);
+            _dashboardData = data;
+            final pendingCount = Formatters.parseInt(data['pending_transfers']);
             _lastPendingTransferCount = pendingCount;
             final role = (_userData?['role'] ?? '').toString().toLowerCase();
 
@@ -122,76 +136,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _handleLogout() async {
-    _pollingTimer?.cancel();
-    await ApiService.logout();
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/login');
-  }
-
-  void _triggerTestNotification() async {
-    await NotificationService.showNotification(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: '🐘 ELEPHANT POS - Notifikasi Aktif!',
-      body: 'Notifikasi status bar native Android berfungsi 100% dengan suara & getar!',
+  void _selectDate(bool isStart) async {
+    final current = isStart ? DateTime.parse(_startDate) : DateTime.parse(_endDate);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: ThemeConfig.primary),
+          ),
+          child: child!,
+        );
+      },
     );
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🔔 Notifikasi berhasil dikirim ke Status Bar HP!'),
-          backgroundColor: ThemeConfig.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    if (picked != null) {
+      final formatted = DateFormat('yyyy-MM-dd').format(picked);
+      setState(() {
+        if (isStart) {
+          _startDate = formatted;
+        } else {
+          _endDate = formatted;
+        }
+      });
+      _loadDashboardData();
     }
-  }
-
-  void _navigate(Widget screen) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => screen),
-    ).then((_) => _loadDashboardData());
   }
 
   @override
   Widget build(BuildContext context) {
-    final userName = _userData?['name'] ?? 'Pengguna';
-    final storeName = _userData?['store_name'] ?? 'Elephant Cell';
-    final role = (_userData?['role'] ?? 'user').toString().toUpperCase();
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final role = (_userData?['role'] ?? 'toko').toString().toLowerCase();
+    final isAdmin = role == 'admin' || role == 'super_admin' || role == 'superadmin';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: ThemeConfig.primary,
-        elevation: 0,
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 24,
-                height: 24,
-                errorBuilder: (_, __, ___) => const Icon(Icons.store, size: 24, color: ThemeConfig.primary),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('ELEPHANT CELL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                Text('Sistem POS & Akuntansi Mandiri', style: TextStyle(fontSize: 10, color: Colors.white70)),
-              ],
+            const Text('Dashboard Operasional', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            Text(
+              _userData?['store_name'] ?? 'ELEPHANT CELL',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
             ),
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDashboardData, tooltip: 'Segarkan'),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _handleLogout, tooltip: 'Keluar'),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Segarkan Dashboard',
+            onPressed: _loadDashboardData,
+          ),
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (_lastPendingTransferCount > 0 && isAdmin)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: Text(
+                        '$_lastPendingTransferCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
+            },
+          ),
         ],
       ),
+      drawer: _buildAppDrawer(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
           : _errorMessage != null
@@ -205,339 +230,822 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: () async => _loadDashboardData(),
-                  color: ThemeConfig.primary,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header Profil Card
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [ThemeConfig.primary, ThemeConfig.primaryLight],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(color: ThemeConfig.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: ThemeConfig.accent,
-                                child: Text(
-                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                                    const SizedBox(height: 2),
-                                    Text('$storeName • $role', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                                  ],
-                                ),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _triggerTestNotification,
-                                icon: const Icon(Icons.notifications_active, size: 16),
-                                label: const Text('Tes Notif', style: TextStyle(fontSize: 11)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                ),
-                              )
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTablet = constraints.maxWidth >= 700;
 
-                        // Ringkasan Statistik
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildSummaryCard(
-                                title: 'Penjualan Hari Ini',
-                                value: Formatters.formatRupiah(_stats?['sales_today']),
-                                icon: Icons.payments_outlined,
-                                color: Colors.green,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildSummaryCard(
-                                title: 'Transaksi Hari Ini',
-                                value: '${Formatters.parseInt(_stats?['trx_today'])} Transaksi',
-                                icon: Icons.receipt_long_outlined,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
+                    return RefreshIndicator(
+                      onRefresh: () async => _loadDashboardData(),
+                      child: ListView(
+                        padding: EdgeInsets.only(
+                          left: 14,
+                          right: 14,
+                          top: 14,
+                          bottom: bottomInset + 30, // Anti-cut navbar padding
                         ),
-                        const SizedBox(height: 24),
+                        children: [
+                          // 1. TOP FILTER & INSTRUCTION PANEL
+                          _buildTopFilterPanel(),
+                          const SizedBox(height: 14),
 
-                        // ==========================================
-                        // 1. MENU PENJUALAN & KASIR
-                        // ==========================================
-                        _buildSectionTitle('1. Penjualan & Kasir', Icons.shopping_cart_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Kasir Retail (Eceran)', 'POS ritel harian', Icons.point_of_sale, Colors.green, () => _navigate(const PosScreen(saleType: 'retail'))),
-                            _buildMenuCard('Kasir Grosir', 'Transaksi grosir', Icons.storefront, Colors.teal, () => _navigate(const PosScreen(saleType: 'grosir'))),
-                            _buildMenuCard('Produk Elektrik', 'Pulsa, Data & PLN', Icons.bolt, Colors.amber.shade800, () => _navigate(const DigitalScreen())),
-                            _buildMenuCard('Pembayaran Piutang', 'Pelunasan piutang', Icons.credit_score, Colors.indigo, () => _navigate(const ReceivablesScreen())),
-                            _buildMenuCard('Retur Penjualan', 'Pengembalian barang', Icons.assignment_return, Colors.red.shade700, () => _navigate(const ReturnsScreen())),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
+                          // 2. 8 KOTAK KPI UTAMA (Responsive Grid)
+                          _buildKpiGrid(isTablet),
+                          const SizedBox(height: 16),
 
-                        // ==========================================
-                        // 2. TRANSFER AGEN & BANK
-                        // ==========================================
-                        _buildSectionTitle('2. Transfer Agen & Bank', Icons.compare_arrows_rounded),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Transfer Agen & Bank', 'Pengajuan & ACC Admin', Icons.swap_horiz_rounded, Colors.green.shade800, () => _navigate(const TransferScreen())),
+                          // 3. 3 RINCIAN BREAKDOWN & TARGET PROFIT
+                          if (isTablet)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _buildCashBreakdownCard()),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildTargetProfitCard()),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildDailyTrendCard()),
+                              ],
+                            )
+                          else ...[
+                            _buildCashBreakdownCard(),
+                            const SizedBox(height: 12),
+                            _buildTargetProfitCard(),
+                            const SizedBox(height: 12),
+                            _buildDailyTrendCard(),
                           ],
-                        ),
-                        const SizedBox(height: 24),
+                          const SizedBox(height: 16),
 
-                        // ==========================================
-                        // 3. MASTER DATA LENGKAP
-                        // ==========================================
-                        _buildSectionTitle('3. Master Data', Icons.folder_open_rounded),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Daftar Item / Produk', 'Kelola stok barang', Icons.inventory_2_outlined, Colors.blue.shade700, () => _navigate(const ProductsScreen(isMulti: false))),
-                            _buildMenuCard('Produk Multi', 'Paket data & voucher', Icons.category_outlined, Colors.cyan.shade700, () => _navigate(const ProductsScreen(isMulti: true))),
-                            _buildMenuCard('Supplier', 'Mitra distributor', Icons.local_shipping_outlined, Colors.orange.shade800, () => _navigate(const SuppliersScreen())),
-                            _buildMenuCard('Pelanggan', 'Data pembeli', Icons.people_alt_outlined, Colors.purple.shade700, () => _navigate(const CustomersScreen())),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ==========================================
-                        // 4. PEMBELIAN & HUTANG
-                        // ==========================================
-                        _buildSectionTitle('4. Pembelian & Hutang', Icons.shopping_bag_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Daftar Pembelian', 'Faktur beli supplier', Icons.receipt_outlined, Colors.brown, () => _navigate(const PurchasesScreen())),
-                            _buildMenuCard('Pembayaran Hutang', 'Bayar tagihan supplier', Icons.payment_outlined, Colors.deepOrange, () => _navigate(const PurchasesScreen())),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ==========================================
-                        // 5. PERSEDIAAN & STOK OPNAME
-                        // ==========================================
-                        _buildSectionTitle('5. Persediaan Stok', Icons.warehouse_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Penyesuaian Stok', 'Koreksi stok barang', Icons.tune_rounded, Colors.teal.shade800, () => _navigate(const InventoryScreen())),
-                            _buildMenuCard('Stok Opname', 'Audit fisik barang', Icons.fact_check_outlined, Colors.blueGrey, () => _navigate(const InventoryScreen())),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ==========================================
-                        // 6. AKUNTANSI & KAS
-                        // ==========================================
-                        _buildSectionTitle('6. Akuntansi & Kas', Icons.account_balance_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Bagan Akun (COA)', 'Daftar rekening', Icons.menu_book_outlined, Colors.indigo.shade800, () => _navigate(const AccountsScreen())),
-                            _buildMenuCard('Kas Masuk', 'Penerimaan tunai', Icons.arrow_downward_rounded, Colors.green.shade700, () => _navigate(const CashScreen(initialType: 'in'))),
-                            _buildMenuCard('Kas Keluar', 'Pengeluaran beban', Icons.arrow_upward_rounded, Colors.red.shade600, () => _navigate(const CashScreen(initialType: 'out'))),
-                            _buildMenuCard('Kas Transfer Antar Bank', 'Pindah buku bank', Icons.sync_alt_rounded, Colors.purple.shade800, () => _navigate(const CashScreen(initialType: 'transfer'))),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ==========================================
-                        // 7. LAPORAN KEUANGAN
-                        // ==========================================
-                        _buildSectionTitle('7. Laporan Keuangan', Icons.analytics_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Laba Rugi', 'Performa laba bersih', Icons.show_chart_rounded, Colors.green.shade800, () => _navigate(const ReportsScreen(initialTabIndex: 0))),
-                            _buildMenuCard('Neraca Keuangan', 'Posisi aktiva & pasiva', Icons.balance, Colors.blue.shade900, () => _navigate(const ReportsScreen(initialTabIndex: 1))),
-                            _buildMenuCard('Lap. Penjualan', 'Histori rincian sales', Icons.description_outlined, Colors.teal.shade700, () => _navigate(const ReportsScreen(initialTabIndex: 2))),
-                            _buildMenuCard('Lap. Pembelian', 'Histori beli barang', Icons.receipt_long, Colors.amber.shade900, () => _navigate(const ReportsScreen(initialTabIndex: 3))),
-                            _buildMenuCard('Lap. Kas & Bank', 'Mutasi arus kas', Icons.account_balance_wallet, Colors.deepPurple, () => _navigate(const ReportsScreen(initialTabIndex: 4))),
-                            _buildMenuCard('Lap. Hutang Piutang', 'Sisa tempo bayar', Icons.credit_score, Colors.indigo.shade800, () => _navigate(const ReportsScreen(initialTabIndex: 5))),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ==========================================
-                        // 8. PENGATURAN & USER
-                        // ==========================================
-                        _buildSectionTitle('8. Pengaturan & Sistem', Icons.settings_outlined),
-                        const SizedBox(height: 10),
-                        GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          childAspectRatio: 2.1,
-                          children: [
-                            _buildMenuCard('Kelola Pengguna', 'Hak akses kasir/admin', Icons.manage_accounts_outlined, Colors.grey.shade700, () => _navigate(const UsersScreen())),
-                            _buildMenuCard('Tutup Buku Tahunan', 'Finalisasi pembukuan', Icons.event_available, Colors.red.shade900, () => _navigate(const SettingsScreen())),
-                          ],
-                        ),
-                        const SizedBox(height: 30),
-                      ],
-                    ),
-                  ),
+                          // 4. TABEL URUTAN PRODUK TERLARIS
+                          _buildTopProductsTable(),
+                        ],
+                      ),
+                    );
+                  },
                 ),
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: ThemeConfig.primary),
-        const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
-      ],
-    );
-  }
+  // ===========================================================================
+  // WIDGET COMPONENTS MATCHING WEB DASHBOARD
+  // ===========================================================================
 
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildTopFilterPanel() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.slateBorder),
+        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 4)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              const Icon(Icons.date_range, size: 16, color: ThemeConfig.primary),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const Text('Periode:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ThemeConfig.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.sync, size: 14, color: Colors.white),
+                label: const Text('REFRESH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                onPressed: _loadDashboardData,
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFF1F5F9),
+                    ),
+                    child: Text(_startDate, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('s/d', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFF1F5F9),
+                    ),
+                    child: Text(_endDate, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.slateBorder),
+            ),
+            child: Row(
+              children: const [
+                Icon(Icons.info_outline, size: 14, color: AppColors.slateText),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'PETUNJUK: Data periode terakumulasi otomatis secara real-time dari database ACID.',
+                    style: TextStyle(fontSize: 10, color: AppColors.slateText, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildKpiGrid(bool isTablet) {
+    final d = _dashboardData ?? {};
+    final pl = d['pl'] ?? {};
+    final revenues = pl['revenues'] ?? {};
+    final expenses = pl['expenses'] ?? {};
+
+    final totalPersediaan = Formatters.parseDouble(d['totalPersediaan']);
+    final totalHutang = Formatters.parseDouble(d['totalHutang']);
+    final totalPiutang = Formatters.parseDouble(d['totalPiutang']);
+    final totalKasBank = Formatters.parseDouble(d['totalKasBank']);
+    final totalPendapatan = Formatters.parseDouble(revenues['total']);
+    final totalBiaya = Formatters.parseDouble(expenses['total']);
+    final salesCount = Formatters.parseInt(d['salesCount']);
+    final retailCount = Formatters.parseInt(d['retailSalesCount']);
+    final grosirCount = Formatters.parseInt(d['grosirSalesCount']);
+    final netProfit = Formatters.parseDouble(pl['net_profit']);
+
+    final kpis = [
+      {
+        'title': 'PERSEDIAAN BARANG',
+        'value': Formatters.formatRupiah(totalPersediaan),
+        'desc': 'Nilai fisik stok moving HPP',
+        'icon': Icons.inventory_2_outlined,
+        'iconColor': AppColors.emeraldIcon,
+        'iconBg': AppColors.emeraldLight,
+        'isDark': false,
+      },
+      {
+        'title': 'HUTANG SUPPLIER',
+        'value': Formatters.formatRupiah(totalHutang),
+        'desc': 'Sisa tagihan kulakan belum lunas',
+        'icon': Icons.credit_card_outlined,
+        'iconColor': AppColors.slateText,
+        'iconBg': const Color(0xFFF1F5F9),
+        'isDark': false,
+      },
+      {
+        'title': 'PIUTANG PELANGGAN',
+        'value': Formatters.formatRupiah(totalPiutang),
+        'desc': 'Penjualan tempo belum tertagih',
+        'icon': Icons.account_balance_wallet_outlined,
+        'iconColor': AppColors.slateText,
+        'iconBg': const Color(0xFFF1F5F9),
+        'isDark': false,
+      },
+      {
+        'title': 'TOTAL KAS & BANK',
+        'value': Formatters.formatRupiah(totalKasBank),
+        'desc': 'Cash laci, BCA, BRI & saldo multi',
+        'icon': Icons.account_balance_outlined,
+        'iconColor': AppColors.emeraldIcon,
+        'iconBg': AppColors.emeraldLight,
+        'isDark': false,
+      },
+      {
+        'title': 'TOTAL PENDAPATAN',
+        'value': Formatters.formatRupiah(totalPendapatan),
+        'desc': 'Retail + Grosir + Multi + Jasa TF',
+        'icon': Icons.trending_up,
+        'iconColor': AppColors.emeraldIcon,
+        'iconBg': AppColors.emeraldLight,
+        'isDark': false,
+      },
+      {
+        'title': 'BIAYA OPERASIONAL',
+        'value': Formatters.formatRupiah(totalBiaya),
+        'desc': 'Kas keluar operasional & listrik/sewa',
+        'icon': Icons.trending_down,
+        'iconColor': AppColors.slateText,
+        'iconBg': const Color(0xFFF1F5F9),
+        'isDark': false,
+      },
+      {
+        'title': 'TOTAL TRANSAKSI',
+        'value': '$salesCount Nota',
+        'desc': 'Retail: $retailCount | Grosir: $grosirCount',
+        'icon': Icons.receipt_long_outlined,
+        'iconColor': AppColors.slateText,
+        'iconBg': const Color(0xFFF1F5F9),
+        'isDark': false,
+      },
+      {
+        'title': 'LABA BERSIH REAL-TIME',
+        'value': Formatters.formatRupiah(netProfit),
+        'desc': 'Laba kotor - Biaya operasional',
+        'icon': Icons.monetization_on_outlined,
+        'iconColor': const Color(0xFFA7F3D0),
+        'iconBg': const Color(0x26FFFFFF),
+        'isDark': true,
+      },
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isTablet ? 4 : 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: isTablet ? 1.4 : 1.3,
+      ),
+      itemCount: kpis.length,
+      itemBuilder: (ctx, i) {
+        final it = kpis[i];
+        final isDark = it['isDark'] == true;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF133E1C) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? const Color(0xFF064E3B) : AppColors.slateBorder),
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? const Color(0x14000000) : const Color(0x05000000),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Expanded(
+                    child: Text(
+                      it['title'] as String,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF64748B),
+                        letterSpacing: 0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: it['iconBg'] as Color,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(it['icon'] as IconData, size: 16, color: it['iconColor'] as Color),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      it['value'] as String,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    it['desc'] as String,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: isDark ? Colors.white70 : const Color(0xFF94A3B8),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCashBreakdownCard() {
+    final d = _dashboardData ?? {};
+    final cashAccounts = (d['cashAccounts'] as List?) ?? [];
+    final pl = d['pl'] ?? {};
+    final revenues = pl['revenues'] ?? {};
+    final hpp = pl['hpp'] ?? {};
+
+    final retailProfit = Formatters.parseDouble(revenues['retail']) - Formatters.parseDouble(hpp['retail']);
+    final grosirProfit = Formatters.parseDouble(revenues['grosir']) - Formatters.parseDouble(hpp['grosir']);
+    final multiProfit = Formatters.parseDouble(revenues['multi']) - Formatters.parseDouble(hpp['multi']);
+    final tfProfit = Formatters.parseDouble(revenues['jasa_transfer']);
+    final grossProfit = Formatters.parseDouble(pl['gross_profit']);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.slateBorder),
+        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.account_balance, size: 16, color: ThemeConfig.primary),
+              SizedBox(width: 6),
+              Text('Rincian Saldo Kas & Bank', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+          const Divider(height: 16),
+          ...cashAccounts.map((acc) {
+            final name = acc['name'] ?? 'Kas';
+            final bal = Formatters.parseDouble(acc['current_balance']);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3.5),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(name, style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                  Text(Formatters.formatRupiah(bal), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 10),
+          const Divider(height: 16),
+          Row(
+            children: const [
+              Icon(Icons.pie_chart_outline, size: 16, color: ThemeConfig.accent),
+              SizedBox(width: 6),
+              Text('Rincian Margin & Laba Kotor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _marginRow('Laba Retail Fisik:', Formatters.formatRupiah(retailProfit)),
+          _marginRow('Laba Grosir:', Formatters.formatRupiah(grosirProfit)),
+          _marginRow('Laba Multi Elektrik:', Formatters.formatRupiah(multiProfit)),
+          _marginRow('Pendapatan Jasa TF:', Formatters.formatRupiah(tfProfit), color: ThemeConfig.primary),
+          const Divider(height: 12),
+          _marginRow('Total Laba Kotor:', Formatters.formatRupiah(grossProfit), isBold: true, color: ThemeConfig.primary),
+        ],
+      ),
+    );
+  }
+
+  Widget _marginRow(String label, String val, {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11.5, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF475569))),
+          Text(
+            val,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
+              fontFamily: 'monospace',
+              color: color ?? const Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTargetProfitCard() {
+    final d = _dashboardData ?? {};
+    final targetProfit = Formatters.parseDouble(d['targetProfit']);
+    final realizedProfit = Formatters.parseDouble(d['realizedProfit']);
+    final remainingTarget = Formatters.parseDouble(d['remainingTarget']);
+    final progressPct = Formatters.parseDouble(d['progressPct']);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.slateBorder),
+        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.flag_outlined, size: 16, color: ThemeConfig.primary),
+              SizedBox(width: 6),
+              Text('Target Profit Bulan Ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.slateBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Target Bulanan:', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        child: Text(
+                          Formatters.formatRupiah(targetProfit),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'monospace'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldLight,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Realisasi Saat Ini:', style: TextStyle(fontSize: 10, color: Color(0xFF065F46))),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        child: Text(
+                          Formatters.formatRupiah(realizedProfit),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'monospace', color: Color(0xFF064E3B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Pencapaian: $progressPct%', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+              Text('Sisa: ${Formatters.formatRupiah(remainingTarget)}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace')),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: (progressPct / 100).clamp(0.0, 1.0),
+              minHeight: 12,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                progressPct >= 100 ? Colors.green : (progressPct >= 50 ? ThemeConfig.primary : Colors.orange),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: progressPct >= 100 ? const Color(0xFFD1FAE5) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: progressPct >= 100 ? const Color(0xFF6EE7B7) : const Color(0xFFCBD5E1)),
+              ),
+              child: Text(
+                progressPct >= 100 ? '🎉 TARGET BULANAN TERCAPAI' : 'Menuju target profit bulan berjalan',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: progressPct >= 100 ? const Color(0xFF065F46) : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyTrendCard() {
+    final d = _dashboardData ?? {};
+    final dailySales = (d['dailySales'] as Map?) ?? {};
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.slateBorder),
+        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.show_chart, size: 16, color: ThemeConfig.primary),
+              SizedBox(width: 6),
+              Text('Tren Penjualan Harian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ),
+          const Divider(height: 16),
+          if (dailySales.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('Belum ada transaksi penjualan pada periode ini', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              ),
+            )
+          else ...[
+            ...dailySales.entries.take(7).map((e) {
+              final day = e.key.toString();
+              final rev = Formatters.parseDouble(e.value);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(day, style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                    Text(Formatters.formatRupiah(rev), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopProductsTable() {
+    final d = _dashboardData ?? {};
+    final topProducts = (d['topProducts'] as List?) ?? [];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.slateBorder),
+        boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Bar matching Web `#133e1c`
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF133E1C),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.check_circle_outline, size: 16, color: Colors.white70),
+                    SizedBox(width: 6),
+                    Text(
+                      'URUTAN PRODUK TERLARIS PERIODE INI',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5, letterSpacing: 0.3),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen())),
+                  child: const Text('Lihat Semua >', style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
+          // Table
+          if (topProducts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(
+                child: Text('Belum ada riwayat transaksi penjualan fisik pada periode ini.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 38,
+                dataRowMinHeight: 40,
+                dataRowMaxHeight: 48,
+                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                columns: const [
+                  DataColumn(label: Text('NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('KODE BARANG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('NAMA PRODUK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('JENIS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('MEREK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('HARGA JUAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('JUMLAH TERJUAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                ],
+                rows: topProducts.asMap().entries.map((entry) {
+                  final idx = entry.key + 1;
+                  final tp = entry.value;
+                  final prod = tp['product'] ?? {};
+                  final itemCode = prod['item_code'] ?? prod['code'] ?? '-';
+                  final name = prod['name'] ?? '-';
+                  final type = prod['type'] ?? '-';
+                  final brand = prod['brand'] ?? '-';
+                  final price = Formatters.parseDouble(prod['retail_price'] ?? prod['selling_price']);
+                  final totalSold = Formatters.parseInt(tp['total_sold']);
+
+                  return DataRow(
+                    cells: [
+                      DataCell(Text('$idx', style: const TextStyle(fontSize: 11, color: Colors.grey))),
+                      DataCell(Text(itemCode, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.primary, fontFamily: 'monospace'))),
+                      DataCell(Text(name, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600))),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                          child: Text(type, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      DataCell(Text(brand, style: const TextStyle(fontSize: 11))),
+                      DataCell(Text(Formatters.formatRupiah(price), style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+                      DataCell(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.emeraldLight,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: Text('$totalSold pcs', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF065F46))),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // APP DRAWER (All 18 Modules Access)
+  // ===========================================================================
+
+  Widget _buildAppDrawer() {
+    return Drawer(
+      child: SafeArea(
+        bottom: true,
+        child: Column(
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(color: ThemeConfig.primary),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.store, color: ThemeConfig.primary, size: 36),
+              ),
+              accountName: Text(
+                _userData?['name'] ?? 'User Kasir',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              accountEmail: Text(_userData?['email'] ?? 'user@pos.moonbyte.my.id'),
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _drawerItem(Icons.point_of_sale, 'Kasir Eceran (Retail)', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
+                  }),
+                  _drawerItem(Icons.storefront, 'Kasir Grosir', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
+                  }),
+                  _drawerItem(Icons.phone_android, 'Produk Multi / Pulsa', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
+                  }),
+                  const Divider(),
+                  _drawerItem(Icons.inventory_2, 'Master Data Produk', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
+                  }),
+                  _drawerItem(Icons.people, 'Master Pelanggan', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()));
+                  }),
+                  _drawerItem(Icons.local_shipping, 'Master Supplier', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()));
+                  }),
+                  _drawerItem(Icons.account_tree, 'Bagan Akun (COA)', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
+                  }),
+                  const Divider(),
+                  _drawerItem(Icons.shopping_bag, 'Pembelian & Hutang', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasesScreen()));
+                  }),
+                  _drawerItem(Icons.receipt, 'Piutang Pelanggan', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
+                  }),
+                  _drawerItem(Icons.assignment_return, 'Retur Penjualan', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnsScreen()));
+                  }),
+                  _drawerItem(Icons.tune, 'Penyesuaian Stok (Opname)', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
+                  }),
+                  _drawerItem(Icons.attach_money, 'Kas Masuk & Keluar', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen()));
+                  }),
+                  _drawerItem(Icons.swap_horiz, 'Transfer Antar Akun', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
+                  }),
+                  const Divider(),
+                  _drawerItem(Icons.bar_chart, 'Laporan Keuangan', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
+                  }),
+                  _drawerItem(Icons.manage_accounts, 'Manajemen Pengguna', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersScreen()));
+                  }),
+                  _drawerItem(Icons.settings, 'Pengaturan & Printer', () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                  }),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade400),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _drawerItem(IconData icon, String title, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: ThemeConfig.primary, size: 20),
+      title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      dense: true,
+      onTap: onTap,
     );
   }
 }

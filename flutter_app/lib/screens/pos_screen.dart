@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/printer_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
@@ -592,7 +593,12 @@ class _PosScreenState extends State<PosScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).padding.bottom + 24, // Safe bottom padding
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -687,31 +693,55 @@ class _PosScreenState extends State<PosScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        if (saleData?['id'] != null) {
-                          _openReceiptUrl('/receipt/thermal/${saleData['id']}');
-                        }
+                        final salePayload = {
+                          'id': saleData?['id'],
+                          'invoice_number': inv,
+                          'date': formattedDate,
+                          'cashier_name': 'Kasir',
+                          'subtotal': grandTotal,
+                          'discount': 0,
+                          'grand_total': grandTotal,
+                          'paid_amount': grandTotal + change,
+                          'change_amount': change,
+                          'payment_method': 'CASH',
+                          'items': itemsPurchased,
+                        };
+                        await PrinterService.printReceipt(sale: salePayload);
                       },
-                      icon: const Icon(Icons.print, size: 16),
-                      label: const Text('Cetak / Buka Web'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                      icon: const Icon(Icons.print, size: 16, color: Colors.white),
+                      label: const Text('Cetak Struk', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ThemeConfig.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        if (saleData?['id'] != null) {
-                          _openReceiptUrl('/receipt/invoice/${saleData['id']}');
-                        }
+                        final salePayload = {
+                          'id': saleData?['id'],
+                          'invoice_number': inv,
+                          'date': formattedDate,
+                          'cashier_name': 'Kasir',
+                          'subtotal': grandTotal,
+                          'discount': 0,
+                          'grand_total': grandTotal,
+                          'paid_amount': grandTotal + change,
+                          'change_amount': change,
+                          'status': 'LUNAS',
+                          'items': itemsPurchased,
+                        };
+                        await PrinterService.printInvoice(sale: salePayload);
                       },
                       icon: const Icon(Icons.picture_as_pdf, size: 16),
                       label: const Text('Faktur A4'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ThemeConfig.accent,
+                      style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1004,7 +1034,12 @@ class _PosScreenState extends State<PosScreen> {
                     // Bottom Cart Floating Action Bar
                     if (_cart.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          top: 14,
+                          bottom: MediaQuery.of(context).padding.bottom + 14,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -1012,32 +1047,30 @@ class _PosScreenState extends State<PosScreen> {
                             BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, -4)),
                           ],
                         ),
-                        child: SafeArea(
-                          child: Row(
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('${_cart.length} Item terpilih', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                  Text(
-                                    Formatters.formatRupiah(_grandTotal),
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ThemeConfig.primary),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              ElevatedButton.icon(
-                                onPressed: _showCheckoutSheet,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ThemeConfig.accent,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: Row(
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('${_cart.length} Item terpilih', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                Text(
+                                  Formatters.formatRupiah(_grandTotal),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: ThemeConfig.primary),
                                 ),
-                                icon: const Icon(Icons.shopping_cart_checkout),
-                                label: const Text('BAYAR (F9)', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: _showCheckoutSheet,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ThemeConfig.accent,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                               ),
-                            ],
-                          ),
+                              icon: const Icon(Icons.shopping_cart_checkout),
+                              label: const Text('BAYAR (F9)', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
                         ),
                       ),
                   ],

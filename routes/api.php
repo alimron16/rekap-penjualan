@@ -56,9 +56,10 @@ Route::post('/purchases/pay-debt', [MobileApiController::class, 'storeDebtPaymen
 Route::get('/inventory/adjustments', [MobileApiController::class, 'inventoryAdjustments']);
 Route::post('/inventory/adjustments', [MobileApiController::class, 'storeInventoryAdjustment']);
 
-// 7. Transfer Agen
+// 7. Transfer Agen & Notifikasi
 Route::get('/transfers', [MobileApiController::class, 'transfers']);
 Route::get('/transfers/pending-check', [MobileApiController::class, 'checkPendingTransfers']);
+Route::get('/notifications/poll', [MobileApiController::class, 'pollNotifications']);
 Route::post('/transfers', [MobileApiController::class, 'storeTransfer']);
 Route::post('/transfers/{id}/approve', [MobileApiController::class, 'approveTransfer']);
 Route::post('/transfers/{id}/reject', [MobileApiController::class, 'rejectTransfer']);

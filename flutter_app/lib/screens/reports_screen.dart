@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
+import '../services/printer_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
@@ -477,7 +478,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: () => _openReceiptUrl('/receipt/thermal/${item['id']}'),
+                                onPressed: () async {
+                                  await PrinterService.printReceipt(sale: item);
+                                },
                                 icon: const Icon(Icons.receipt_long, size: 14, color: ThemeConfig.primary),
                                 label: const Text('Cetak Struk', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.primary)),
                                 style: OutlinedButton.styleFrom(
@@ -487,7 +490,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
-                                onPressed: () => _openReceiptUrl('/receipt/invoice/${item['id']}'),
+                                onPressed: () async {
+                                  await PrinterService.printInvoice(sale: item);
+                                },
                                 icon: const Icon(Icons.print, size: 14, color: Colors.white),
                                 label: const Text('Cetak Faktur', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                 style: ElevatedButton.styleFrom(
