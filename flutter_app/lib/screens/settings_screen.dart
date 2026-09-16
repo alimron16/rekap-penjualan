@@ -208,6 +208,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const Spacer(),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ThemeConfig.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.print, size: 16, color: Colors.white),
+                      label: const Text('Cetak Struk', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        PrinterService.testPrintReceipt(
+                          context,
+                          overrideSetting: {
+                            'name': _nameCtrl.text.trim(),
+                            'store_name': _nameCtrl.text.trim(),
+                            'address': _addressCtrl.text.trim(),
+                            'phone': _phoneCtrl.text.trim(),
+                            'receipt_footer': _footerCtrl.text.trim(),
+                            'logo_url': _setting?['logo_url'],
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
                     TextButton.icon(
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close, size: 18),
@@ -460,7 +485,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 icon: const Icon(Icons.print, size: 18, color: Colors.white),
                                 label: const Text('Uji Cetak Struk (Test Print)',
                                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                onPressed: () => PrinterService.testPrintReceipt(context),
+                                onPressed: () => PrinterService.testPrintReceipt(
+                                  context,
+                                  overrideSetting: {
+                                    'name': _nameCtrl.text.trim(),
+                                    'store_name': _nameCtrl.text.trim(),
+                                    'address': _addressCtrl.text.trim(),
+                                    'phone': _phoneCtrl.text.trim(),
+                                    'receipt_footer': _footerCtrl.text.trim(),
+                                    'logo_url': _setting?['logo_url'],
+                                  },
+                                ),
                               ),
                             ),
                           ],

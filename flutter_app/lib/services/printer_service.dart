@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_service.dart';
 import '../utils/formatters.dart';
 
 class PrinterService {
@@ -33,6 +35,81 @@ class PrinterService {
     await prefs.setBool(keyAutoPrint, enabled);
   }
 
+  /// Resolve store settings with fallback to ApiService.getSettings()
+  static Future<Map<String, dynamic>> _resolveStoreSetting(Map<String, dynamic>? storeSetting) async {
+    final map = <String, dynamic>{};
+    if (storeSetting != null && storeSetting.isNotEmpty) {
+      map.addAll(storeSetting);
+    }
+
+    final hasValidName = (map['store_name'] != null && map['store_name'].toString().isNotEmpty) ||
+        (map['name'] != null && map['name'].toString().isNotEmpty);
+
+    if (!hasValidName) {
+      try {
+        final res = await ApiService.getSettings();
+        if (res['success'] == true && res['setting'] is Map) {
+          final fetched = Map<String, dynamic>.from(res['setting']);
+          map.addAll(fetched);
+        }
+      } catch (_) {}
+    }
+
+    return map;
+  }
+
+  /// Download logo bytes or return null
+  static Future<Uint8List?> _fetchLogoBytes(String? logoUrl) async {
+    if (logoUrl == null || logoUrl.isEmpty) return null;
+    try {
+      final uri = Uri.parse(logoUrl);
+      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        return res.bodyBytes;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Build Circular Store Avatar / Logo matching Settings Screen Preview
+  static pw.Widget _buildPdfLogo(Uint8List? logoBytes) {
+    if (logoBytes != null) {
+      return pw.Container(
+        width: 32,
+        height: 32,
+        child: pw.ClipRRect(
+          horizontalRadius: 16,
+          verticalRadius: 16,
+          child: pw.Image(
+            pw.MemoryImage(logoBytes),
+            width: 32,
+            height: 32,
+            fit: pw.BoxFit.contain,
+          ),
+        ),
+      );
+    }
+
+    return pw.Container(
+      width: 32,
+      height: 32,
+      decoration: const pw.BoxDecoration(
+        shape: pw.BoxShape.circle,
+        color: PdfColor(0.067, 0.220, 0.098, 0.12), // ThemeConfig.primary with opacity
+      ),
+      child: pw.Center(
+        child: pw.Text(
+          'STORE',
+          style: pw.TextStyle(
+            fontSize: 7,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor(0.067, 0.220, 0.098),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Print Thermal Receipt directly inside the app using Printing plugin
   static Future<void> printReceipt({
     required Map<String, dynamic> sale,
@@ -40,16 +117,22 @@ class PrinterService {
     String? paperSize,
   }) async {
     final size = paperSize ?? await getPreferredPaperSize();
+    final resolvedSetting = await _resolveStoreSetting(storeSetting);
+
+    final double rollWidth = size == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
+    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 3 * PdfPageFormat.mm);
+
     final pdfBytes = await generateReceiptPdf(
       sale: sale,
-      storeSetting: storeSetting,
+      storeSetting: resolvedSetting,
       paperSize: size,
     );
 
     final invoiceNo = sale['invoice_number'] ?? sale['invoice_no'] ?? 'Struk';
     await Printing.layoutPdf(
       name: 'Receipt-$invoiceNo',
-      onLayout: (PdfPageFormat format) async => pdfBytes,
+      format: pageFormat,
+      onLayout: (PdfPageFormat _) async => pdfBytes,
     );
   }
 
@@ -60,16 +143,22 @@ class PrinterService {
     String? paperSize,
   }) async {
     final size = paperSize ?? await getPreferredPaperSize();
+    final resolvedSetting = await _resolveStoreSetting(storeSetting);
+
+    final double rollWidth = size == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
+    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 3 * PdfPageFormat.mm);
+
     final pdfBytes = await generateDigitalReceiptPdf(
       digitalSale: digitalSale,
-      storeSetting: storeSetting,
+      storeSetting: resolvedSetting,
       paperSize: size,
     );
 
     final trxNo = digitalSale['transaction_number'] ?? digitalSale['invoice_number'] ?? 'Pulsa';
     await Printing.layoutPdf(
       name: 'Receipt-$trxNo',
-      onLayout: (PdfPageFormat format) async => pdfBytes,
+      format: pageFormat,
+      onLayout: (PdfPageFormat _) async => pdfBytes,
     );
   }
 
@@ -78,7 +167,8 @@ class PrinterService {
     required Map<String, dynamic> sale,
     Map<String, dynamic>? storeSetting,
   }) async {
-    final pdfBytes = await generateInvoicePdf(sale: sale, storeSetting: storeSetting);
+    final resolvedSetting = await _resolveStoreSetting(storeSetting);
+    final pdfBytes = await generateInvoicePdf(sale: sale, storeSetting: resolvedSetting);
     final invoiceNo = sale['invoice_number'] ?? sale['invoice_no'] ?? 'Faktur';
     await Printing.layoutPdf(
       name: 'Faktur-$invoiceNo',
@@ -95,24 +185,33 @@ class PrinterService {
   }) async {
     final pdf = pw.Document();
 
-    // 58mm = 58 * 72 / 25.4 = ~164 pt
-    // 80mm = 80 * 72 / 25.4 = ~226 pt
     final double rollWidth = paperSize == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
-    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 3 * PdfPageFormat.mm);
 
     final outlet = (sale['outlet'] is Map) ? sale['outlet'] : null;
-    final storeName = (outlet?['name'] != null && outlet!['name'].toString().isNotEmpty)
-        ? outlet['name'].toString()
-        : (storeSetting?['name'] ?? storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP');
-    final storeAddress = (outlet?['address'] != null && outlet!['address'].toString().isNotEmpty)
-        ? outlet['address'].toString()
-        : (storeSetting?['address'] ?? '');
-    final storePhone = (outlet?['phone'] != null && outlet!['phone'].toString().isNotEmpty)
-        ? outlet['phone'].toString()
-        : (storeSetting?['phone'] ?? '');
+    final storeName = (storeSetting?['store_name'] != null && storeSetting!['store_name'].toString().isNotEmpty)
+        ? storeSetting['store_name'].toString()
+        : ((storeSetting?['name'] != null && storeSetting!['name'].toString().isNotEmpty)
+            ? storeSetting['name'].toString()
+            : ((outlet?['name'] != null && outlet!['name'].toString().isNotEmpty)
+                ? outlet['name'].toString()
+                : 'ELEPHANT CELL GROUP'));
+
+    final storeAddress = (storeSetting?['address'] != null && storeSetting!['address'].toString().isNotEmpty)
+        ? storeSetting['address'].toString()
+        : (outlet?['address']?.toString() ?? '');
+
+    final storePhone = (storeSetting?['phone'] != null && storeSetting!['phone'].toString().isNotEmpty)
+        ? storeSetting['phone'].toString()
+        : (outlet?['phone']?.toString() ?? '');
+
     final receiptFooter = (storeSetting?['receipt_footer'] != null && storeSetting!['receipt_footer'].toString().isNotEmpty)
         ? storeSetting['receipt_footer'].toString()
-        : 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.';
+        : 'Terima kasih telah berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.';
+
+    // Fetch logo if present
+    final logoUrl = storeSetting?['logo_url']?.toString();
+    final logoBytes = await _fetchLogoBytes(logoUrl);
 
     final invoiceNo = sale['invoice_number'] ?? sale['invoice_no'] ?? '-';
     final dateStr = sale['date'] != null ? sale['date'].toString() : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
@@ -129,7 +228,7 @@ class PrinterService {
     final grandTotal = Formatters.parseDouble(sale['grand_total'] ?? sale['total']);
     final paidAmount = Formatters.parseDouble(sale['paid_amount']);
     final changeAmount = Formatters.parseDouble(sale['change_amount']);
-    final paymentMethod = (sale['payment_method'] ?? 'cash').toString().toUpperCase();
+    final paymentMethod = (sale['payment_method'] ?? 'CASH').toString().toUpperCase();
 
     pdf.addPage(
       pw.Page(
@@ -138,7 +237,13 @@ class PrinterService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              // Store Header
+              // Logo Avatar matching preview
+              pw.Center(
+                child: _buildPdfLogo(logoBytes),
+              ),
+              pw.SizedBox(height: 4),
+
+              // Store Name
               pw.Center(
                 child: pw.Text(
                   storeName,
@@ -169,17 +274,17 @@ class PrinterService {
                   ),
                 ),
               pw.SizedBox(height: 3),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
-              // Info
+              // Meta rows matching preview
               _receiptRow('No. Nota', invoiceNo),
               _receiptRow('Tanggal', dateStr),
               _receiptRow('Kasir', cashierName),
               if (customerName.toUpperCase() != 'UMUM')
                 _receiptRow('Pelanggan', customerName),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
-              // Items
+              // Item List matching preview
               ...items.map((it) {
                 final prodName = it['product'] != null && it['product'] is Map
                     ? (it['product']['name'] ?? 'Item')
@@ -193,7 +298,10 @@ class PrinterService {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(prodName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
+                      pw.Text(
+                        prodName,
+                        style: const pw.TextStyle(fontSize: 7.5),
+                      ),
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
@@ -201,7 +309,10 @@ class PrinterService {
                             '  ${qty.toStringAsFixed(0)} x ${Formatters.formatRupiah(price)}',
                             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
                           ),
-                          pw.Text(Formatters.formatRupiah(sub), style: const pw.TextStyle(fontSize: 7.5)),
+                          pw.Text(
+                            Formatters.formatRupiah(sub),
+                            style: const pw.TextStyle(fontSize: 7.5),
+                          ),
                         ],
                       ),
                     ],
@@ -209,22 +320,21 @@ class PrinterService {
                 );
               }),
 
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
-              // Calculation
-              _receiptRow('Subtotal', Formatters.formatRupiah(subtotal > 0 ? subtotal : grandTotal)),
-              if (discount > 0) _receiptRow('Diskon', '- ${Formatters.formatRupiah(discount)}'),
+              // Totals Section matching preview
+              _receiptRow('Subtotal', Formatters.formatRupiah(subtotal > 0 ? subtotal : (grandTotal + discount))),
+              _receiptRow('Diskon', discount > 0 ? '- ${Formatters.formatRupiah(discount)}' : 'Rp 0'),
               _receiptRow('Total', Formatters.formatRupiah(grandTotal), bold: true),
               _receiptRow('Bayar ($paymentMethod)', Formatters.formatRupiah(paidAmount > 0 ? paidAmount : grandTotal)),
-              if (changeAmount >= 0 && paidAmount > grandTotal)
-                _receiptRow('Kembali', Formatters.formatRupiah(changeAmount)),
+              _receiptRow('Kembali', Formatters.formatRupiah(changeAmount >= 0 ? changeAmount : 0)),
               if (grandTotal > paidAmount && (paidAmount > 0 || paymentMethod.contains('PIUTANG')))
                 _receiptRow('Sisa Piutang', Formatters.formatRupiah(grandTotal - paidAmount), bold: true),
 
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
               pw.SizedBox(height: 2),
 
-              // Footer Notes
+              // Footer Notes matching preview
               pw.Center(
                 child: pw.Text(
                   receiptFooter,
@@ -236,11 +346,11 @@ class PrinterService {
               pw.Center(
                 child: pw.Text(
                   '--- * ---',
-                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey500),
+                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey400),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: 6),
             ],
           );
         },
@@ -249,7 +359,6 @@ class PrinterService {
 
     return pdf.save();
   }
-
   /// Generate Receipt PDF bytes for Digital / Pulsa / PLN Sales (58mm/80mm)
   static Future<Uint8List> generateDigitalReceiptPdf({
     required Map<String, dynamic> digitalSale,
@@ -259,14 +368,21 @@ class PrinterService {
     final pdf = pw.Document();
 
     final double rollWidth = paperSize == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
-    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 3 * PdfPageFormat.mm);
 
-    final storeName = storeSetting?['name'] ?? storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP';
-    final storeAddress = storeSetting?['address'] ?? '';
-    final storePhone = storeSetting?['phone'] ?? '';
+    final storeName = (storeSetting?['store_name'] != null && storeSetting!['store_name'].toString().isNotEmpty)
+        ? storeSetting['store_name'].toString()
+        : ((storeSetting?['name'] != null && storeSetting!['name'].toString().isNotEmpty)
+            ? storeSetting['name'].toString()
+            : 'ELEPHANT CELL GROUP');
+    final storeAddress = storeSetting?['address']?.toString() ?? '';
+    final storePhone = storeSetting?['phone']?.toString() ?? '';
     final receiptFooter = (storeSetting?['receipt_footer'] != null && storeSetting!['receipt_footer'].toString().isNotEmpty)
         ? storeSetting['receipt_footer'].toString()
-        : 'Simpan struk ini sebagai bukti transaksi yang sah.';
+        : 'Terima kasih telah berbelanja!\nSimpan struk ini sebagai bukti transaksi yang sah.';
+
+    final logoUrl = storeSetting?['logo_url']?.toString();
+    final logoBytes = await _fetchLogoBytes(logoUrl);
 
     final trxNo = digitalSale['transaction_number'] ?? digitalSale['invoice_number'] ?? 'PE-NOTA';
     final dateStr = digitalSale['date'] != null ? digitalSale['date'].toString() : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
@@ -283,14 +399,12 @@ class PrinterService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              // Store Header
+              // Store Logo Avatar matching preview
               pw.Center(
-                child: pw.Text(
-                  storeName,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
-                  textAlign: pw.TextAlign.center,
-                ),
+                child: _buildPdfLogo(logoBytes),
               ),
+              pw.SizedBox(height: 4),
+
               // Store Header
               pw.Center(
                 child: pw.Text(
@@ -322,13 +436,13 @@ class PrinterService {
                   ),
                 ),
               pw.SizedBox(height: 3),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
               // Info
               _receiptRow('No. Trx', trxNo),
               _receiptRow('Tanggal', dateStr),
               _receiptRow('Kategori', 'Pulsa / PPOB'),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
               // Product Detail
               _receiptRow('Produk', productName, bold: true),
@@ -336,13 +450,13 @@ class PrinterService {
               if (notes.isNotEmpty) _receiptRow('SN / Ket', notes),
               _receiptRow('Status', status),
 
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
               // Total
               _receiptRow('Total', Formatters.formatRupiah(sellingPrice), bold: true),
               _receiptRow('Bayar', 'Tunai'),
 
-              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey300),
               pw.SizedBox(height: 2),
 
               // Footer
@@ -357,11 +471,11 @@ class PrinterService {
               pw.Center(
                 child: pw.Text(
                   '--- * ---',
-                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey500),
+                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey400),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: 6),
             ],
           );
         },
@@ -373,12 +487,24 @@ class PrinterService {
 
   static pw.Widget _receiptRow(String label, String value, {bool bold = false}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 0.8),
+      padding: const pw.EdgeInsets.symmetric(vertical: 1.0),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-          pw.Text(value, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 7.5,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
@@ -608,40 +734,48 @@ class PrinterService {
   }
 
   /// Test Print Action for Printer Settings Screen
-  static Future<void> testPrintReceipt(BuildContext context) async {
+  static Future<void> testPrintReceipt(BuildContext context, {Map<String, dynamic>? overrideSetting}) async {
     try {
+      final now = DateTime.now();
+      final dateFormatted = DateFormat('dd/MM/yyyy  HH:mm').format(now);
+
       final dummySale = {
-        'invoice_number': 'TEST-${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
-        'date': DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-        'cashier_name': 'Admin Demo',
-        'customer_name': 'Pelanggan Uji Coba',
-        'subtotal': 35000,
+        'invoice_number': 'INV-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-001',
+        'date': dateFormatted,
+        'cashier_name': 'Admin',
+        'customer_name': 'Umum',
+        'subtotal': 5250000,
         'discount': 0,
-        'grand_total': 35000,
-        'paid_amount': 50000,
-        'change_amount': 15000,
-        'payment_method': 'cash',
+        'grand_total': 5250000,
+        'paid_amount': 6000000,
+        'change_amount': 750000,
+        'payment_method': 'Tunai',
         'items': [
           {
-            'product_name': 'Paket Data Telkomsel 10GB',
+            'product_name': 'Samsung A55 5G',
             'qty': 1,
-            'price': 25000,
-            'subtotal': 25000,
+            'price': 5200000,
+            'subtotal': 5200000,
           },
           {
-            'product_name': 'Kabel Data Type C Fast Charging',
-            'qty': 1,
-            'price': 10000,
-            'subtotal': 10000,
+            'product_name': 'Tempered Glass',
+            'qty': 2,
+            'price': 25000,
+            'subtotal': 50000,
           },
         ],
       };
 
-      await printReceipt(sale: dummySale);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal melakukan test print: $e'), backgroundColor: Colors.red),
+      await printReceipt(
+        sale: dummySale,
+        storeSetting: overrideSetting,
       );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal melakukan test print: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 }
