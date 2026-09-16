@@ -156,7 +156,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
   void _showDigitalReceiptModal(Map<String, dynamic> digitalSale) {
     final trxNo = digitalSale['transaction_number'] ?? 'PE-NOTA';
     final date = DateTime.now();
-    final formattedDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    final formattedDate = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}  ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
     final storeDisplayName = _storeSetting?['name'] ?? _storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP';
     final storeAddress = _storeSetting?['address'] ?? '';
     final storePhone = _storeSetting?['phone'] ?? '';
@@ -171,10 +171,10 @@ class _DigitalScreenState extends State<DigitalScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: EdgeInsets.only(
-          top: 20,
-          left: 20,
-          right: 20,
-          bottom: MediaQuery.of(ctx).padding.bottom + 24,
+          top: 16,
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(ctx).padding.bottom + 20,
         ),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -187,90 +187,96 @@ class _DigitalScreenState extends State<DigitalScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Struk Transaksi Pulsa / PPOB', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Row(
+                    children: const [
+                      Icon(Icons.receipt_long, color: ThemeConfig.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text('Preview Struk Pulsa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
-              const Divider(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAF9F6),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(storeDisplayName, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center),
-                    if (storeAddress.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(storeAddress, style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
+              const Divider(height: 8),
+              const SizedBox(height: 8),
+              // Receipt Card exactly matching Settings Preview
+              Center(
+                child: Container(
+                  width: 320,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 8)],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Store Avatar / Icon
+                      if (_storeSetting?['logo_url'] != null && (_storeSetting!['logo_url'] as String).isNotEmpty)
+                        Image.network(
+                          _storeSetting!['logo_url'],
+                          height: 54,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: ThemeConfig.primary.withOpacity(0.1),
+                            ),
+                            child: const Icon(Icons.store, color: ThemeConfig.primary, size: 28),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: ThemeConfig.primary.withOpacity(0.1),
+                          ),
+                          child: const Icon(Icons.store, color: ThemeConfig.primary, size: 28),
+                        ),
+                      const SizedBox(height: 8),
+                      Text(storeDisplayName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14), textAlign: TextAlign.center),
+                      if (storeAddress.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(storeAddress, style: const TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                        ),
+                      if (storePhone.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Text('Telp: $storePhone', style: const TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                        ),
+                      const Divider(height: 16),
+                      _receiptDigitalRow('No. Trx', trxNo),
+                      _receiptDigitalRow('Tanggal', formattedDate),
+                      _receiptDigitalRow('Kategori', 'Pulsa / PPOB'),
+                      const Divider(height: 12),
+                      _receiptDigitalRow('Produk', productName),
+                      _receiptDigitalRow('No. Tujuan', customerNo),
+                      if (digitalSale['notes'] != null && digitalSale['notes'].toString().isNotEmpty)
+                        _receiptDigitalRow('SN / Ket', digitalSale['notes'].toString()),
+                      const Divider(height: 12),
+                      _receiptDigitalRow('Total', Formatters.formatRupiah(sellingPrice), bold: true),
+                      _receiptDigitalRow('Bayar', 'Tunai'),
+                      _receiptDigitalRow('Status', 'SUKSES', statusColor: Colors.green),
+                      const Divider(height: 16),
+                      Text(
+                        receiptFooterText,
+                        style: const TextStyle(fontSize: 9, color: Colors.grey, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
                       ),
-                    if (storePhone.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Text('Telp: $storePhone', style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
+                      const SizedBox(height: 6),
+                      Text(
+                        '--- * ---',
+                        style: TextStyle(fontSize: 9, color: Colors.grey.shade400),
                       ),
-                    const SizedBox(height: 4),
-                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    const Text('STRUK TRANSAKSI ELEKTRIK', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('No: $trxNo', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
-                        Text(formattedDate, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                      ],
-                    ),
-                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(productName, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 2),
-                          Text('No Tujuan: $customerNo', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                          if (digitalSale['notes'] != null && digitalSale['notes'].toString().isNotEmpty)
-                            Text('Catatan: ${digitalSale['notes']}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('TOTAL TAGIHAN:', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
-                        Text(Formatters.formatRupiah(sellingPrice), style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Metode Bayar:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                        const Text('TUNAI / CASH', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Status:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                        const Text('SUKSES', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
-                      ],
-                    ),
-                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Text(
-                      receiptFooterText,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 2),
-                    Text('-- $storeDisplayName --', style: const TextStyle(fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.bold)),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -304,6 +310,26 @@ class _DigitalScreenState extends State<DigitalScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _receiptDigitalRow(String label, String value, {bool bold = false, Color? statusColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: (bold || statusColor != null) ? FontWeight.bold : FontWeight.normal,
+              color: statusColor,
+            ),
+          ),
+        ],
       ),
     );
   }

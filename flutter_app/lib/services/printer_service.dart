@@ -142,45 +142,42 @@ class PrinterService {
               pw.Center(
                 child: pw.Text(
                   storeName,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
               if (storeAddress.isNotEmpty)
                 pw.Center(
-                  child: pw.Text(
-                    storeAddress,
-                    style: const pw.TextStyle(fontSize: 7.5),
-                    textAlign: pw.TextAlign.center,
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 1),
+                    child: pw.Text(
+                      storeAddress,
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                      textAlign: pw.TextAlign.center,
+                    ),
                   ),
                 ),
               if (storePhone.isNotEmpty)
                 pw.Center(
-                  child: pw.Text(
-                    'Telp/WA: $storePhone',
-                    style: const pw.TextStyle(fontSize: 7.5),
-                    textAlign: pw.TextAlign.center,
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 1),
+                    child: pw.Text(
+                      'Telp: $storePhone',
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                      textAlign: pw.TextAlign.center,
+                    ),
                   ),
                 ),
               pw.SizedBox(height: 3),
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Info
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('No: $invoiceNo', style: const pw.TextStyle(fontSize: 7.5)),
-                  pw.Text(dateStr, style: const pw.TextStyle(fontSize: 7.5)),
-                ],
-              ),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Kasir: $cashierName', style: const pw.TextStyle(fontSize: 7.5)),
-                  pw.Text('Pelanggan: $customerName', style: const pw.TextStyle(fontSize: 7.5)),
-                ],
-              ),
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              _receiptRow('No. Nota', invoiceNo),
+              _receiptRow('Tanggal', dateStr),
+              _receiptRow('Kasir', cashierName),
+              if (customerName.toUpperCase() != 'UMUM')
+                _receiptRow('Pelanggan', customerName),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Items
               ...items.map((it) {
@@ -192,15 +189,18 @@ class PrinterService {
                 final sub = Formatters.parseDouble(it['subtotal'] ?? (qty * price));
 
                 return pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+                  padding: const pw.EdgeInsets.symmetric(vertical: 1),
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(prodName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                      pw.Text(prodName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7.5)),
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('${qty.toStringAsFixed(0)} x ${Formatters.formatRupiah(price)}', style: const pw.TextStyle(fontSize: 7.5)),
+                          pw.Text(
+                            '  ${qty.toStringAsFixed(0)} x ${Formatters.formatRupiah(price)}',
+                            style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                          ),
                           pw.Text(Formatters.formatRupiah(sub), style: const pw.TextStyle(fontSize: 7.5)),
                         ],
                       ),
@@ -209,46 +209,38 @@ class PrinterService {
                 );
               }),
 
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Calculation
-              _receiptRow('Subtotal:', Formatters.formatRupiah(subtotal > 0 ? subtotal : grandTotal)),
-              if (discount > 0) _receiptRow('Diskon:', '- ${Formatters.formatRupiah(discount)}'),
-              pw.SizedBox(height: 2),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('TOTAL:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
-                  pw.Text(Formatters.formatRupiah(grandTotal), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
-                ],
-              ),
-              pw.SizedBox(height: 2),
-              _receiptRow('Metode:', paymentMethod),
-              if (paidAmount > 0) _receiptRow('Bayar:', Formatters.formatRupiah(paidAmount)),
-              if (changeAmount >= 0 && paidAmount > grandTotal) _receiptRow('Kembali:', Formatters.formatRupiah(changeAmount)),
+              _receiptRow('Subtotal', Formatters.formatRupiah(subtotal > 0 ? subtotal : grandTotal)),
+              if (discount > 0) _receiptRow('Diskon', '- ${Formatters.formatRupiah(discount)}'),
+              _receiptRow('Total', Formatters.formatRupiah(grandTotal), bold: true),
+              _receiptRow('Bayar ($paymentMethod)', Formatters.formatRupiah(paidAmount > 0 ? paidAmount : grandTotal)),
+              if (changeAmount >= 0 && paidAmount > grandTotal)
+                _receiptRow('Kembali', Formatters.formatRupiah(changeAmount)),
               if (grandTotal > paidAmount && (paidAmount > 0 || paymentMethod.contains('PIUTANG')))
-                _receiptRow('Sisa Piutang:', Formatters.formatRupiah(grandTotal - paidAmount)),
+                _receiptRow('Sisa Piutang', Formatters.formatRupiah(grandTotal - paidAmount), bold: true),
 
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
-              pw.SizedBox(height: 3),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.SizedBox(height: 2),
 
               // Footer Notes
               pw.Center(
                 child: pw.Text(
-                  'TERIMA KASIH ATAS KUNJUNGAN ANDA',
-                  style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+                  receiptFooter,
+                  style: pw.TextStyle(fontSize: 6.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 1),
+              pw.SizedBox(height: 2),
               pw.Center(
                 child: pw.Text(
-                  receiptFooter,
-                  style: const pw.TextStyle(fontSize: 6.5),
+                  '--- * ---',
+                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey500),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
             ],
           );
         },
@@ -299,84 +291,77 @@ class PrinterService {
                   textAlign: pw.TextAlign.center,
                 ),
               ),
+              // Store Header
+              pw.Center(
+                child: pw.Text(
+                  storeName,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
               if (storeAddress.isNotEmpty)
                 pw.Center(
-                  child: pw.Text(
-                    storeAddress,
-                    style: const pw.TextStyle(fontSize: 7.5),
-                    textAlign: pw.TextAlign.center,
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 1),
+                    child: pw.Text(
+                      storeAddress,
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                      textAlign: pw.TextAlign.center,
+                    ),
                   ),
                 ),
               if (storePhone.isNotEmpty)
                 pw.Center(
-                  child: pw.Text(
-                    'Telp/WA: $storePhone',
-                    style: const pw.TextStyle(fontSize: 7.5),
-                    textAlign: pw.TextAlign.center,
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.only(top: 1),
+                    child: pw.Text(
+                      'Telp: $storePhone',
+                      style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+                      textAlign: pw.TextAlign.center,
+                    ),
                   ),
                 ),
               pw.SizedBox(height: 3),
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
-
-              // Title
-              pw.Center(
-                child: pw.Text(
-                  'STRUK PEMBELIAN PULSA / PPOB',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
-                  textAlign: pw.TextAlign.center,
-                ),
-              ),
-              pw.SizedBox(height: 3),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Info
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('No Trx: $trxNo', style: const pw.TextStyle(fontSize: 7.5)),
-                  pw.Text(dateStr, style: const pw.TextStyle(fontSize: 7.5)),
-                ],
-              ),
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              _receiptRow('No. Trx', trxNo),
+              _receiptRow('Tanggal', dateStr),
+              _receiptRow('Kategori', 'Pulsa / PPOB'),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Product Detail
-              pw.Text(productName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
-              pw.SizedBox(height: 2),
-              _receiptRow('No Tujuan/ID:', customerNo),
-              if (notes.isNotEmpty) _receiptRow('Catatan/SN:', notes),
-              _receiptRow('Status:', status),
+              _receiptRow('Produk', productName, bold: true),
+              _receiptRow('No. Tujuan', customerNo),
+              if (notes.isNotEmpty) _receiptRow('SN / Ket', notes),
+              _receiptRow('Status', status),
 
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
 
               // Total
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('TOTAL TAGIHAN:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
-                  pw.Text(Formatters.formatRupiah(sellingPrice), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
-                ],
-              ),
-              _receiptRow('Metode Bayar:', 'TUNAI / CASH'),
+              _receiptRow('Total', Formatters.formatRupiah(sellingPrice), bold: true),
+              _receiptRow('Bayar', 'Tunai'),
 
-              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
-              pw.SizedBox(height: 3),
+              pw.Divider(thickness: 0.5, color: PdfColors.grey400),
+              pw.SizedBox(height: 2),
 
               // Footer
               pw.Center(
                 child: pw.Text(
-                  'TERIMA KASIH TELAH BERTRANSAKSI',
-                  style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+                  receiptFooter,
+                  style: pw.TextStyle(fontSize: 6.5, fontStyle: pw.FontStyle.italic, color: PdfColors.grey700),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 1),
+              pw.SizedBox(height: 2),
               pw.Center(
                 child: pw.Text(
-                  receiptFooter,
-                  style: const pw.TextStyle(fontSize: 6.5),
+                  '--- * ---',
+                  style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.grey500),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
             ],
           );
         },
@@ -386,14 +371,14 @@ class PrinterService {
     return pdf.save();
   }
 
-  static pw.Widget _receiptRow(String label, String value) {
+  static pw.Widget _receiptRow(String label, String value, {bool bold = false}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 0.8),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: const pw.TextStyle(fontSize: 7.5)),
-          pw.Text(value, style: const pw.TextStyle(fontSize: 7.5)),
+          pw.Text(label, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(value, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
         ],
       ),
     );

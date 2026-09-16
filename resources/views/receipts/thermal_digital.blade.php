@@ -9,29 +9,26 @@
             margin: 0;
         }
         body {
-            font-family: 'Courier New', Courier, monospace;
-            width: 76mm;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            width: 74mm;
             margin: 0 auto;
-            padding: 8px 4px;
+            padding: 10px 6px;
             font-size: 11px;
-            color: #000;
-            line-height: 1.25;
+            color: #1f2937;
+            line-height: 1.35;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
-        .bold { font-weight: bold; }
-        .dashed {
-            border-top: 1px dashed #000;
-            margin: 6px 0;
-        }
-        .double-dashed {
-            border-top: 2px dashed #000;
-            margin: 6px 0;
+        .bold { font-weight: 700; }
+        .divider {
+            border-top: 1px solid #e5e7eb;
+            margin: 8px 0;
         }
         .flex {
             display: flex;
             justify-content: space-between;
+            padding: 1.5px 0;
         }
         .btn-print {
             background: #14421b;
@@ -39,9 +36,9 @@
             border: none;
             padding: 8px 16px;
             font-weight: bold;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             width: 100%;
         }
         @media print {
@@ -57,78 +54,76 @@
 
     <!-- Header Toko -->
     <div class="text-center">
-        <div class="bold" style="font-size: 13px; text-transform: uppercase;">{{ $setting->name ?? 'ELEPHANT CELL GROUP' }}</div>
+        <div style="font-weight: 900; font-size: 13px;">{{ $setting->name ?? 'ELEPHANT CELL GROUP' }}</div>
         @if(!empty($setting->address))
-            <div style="font-size: 10px;">{{ $setting->address }}</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">{{ $setting->address }}</div>
         @endif
         @if(!empty($setting->phone))
-            <div style="font-size: 10px;">Telp/WA: {{ $setting->phone }}</div>
+            <div style="font-size: 10px; color: #6b7280;">Telp: {{ $setting->phone }}</div>
         @endif
     </div>
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Info Transaksi Pulsa -->
-    <div class="text-center bold" style="font-size: 11px; margin-bottom: 4px;">
-        STRUK PEMBELIAN PULSA / LISTRIK / PPOB
-    </div>
     <div class="flex">
-        <span>No Trx:</span>
+        <span style="color: #4b5563;">No. Trx</span>
         <span class="bold">{{ $digitalSale->transaction_number }}</span>
     </div>
     <div class="flex">
-        <span>Tanggal:</span>
-        <span>{{ $digitalSale->date ? $digitalSale->date->format('d/m/Y H:i') : date('d/m/Y H:i') }}</span>
+        <span style="color: #4b5563;">Tanggal</span>
+        <span>{{ $digitalSale->date ? $digitalSale->date->format('d/m/Y  H:i') : date('d/m/Y  H:i') }}</span>
     </div>
     <div class="flex">
-        <span>Kasir:</span>
-        <span>Kasir 1</span>
+        <span style="color: #4b5563;">Kategori</span>
+        <span>Pulsa / PPOB</span>
     </div>
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Detail Produk & Nomor Tujuan -->
-    <div style="margin-bottom: 4px;">
-        <div class="bold" style="font-size: 12px;">{{ $digitalSale->digitalProduct->name ?? 'PRODUK ELEKTRIK' }}</div>
-        <div class="flex" style="font-size: 11px; margin-top: 2px;">
-            <span>No Tujuan/Meter:</span>
-            <span class="bold" style="font-size: 12px;">{{ $digitalSale->customer_number }}</span>
-        </div>
-        @if(!empty($digitalSale->notes))
-            <div class="flex" style="font-size: 10px; margin-top: 1px;">
-                <span>Catatan / SN:</span>
-                <span>{{ $digitalSale->notes }}</span>
-            </div>
-        @endif
+    <div class="flex">
+        <span style="color: #4b5563;">Produk</span>
+        <span class="bold">{{ $digitalSale->digitalProduct->name ?? 'PRODUK ELEKTRIK' }}</span>
     </div>
+    <div class="flex">
+        <span style="color: #4b5563;">No. Tujuan</span>
+        <span>{{ $digitalSale->customer_number }}</span>
+    </div>
+    @if(!empty($digitalSale->notes))
+    <div class="flex">
+        <span style="color: #4b5563;">SN / Ket</span>
+        <span style="font-size: 10px;">{{ $digitalSale->notes }}</span>
+    </div>
+    @endif
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Total Tagihan -->
-    <div class="flex bold" style="font-size: 12px; margin-top: 2px;">
-        <span>TOTAL TAGIHAN:</span>
+    <div class="flex bold" style="font-size: 11.5px; margin-top: 1px;">
+        <span>Total</span>
         <span>Rp {{ number_format($digitalSale->selling_price, 0, ',', '.') }}</span>
     </div>
     <div class="flex">
-        <span>Metode Bayar:</span>
-        <span>TUNAI / CASH</span>
+        <span>Bayar</span>
+        <span>Tunai</span>
     </div>
     <div class="flex">
-        <span>Status Transaksi:</span>
-        <span class="bold" style="color: {{ $digitalSale->status === 'SUKSES' ? 'green' : 'red' }};">{{ $digitalSale->status }}</span>
+        <span>Status</span>
+        <span class="bold" style="color: {{ $digitalSale->status === 'SUKSES' ? '#15803d' : '#b91c1c' }};">{{ $digitalSale->status }}</span>
     </div>
 
-    <div class="double-dashed"></div>
+    <div class="divider"></div>
 
     <!-- Footer -->
-    <div class="text-center" style="font-size: 10px; margin-top: 6px;">
+    <div class="text-center" style="font-size: 9.5px; color: #6b7280; margin-top: 6px; font-style: italic;">
         @if(!empty($setting->receipt_footer))
             <div>{!! nl2br(e($setting->receipt_footer)) !!}</div>
         @else
-            <div>Terima Kasih Telah Bertransaksi</div>
-            <div>Simpan struk ini sebagai bukti pembayaran yang sah</div>
+            <div>Terima kasih telah berbelanja!</div>
+            <div>Simpan struk ini sebagai bukti transaksi yang sah.</div>
         @endif
-        <div style="margin-top: 4px; font-weight: bold;">-- {{ $setting->name ?? 'ELEPHANT CELL' }} --</div>
+        <div style="margin-top: 6px; font-style: normal; color: #9ca3af;">--- * ---</div>
     </div>
 
     <script>

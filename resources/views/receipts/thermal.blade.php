@@ -9,29 +9,26 @@
             margin: 0;
         }
         body {
-            font-family: 'Courier New', Courier, monospace;
-            width: 76mm;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            width: 74mm;
             margin: 0 auto;
-            padding: 8px 4px;
+            padding: 10px 6px;
             font-size: 11px;
-            color: #000;
-            line-height: 1.25;
+            color: #1f2937;
+            line-height: 1.35;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
-        .bold { font-weight: bold; }
-        .dashed {
-            border-top: 1px dashed #000;
-            margin: 6px 0;
-        }
-        .double-dashed {
-            border-top: 2px dashed #000;
-            margin: 6px 0;
+        .bold { font-weight: 700; }
+        .divider {
+            border-top: 1px solid #e5e7eb;
+            margin: 8px 0;
         }
         .flex {
             display: flex;
             justify-content: space-between;
+            padding: 1.5px 0;
         }
         .table-item {
             width: 100%;
@@ -47,9 +44,9 @@
             border: none;
             padding: 8px 16px;
             font-weight: bold;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             width: 100%;
         }
         @media print {
@@ -70,99 +67,100 @@
         $receiptPhone = ($sale->outlet && !empty($sale->outlet->phone)) ? $sale->outlet->phone : $setting->phone;
     @endphp
     <div class="text-center">
-        <div class="bold" style="font-size: 13px; text-transform: uppercase;">{{ $receiptStoreName }}</div>
+        <div style="font-weight: 900; font-size: 13px;">{{ $receiptStoreName }}</div>
         @if($receiptAddress)
-            <div style="font-size: 10px;">{{ $receiptAddress }}</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">{{ $receiptAddress }}</div>
         @endif
         @if($receiptPhone)
-            <div style="font-size: 10px;">Telp/WA: {{ $receiptPhone }}</div>
+            <div style="font-size: 10px; color: #6b7280;">Telp: {{ $receiptPhone }}</div>
         @endif
     </div>
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Info Nota -->
     <div class="flex">
-        <span>No Nota:</span>
+        <span style="color: #4b5563;">No. Nota</span>
         <span class="bold">{{ $sale->invoice_number }}</span>
     </div>
     <div class="flex">
-        <span>Tanggal:</span>
-        <span>{{ $sale->date->format('d/m/Y H:i') }}</span>
+        <span style="color: #4b5563;">Tanggal</span>
+        <span>{{ $sale->date->format('d/m/Y  H:i') }}</span>
     </div>
     <div class="flex">
-        <span>Kasir:</span>
+        <span style="color: #4b5563;">Kasir</span>
         <span>Kasir 1</span>
     </div>
+    @if($sale->customer && strtoupper($sale->customer->name) !== 'UMUM')
     <div class="flex">
-        <span>Pelanggan:</span>
-        <span class="bold">{{ $sale->customer->name ?? 'UMUM' }}</span>
+        <span style="color: #4b5563;">Pelanggan</span>
+        <span>{{ $sale->customer->name }}</span>
     </div>
-    <div class="flex">
-        <span>Jenis Trx:</span>
-        <span class="bold uppercase">{{ $sale->sale_type }}</span>
-    </div>
+    @endif
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Rincian Barang Belanja -->
     <table class="table-item">
         @foreach($sale->items as $item)
             <tr>
-                <td colspan="3" class="bold text-left">{{ $item->product->name ?? '-' }}</td>
+                <td colspan="2" class="text-left" style="font-weight: 600; font-size: 11px;">{{ $item->product->name ?? '-' }}</td>
             </tr>
             <tr>
-                <td class="text-left" style="width: 35%;">{{ (float)$item->qty }} x {{ number_format($item->selling_price, 0, ',', '.') }}</td>
-                <td class="text-right" style="width: 65%;">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                <td class="text-left" style="width: 50%; font-size: 9.5px; color: #6b7280;">
+                    &nbsp;&nbsp;{{ (float)$item->qty }} x Rp {{ number_format($item->selling_price, 0, ',', '.') }}
+                </td>
+                <td class="text-right" style="width: 50%; font-size: 10.5px;">
+                    Rp {{ number_format($item->subtotal, 0, ',', '.') }}
+                </td>
             </tr>
         @endforeach
     </table>
 
-    <div class="dashed"></div>
+    <div class="divider"></div>
 
     <!-- Total Perhitungan -->
     <div class="flex">
-        <span>Subtotal:</span>
+        <span>Subtotal</span>
         <span>Rp {{ number_format($sale->subtotal, 0, ',', '.') }}</span>
     </div>
     @if($sale->discount > 0)
         <div class="flex">
-            <span>Diskon:</span>
+            <span>Diskon</span>
             <span>-Rp {{ number_format($sale->discount, 0, ',', '.') }}</span>
         </div>
     @endif
-    <div class="flex bold" style="font-size: 12px; margin-top: 2px;">
-        <span>TOTAL AKHIR:</span>
+    <div class="flex bold" style="font-size: 11.5px; margin-top: 1px;">
+        <span>Total</span>
         <span>Rp {{ number_format($sale->total, 0, ',', '.') }}</span>
     </div>
     <div class="flex">
-        <span>Bayar (Tunai):</span>
+        <span>Bayar ({{ strtoupper($sale->payment_method ?? 'Tunai') }})</span>
         <span>Rp {{ number_format($sale->paid_amount, 0, ',', '.') }}</span>
     </div>
     @if($sale->remaining_receivable > 0)
-        <div class="flex bold" style="color: #900;">
-            <span>Sisa Piutang:</span>
+        <div class="flex bold" style="color: #b91c1c;">
+            <span>Sisa Piutang</span>
             <span>Rp {{ number_format($sale->remaining_receivable, 0, ',', '.') }}</span>
         </div>
     @else
         <div class="flex">
-            <span>Kembali:</span>
+            <span>Kembali</span>
             <span>Rp {{ number_format(max(0, $sale->paid_amount - $sale->total), 0, ',', '.') }}</span>
         </div>
     @endif
 
-    <div class="double-dashed"></div>
+    <div class="divider"></div>
 
     <!-- Footer Struk -->
-    <div class="text-center" style="font-size: 10px; margin-top: 6px;">
+    <div class="text-center" style="font-size: 9.5px; color: #6b7280; margin-top: 6px; font-style: italic;">
         @if(!empty($setting->receipt_footer))
             <div>{!! nl2br(e($setting->receipt_footer)) !!}</div>
         @else
-            <div>Terima Kasih Atas Kunjungan Anda</div>
-            <div>Barang yang dibeli tidak dapat ditukar</div>
-            <div>kecuali dengan perjanjian nota</div>
+            <div>Terima kasih telah berbelanja!</div>
+            <div>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</div>
         @endif
-        <div style="margin-top: 4px; font-weight: bold;">-- {{ $receiptStoreName }} --</div>
+        <div style="margin-top: 6px; font-style: normal; color: #9ca3af;">--- * ---</div>
     </div>
 
     <script>

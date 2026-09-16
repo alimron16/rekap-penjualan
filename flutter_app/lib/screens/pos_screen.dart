@@ -628,7 +628,7 @@ class _PosScreenState extends State<PosScreen> {
   void _showThermalReceiptModal(dynamic saleData, double change, List<Map<String, dynamic>> itemsPurchased, double grandTotal) {
     final inv = saleData?['invoice_number'] ?? 'PR-NOTA';
     final date = DateTime.now();
-    final formattedDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    final formattedDate = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}  ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
     final storeDisplayName = (_outlet?['name'] != null && _outlet!['name'].toString().isNotEmpty)
         ? _outlet!['name'].toString()
         : (_storeSetting?['name'] ?? _storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP');
@@ -642,16 +642,26 @@ class _PosScreenState extends State<PosScreen> {
         ? _storeSetting!['receipt_footer'].toString()
         : 'Terima kasih telah berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.';
 
+    final cashierName = saleData?['user']?['name'] ?? saleData?['cashier_name'] ?? 'Admin';
+    final customerName = _selectedCustomerId != null
+        ? (_customers.firstWhere((c) => c['id'] == _selectedCustomerId, orElse: () => null)?['name'] ?? 'Umum')
+        : 'Umum';
+
+    // Calculate subtotal, discount, paid
+    final double discount = _discount;
+    final double subtotal = grandTotal + discount;
+    final double paid = grandTotal + change;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: EdgeInsets.only(
-          top: 20,
-          left: 20,
-          right: 20,
-          bottom: MediaQuery.of(ctx).padding.bottom + 24, // Safe bottom padding
+          top: 16,
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(ctx).padding.bottom + 20,
         ),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -661,104 +671,157 @@ class _PosScreenState extends State<PosScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Top Bar Handle & Title
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Preview Struk Thermal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  Row(
+                    children: const [
+                      Icon(Icons.receipt_long, color: ThemeConfig.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text('Preview Struk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
-              const Divider(height: 12),
-              // Thermal Paper Preview Box
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAF9F6),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(storeDisplayName, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center),
-                    if (storeAddress.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(storeAddress, style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
-                      ),
-                    if (storePhone.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Text('Telp: $storePhone', style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
-                      ),
-                    const SizedBox(height: 4),
-                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('No: $inv', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
-                        Text(formattedDate, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                      ],
-                    ),
-                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    ...itemsPurchased.map((it) {
-                      final name = it['product']?['name'] ?? 'Item';
-                      final qty = it['qty'] ?? 1;
-                      final price = Formatters.parseDouble(it['price']);
-                      final total = qty * price;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold)),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('$qty x ${Formatters.formatRupiah(price)}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                                Text(Formatters.formatRupiah(total), style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
-                              ],
+              const Divider(height: 8),
+              const SizedBox(height: 8),
+
+              // Receipt Card exactly matching Settings Preview
+              Center(
+                child: Container(
+                  width: 320,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 8)],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Store Avatar / Icon
+                      if (_storeSetting?['logo_url'] != null && (_storeSetting!['logo_url'] as String).isNotEmpty)
+                        Image.network(
+                          _storeSetting!['logo_url'],
+                          height: 54,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: ThemeConfig.primary.withOpacity(0.1),
                             ),
-                          ],
+                            child: const Icon(Icons.store, color: ThemeConfig.primary, size: 28),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: ThemeConfig.primary.withOpacity(0.1),
+                          ),
+                          child: const Icon(Icons.store, color: ThemeConfig.primary, size: 28),
                         ),
-                      );
-                    }),
-                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('TOTAL TAGIHAN:', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
-                        Text(Formatters.formatRupiah(grandTotal), style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Uang Diterima:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                        Text(Formatters.formatRupiah(grandTotal + change), style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Kembalian:', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
-                        Text(Formatters.formatRupiah(change), style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                      ],
-                    ),
-                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
-                    Text(
-                      receiptFooterText,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 2),
-                    Text('-- $storeDisplayName --', style: const TextStyle(fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.bold)),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        storeDisplayName,
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (storeAddress.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            storeAddress,
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      if (storePhone.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Text(
+                            'Telp: $storePhone',
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      const Divider(height: 16),
+
+                      // Meta Info Rows
+                      _receiptPreviewRow('No. Nota', inv),
+                      _receiptPreviewRow('Tanggal', formattedDate),
+                      _receiptPreviewRow('Kasir', cashierName.toString()),
+                      if (customerName.toString().toUpperCase() != 'UMUM')
+                        _receiptPreviewRow('Pelanggan', customerName.toString()),
+                      const Divider(height: 12),
+
+                      // Items List
+                      ...itemsPurchased.map((it) {
+                        final name = it['product']?['name'] ?? it['product_name'] ?? 'Item';
+                        final double qty = Formatters.parseDouble(it['qty'] ?? 1);
+                        final double price = Formatters.parseDouble(it['price']);
+                        final double itemTotal = qty * price;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '  ${qty.toStringAsFixed(0)} x ${Formatters.formatRupiah(price)}',
+                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                  ),
+                                  Text(
+                                    Formatters.formatRupiah(itemTotal),
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const Divider(height: 12),
+
+                      // Totals
+                      _receiptPreviewRow('Subtotal', Formatters.formatRupiah(subtotal)),
+                      if (discount > 0)
+                        _receiptPreviewRow('Diskon', '- ${Formatters.formatRupiah(discount)}'),
+                      _receiptPreviewRow('Total', Formatters.formatRupiah(grandTotal), bold: true),
+                      _receiptPreviewRow('Bayar (${_paymentMethod.toUpperCase()})', Formatters.formatRupiah(paid)),
+                      _receiptPreviewRow('Kembali', Formatters.formatRupiah(change)),
+                      const Divider(height: 16),
+
+                      // Footer Note & Mark
+                      Text(
+                        receiptFooterText,
+                        style: const TextStyle(fontSize: 9, color: Colors.grey, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '--- * ---',
+                        style: TextStyle(fontSize: 9, color: Colors.grey.shade400),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -768,13 +831,14 @@ class _PosScreenState extends State<PosScreen> {
                       'id': saleData?['id'],
                       'invoice_number': inv,
                       'date': formattedDate,
-                      'cashier_name': 'Kasir',
-                      'subtotal': grandTotal,
-                      'discount': 0,
+                      'cashier_name': cashierName,
+                      'customer_name': customerName,
+                      'subtotal': subtotal,
+                      'discount': discount,
                       'grand_total': grandTotal,
-                      'paid_amount': grandTotal + change,
+                      'paid_amount': paid,
                       'change_amount': change,
-                      'payment_method': 'CASH',
+                      'payment_method': _paymentMethod.toUpperCase(),
                       'items': itemsPurchased,
                       'outlet': _outlet,
                     };
@@ -795,6 +859,19 @@ class _PosScreenState extends State<PosScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _receiptPreviewRow(String label, String value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 10, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+          Text(value, style: TextStyle(fontSize: 10, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+        ],
       ),
     );
   }
