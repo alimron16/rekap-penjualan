@@ -437,6 +437,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     final paid = Formatters.parseDouble(item['paid_amount']);
                     final receivable = Formatters.parseDouble(item['remaining_receivable']);
 
+                    final isDigital = item['is_digital'] == true || type == 'DIGITAL';
+                    final badgeColor = isDigital
+                        ? Colors.amber.shade50
+                        : (type == 'GROSIR' ? Colors.indigo.shade50 : Colors.green.shade50);
+                    final textColor = isDigital
+                        ? Colors.amber.shade900
+                        : (type == 'GROSIR' ? Colors.indigo.shade900 : Colors.green.shade900);
+
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -454,15 +462,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: type == 'GROSIR' ? Colors.indigo.shade50 : Colors.green.shade50,
+                                  color: badgeColor,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: type == 'GROSIR' ? Colors.indigo.shade900 : Colors.green.shade900)),
+                                child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('Tanggal: $date • Pelanggan: $cust', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text(isDigital ? 'Waktu: $date • Produk: $cust' : 'Tanggal: $date • Pelanggan: $cust', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                           const Divider(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -479,7 +487,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             children: [
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  await PrinterService.printReceipt(sale: item);
+                                  if (isDigital) {
+                                    await PrinterService.printDigitalReceipt(digitalSale: item);
+                                  } else {
+                                    await PrinterService.printReceipt(sale: item);
+                                  }
                                 },
                                 icon: const Icon(Icons.receipt_long, size: 14, color: ThemeConfig.primary),
                                 label: const Text('Cetak Struk', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.primary)),
@@ -488,18 +500,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                                   side: BorderSide(color: ThemeConfig.primary.withOpacity(0.5)),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  await PrinterService.printInvoice(sale: item);
-                                },
-                                icon: const Icon(Icons.print, size: 14, color: Colors.white),
-                                label: const Text('Cetak Faktur', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ThemeConfig.accent,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              if (!isDigital) ...[
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await PrinterService.printInvoice(sale: item);
+                                  },
+                                  icon: const Icon(Icons.print, size: 14, color: Colors.white),
+                                  label: const Text('Cetak Faktur', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: ThemeConfig.accent,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],

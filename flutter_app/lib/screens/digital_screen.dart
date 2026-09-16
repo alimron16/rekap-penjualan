@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/printer_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
@@ -15,6 +16,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
   List<dynamic> _products = [];
   List<dynamic> _depositAccounts = [];
   List<dynamic> _cashAccounts = [];
+  Map<String, dynamic>? _storeSetting;
   double _saldoMulti = 0;
   bool _isLoading = true;
   String? _errorMessage;
@@ -49,6 +51,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
             _depositAccounts = res['deposit_accounts'] ?? [];
             _cashAccounts = res['cash_accounts'] ?? [];
             _saldoMulti = Formatters.parseDouble(res['saldo_multi']);
+            _storeSetting = res['setting'];
 
             if (_products.isNotEmpty && _selectedProductId == null) {
               _selectedProductId = _products[0]['id'];
@@ -111,19 +114,28 @@ class _DigitalScreenState extends State<DigitalScreen> {
       setState(() => _isSubmitting = false);
 
       if (res['success'] == true) {
+        final digitalSaleData = res['digital_sale'] ?? {
+          'transaction_number': 'PE-${DateTime.now().millisecondsSinceEpoch}',
+          'customer_number': _phoneController.text.trim(),
+          'selling_price': price,
+          'digital_product': selectedProd,
+          'status': 'SUKSES',
+          'notes': _notesController.text.trim(),
+          'date': DateTime.now().toString(),
+        };
+
+        if (res['setting'] != null) {
+          _storeSetting = res['setting'];
+        }
+
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '⚡ Transaksi Elektrik Berhasil!',
+          title: '⚡ Transaksi Elektrik Berhasil! 🧾',
           body: 'Penjualan pulsa/data ke ${_phoneController.text} sebesar ${Formatters.formatRupiah(price)} sukses.',
         );
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['message'] ?? 'Transaksi Berhasil!'),
-            backgroundColor: ThemeConfig.accent,
-          ),
-        );
+        _showDigitalReceiptModal(digitalSaleData);
 
         _phoneController.clear();
         _notesController.clear();
@@ -139,6 +151,161 @@ class _DigitalScreenState extends State<DigitalScreen> {
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _showDigitalReceiptModal(Map<String, dynamic> digitalSale) {
+    final trxNo = digitalSale['transaction_number'] ?? 'PE-NOTA';
+    final date = DateTime.now();
+    final formattedDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    final storeDisplayName = _storeSetting?['name'] ?? _storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP';
+    final storeAddress = _storeSetting?['address'] ?? '';
+    final storePhone = _storeSetting?['phone'] ?? '';
+    final productName = digitalSale['digital_product']?['name'] ?? 'Pulsa / Elektrik';
+    final customerNo = digitalSale['customer_number'] ?? _phoneController.text;
+    final sellingPrice = Formatters.parseDouble(digitalSale['selling_price']);
+    final receiptFooterText = _storeSetting?['receipt_footer'] ?? 'Simpan struk ini sebagai bukti transaksi yang sah.';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(
+          top: 20,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(ctx).padding.bottom + 24,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Struk Transaksi Pulsa / PPOB', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const Divider(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAF9F6),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6)],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(storeDisplayName, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center),
+                    if (storeAddress.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(storeAddress, style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
+                      ),
+                    if (storePhone.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text('Telp: $storePhone', style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5), textAlign: TextAlign.center),
+                      ),
+                    const SizedBox(height: 4),
+                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    const Text('STRUK TRANSAKSI ELEKTRIK', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('No: $trxNo', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(formattedDate, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                      ],
+                    ),
+                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(productName, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text('No Tujuan: $customerNo', style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                          if (digitalSale['notes'] != null && digitalSale['notes'].toString().isNotEmpty)
+                            Text('Catatan: ${digitalSale['notes']}', style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    const Text('--------------------------------', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('TOTAL TAGIHAN:', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
+                        Text(Formatters.formatRupiah(sellingPrice), style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Metode Bayar:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                        const Text('TUNAI / CASH', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Status:', style: TextStyle(fontFamily: 'monospace', fontSize: 10)),
+                        const Text('SUKSES', style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
+                      ],
+                    ),
+                    const Text('================================', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                    Text(
+                      receiptFooterText,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 9.5),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 2),
+                    Text('-- $storeDisplayName --', style: const TextStyle(fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await PrinterService.printDigitalReceipt(
+                      digitalSale: digitalSale,
+                      storeSetting: _storeSetting,
+                    );
+                  },
+                  icon: const Icon(Icons.print, size: 18, color: Colors.white),
+                  label: const Text('Cetak Struk Thermal (ESC/POS)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ThemeConfig.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Tutup'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override

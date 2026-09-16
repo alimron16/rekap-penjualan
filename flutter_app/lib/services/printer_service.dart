@@ -53,6 +53,26 @@ class PrinterService {
     );
   }
 
+  /// Print Thermal Receipt for Digital / Pulsa / PLN Sales
+  static Future<void> printDigitalReceipt({
+    required Map<String, dynamic> digitalSale,
+    Map<String, dynamic>? storeSetting,
+    String? paperSize,
+  }) async {
+    final size = paperSize ?? await getPreferredPaperSize();
+    final pdfBytes = await generateDigitalReceiptPdf(
+      digitalSale: digitalSale,
+      storeSetting: storeSetting,
+      paperSize: size,
+    );
+
+    final trxNo = digitalSale['transaction_number'] ?? digitalSale['invoice_number'] ?? 'Pulsa';
+    await Printing.layoutPdf(
+      name: 'Receipt-$trxNo',
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+    );
+  }
+
   /// Print Official A4 Sales Invoice
   static Future<void> printInvoice({
     required Map<String, dynamic> sale,
@@ -216,6 +236,134 @@ class PrinterService {
               pw.Center(
                 child: pw.Text(
                   'TERIMA KASIH ATAS KUNJUNGAN ANDA',
+                  style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+              pw.SizedBox(height: 1),
+              pw.Center(
+                child: pw.Text(
+                  receiptFooter,
+                  style: const pw.TextStyle(fontSize: 6.5),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+              pw.SizedBox(height: 10),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  /// Generate Receipt PDF bytes for Digital / Pulsa / PLN Sales (58mm/80mm)
+  static Future<Uint8List> generateDigitalReceiptPdf({
+    required Map<String, dynamic> digitalSale,
+    Map<String, dynamic>? storeSetting,
+    String paperSize = '58mm',
+  }) async {
+    final pdf = pw.Document();
+
+    final double rollWidth = paperSize == '80mm' ? (80 * PdfPageFormat.mm) : (58 * PdfPageFormat.mm);
+    final pageFormat = PdfPageFormat(rollWidth, double.infinity, marginAll: 4 * PdfPageFormat.mm);
+
+    final storeName = storeSetting?['name'] ?? storeSetting?['store_name'] ?? 'ELEPHANT CELL GROUP';
+    final storeAddress = storeSetting?['address'] ?? '';
+    final storePhone = storeSetting?['phone'] ?? '';
+    final receiptFooter = (storeSetting?['receipt_footer'] != null && storeSetting!['receipt_footer'].toString().isNotEmpty)
+        ? storeSetting['receipt_footer'].toString()
+        : 'Simpan struk ini sebagai bukti transaksi yang sah.';
+
+    final trxNo = digitalSale['transaction_number'] ?? digitalSale['invoice_number'] ?? 'PE-NOTA';
+    final dateStr = digitalSale['date'] != null ? digitalSale['date'].toString() : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+    final customerNo = digitalSale['customer_number'] ?? digitalSale['phone'] ?? '-';
+    final productName = digitalSale['digital_product']?['name'] ?? digitalSale['product_name'] ?? 'Pulsa / Elektrik';
+    final sellingPrice = Formatters.parseDouble(digitalSale['selling_price'] ?? digitalSale['total']);
+    final status = (digitalSale['status'] ?? 'SUKSES').toString().toUpperCase();
+    final notes = digitalSale['notes']?.toString() ?? '';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        build: (pw.Context ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // Store Header
+              pw.Center(
+                child: pw.Text(
+                  storeName,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+              if (storeAddress.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    storeAddress,
+                    style: const pw.TextStyle(fontSize: 7.5),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              if (storePhone.isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    'Telp/WA: $storePhone',
+                    style: const pw.TextStyle(fontSize: 7.5),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              pw.SizedBox(height: 3),
+              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+
+              // Title
+              pw.Center(
+                child: pw.Text(
+                  'STRUK PEMBELIAN PULSA / PPOB',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+              pw.SizedBox(height: 3),
+
+              // Info
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('No Trx: $trxNo', style: const pw.TextStyle(fontSize: 7.5)),
+                  pw.Text(dateStr, style: const pw.TextStyle(fontSize: 7.5)),
+                ],
+              ),
+              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+
+              // Product Detail
+              pw.Text(productName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8.5)),
+              pw.SizedBox(height: 2),
+              _receiptRow('No Tujuan/ID:', customerNo),
+              if (notes.isNotEmpty) _receiptRow('Catatan/SN:', notes),
+              _receiptRow('Status:', status),
+
+              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+
+              // Total
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('TOTAL TAGIHAN:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                  pw.Text(Formatters.formatRupiah(sellingPrice), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9.5)),
+                ],
+              ),
+              _receiptRow('Metode Bayar:', 'TUNAI / CASH'),
+
+              pw.Text('----------------------------------------------------', style: const pw.TextStyle(fontSize: 6.5)),
+              pw.SizedBox(height: 3),
+
+              // Footer
+              pw.Center(
+                child: pw.Text(
+                  'TERIMA KASIH TELAH BERTRANSAKSI',
                   style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold),
                   textAlign: pw.TextAlign.center,
                 ),

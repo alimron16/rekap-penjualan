@@ -17,9 +17,10 @@
 
         <form action="{{ route('reports.sales') }}" method="GET" class="flex flex-wrap items-center gap-2 text-xs">
             <select name="sale_type" class="px-2.5 py-1.5 border border-slate-300 rounded font-semibold">
-                <option value="all" {{ $saleType === 'all' ? 'selected' : '' }}>-- Semua Penjualan --</option>
+                <option value="all" {{ $saleType === 'all' ? 'selected' : '' }}>-- Semua Penjualan (Retail, Grosir, Digital) --</option>
                 <option value="retail" {{ $saleType === 'retail' ? 'selected' : '' }}>Retail (Eceran)</option>
                 <option value="grosir" {{ $saleType === 'grosir' ? 'selected' : '' }}>Grosir (Partai)</option>
+                <option value="digital" {{ $saleType === 'digital' ? 'selected' : '' }}>Pulsa / Elektrik (Digital)</option>
             </select>
             <input type="date" name="start_date" value="{{ $startDate }}" class="px-2 py-1.5 border border-slate-300 rounded font-medium">
             <span class="text-slate-400 font-bold">-</span>
@@ -67,7 +68,7 @@
                         <th>TANGGAL</th>
                         <th>NO TRANSAKSI</th>
                         <th class="text-center">TIPE</th>
-                        <th>PELANGGAN</th>
+                        <th>PELANGGAN / DETAIL</th>
                         <th class="text-center">QTY</th>
                         <th class="text-right">SUBTOTAL</th>
                         <th class="text-right">POTONGAN</th>
@@ -75,21 +76,32 @@
                         <th class="text-right">DIBAYAR</th>
                         <th class="text-right">PIUTANG</th>
                         <th class="text-center">STATUS</th>
+                        <th class="text-center">AKSI</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($sales as $idx => $s)
                         <tr>
                             <td class="text-center text-slate-500 font-semibold">{{ $sales->firstItem() + $idx }}</td>
-                            <td class="whitespace-nowrap">{{ $s->date->format('d/m/Y H:i') }}</td>
+                            <td class="whitespace-nowrap">{{ $s->date ? $s->date->format('d/m/Y H:i') : '-' }}</td>
                             <td class="font-mono font-bold text-emerald-900">{{ $s->invoice_number }}</td>
                             <td class="text-center">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $s->sale_type === 'grosir' ? 'bg-indigo-100 text-indigo-900' : 'bg-emerald-100 text-emerald-900' }}">
-                                    {{ $s->sale_type }}
-                                </span>
+                                @if($s->sale_type === 'digital')
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                                        DIGITAL
+                                    </span>
+                                @elseif($s->sale_type === 'grosir')
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-900">
+                                        GROSIR
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-900">
+                                        RETAIL
+                                    </span>
+                                @endif
                             </td>
-                            <td class="font-bold text-slate-800">{{ $s->customer->name ?? 'UMUM' }}</td>
-                            <td class="text-center font-mono font-bold">{{ $s->items->sum('qty') }}</td>
+                            <td class="font-bold text-slate-800">{{ $s->customer_name ?? 'UMUM' }}</td>
+                            <td class="text-center font-mono font-bold">{{ $s->items_qty }}</td>
                             <td class="text-right font-mono">Rp {{ number_format($s->subtotal, 0, ',', '.') }}</td>
                             <td class="text-right font-mono text-slate-500">{{ $s->discount > 0 ? 'Rp ' . number_format($s->discount, 0, ',', '.') : '-' }}</td>
                             <td class="text-right font-mono font-bold text-slate-900">Rp {{ number_format($s->total, 0, ',', '.') }}</td>
@@ -98,14 +110,22 @@
                                 {{ $s->remaining_receivable > 0 ? 'Rp ' . number_format($s->remaining_receivable, 0, ',', '.') : '-' }}
                             </td>
                             <td class="text-center">
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $s->status === 'LUNAS' ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-100 text-sky-800' }}">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $s->status === 'LUNAS' || $s->status === 'SUKSES' ? 'bg-emerald-100 text-emerald-800' : ($s->status === 'GAGAL' ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800') }}">
                                     {{ $s->status }}
                                 </span>
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ $s->receipt_url }}" target="_blank" class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-[10px] font-bold inline-flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                    </svg>
+                                    <span>STRUK</span>
+                                </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="text-center py-6 text-slate-400">Tidak ada data penjualan pada periode ini.</td>
+                            <td colspan="13" class="text-center py-6 text-slate-400">Tidak ada data penjualan pada periode ini.</td>
                         </tr>
                     @endforelse
                 </tbody>

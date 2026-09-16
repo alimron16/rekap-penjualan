@@ -16,6 +16,7 @@ class Sale extends Model
         'sale_type',
         'date',
         'outlet_id',
+        'user_id',
         'customer_id',
         'subtotal',
         'discount',
@@ -36,6 +37,11 @@ class Sale extends Model
         'paid_amount' => 'decimal:2',
         'remaining_receivable' => 'decimal:2',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function customer(): BelongsTo
     {

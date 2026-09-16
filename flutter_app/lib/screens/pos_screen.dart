@@ -129,13 +129,37 @@ class _PosScreenState extends State<PosScreen> {
     final int id = Formatters.parseInt(product['id']);
     if (id <= 0) return;
 
+    final double availableStock = Formatters.parseDouble(product['stock']);
+    if (availableStock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Stok produk [${product['name'] ?? 'Item'}] habis! (Sisa: 0)'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final double currentCartQty = _cart.containsKey(id) ? (_cart[id]!['qty'] as double) : 0.0;
+    if (currentCartQty + 1.0 > availableStock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Jumlah melebihi sisa stok! (Sisa: ${availableStock.toInt()} pcs)'),
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final double price = widget.saleType == 'grosir'
         ? Formatters.parseDouble(product['wholesale_price'] ?? product['selling_price_grosir'] ?? product['retail_price'] ?? product['selling_price'])
         : Formatters.parseDouble(product['retail_price'] ?? product['selling_price']);
 
     setState(() {
       if (_cart.containsKey(id)) {
-        _cart[id]!['qty'] = (_cart[id]!['qty'] as double) + 1.0;
+        _cart[id]!['qty'] = currentCartQty + 1.0;
       } else {
         _cart[id] = {
           'product': product,
@@ -151,6 +175,20 @@ class _PosScreenState extends State<PosScreen> {
       if (!_cart.containsKey(id)) return;
       final currentQty = _cart[id]!['qty'] as double;
       final newQty = currentQty + delta;
+      final product = _cart[id]!['product'];
+      final availableStock = product != null ? Formatters.parseDouble(product['stock']) : 9999.0;
+
+      if (delta > 0 && newQty > availableStock) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stok tidak mencukupi! Sisa stok: ${availableStock.toInt()} pcs'),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
       if (newQty <= 0) {
         _cart.remove(id);
       } else {
@@ -1004,6 +1042,23 @@ class _PosScreenState extends State<PosScreen> {
                                         IconButton(
                                           icon: const Icon(Icons.add_circle_outline, color: Colors.green),
                                           onPressed: () => _updateCartQty(id, 1),
+                                        ),
+                                      ] else if (stock <= 0) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: Colors.red.shade200),
+                                          ),
+                                          child: Text(
+                                            'Habis',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.red.shade700,
+                                            ),
+                                          ),
                                         ),
                                       ] else
                                         ElevatedButton(

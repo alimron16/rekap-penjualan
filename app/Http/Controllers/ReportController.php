@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\CashTransaction;
+use App\Models\DigitalSale;
 use App\Models\InventoryAdjustment;
 use App\Models\Purchase;
 use App\Models\Sale;
 use App\Services\FinancialReportService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 class ReportController extends Controller
 {
@@ -24,8 +27,7 @@ class ReportController extends Controller
         $endDate = $request->input('end_date', date('Y-m-d'));
         $perPage = $request->input('per_page', 25);
 
-        $query = Purchase::whereBetween('date', [$startDate, $endDate])
-            ->with(['supplier', 'items']);
+        $query = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -35,8 +37,8 @@ class ReportController extends Controller
         }
 
         $purchases = ($perPage === 'all')
-            ? $query->orderByDesc('date')->paginate(10000)->withQueryString()
-            : $query->orderByDesc('date')->paginate((int)$perPage)->withQueryString();
+            ? $query->with(['supplier', 'items'])->orderByDesc('date')->paginate(10000)->withQueryString()
+            : $query->with(['supplier', 'items'])->orderByDesc('date')->paginate((int)$perPage)->withQueryString();
 
         $totalQty = 0;
         $totalSubtotal = 0;
@@ -59,7 +61,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Laporan Penjualan
+     * Laporan Penjualan (Mendukung Retail, Grosir, & Produk Multi / Pulsa)
      */
     public function sales(Request $request)
     {
@@ -67,38 +69,101 @@ class ReportController extends Controller
         $endDate = $request->input('end_date', date('Y-m-d'));
         $saleType = $request->input('sale_type', 'all');
         $perPage = $request->input('per_page', 25);
+        $search = $request->input('search');
 
-        $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
-        if ($saleType !== 'all') {
-            $query->where('sale_type', $saleType);
+        $unifiedSales = collect();
+
+        // 1. Ambil Penjualan Fisik (Retail / Grosir)
+        if ($saleType !== 'digital') {
+            $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
+            if ($saleType !== 'all') {
+                $query->where('sale_type', $saleType);
+            }
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('invoice_number', 'like', "%$search%")
+                      ->orWhereHas('customer', fn($cq) => $cq->where('name', 'like', "%$search%"));
+                });
+            }
+
+            $salesList = $query->with(['customer', 'items', 'outlet'])->get();
+            foreach ($salesList as $s) {
+                $unifiedSales->push((object)[
+                    'id' => $s->id,
+                    'is_digital' => false,
+                    'date' => $s->date,
+                    'invoice_number' => $s->invoice_number,
+                    'sale_type' => $s->sale_type,
+                    'customer_name' => $s->customer->name ?? 'UMUM',
+                    'items_qty' => (float) $s->items->sum('qty'),
+                    'subtotal' => (float) $s->subtotal,
+                    'discount' => (float) $s->discount,
+                    'total' => (float) $s->total,
+                    'paid_amount' => (float) $s->paid_amount,
+                    'remaining_receivable' => (float) $s->remaining_receivable,
+                    'status' => $s->status,
+                    'receipt_url' => route('receipt.thermal', $s->id),
+                ]);
+            }
         }
 
-        if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%$search%")
-                  ->orWhereHas('customer', fn($cq) => $cq->where('name', 'like', "%$search%"));
-            });
+        // 2. Ambil Penjualan Elektrik / Multi Pulsa (Digital)
+        if ($saleType === 'all' || $saleType === 'digital') {
+            $digitalQuery = DigitalSale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->with(['digitalProduct']);
+
+            if ($search) {
+                $digitalQuery->where(function ($q) use ($search) {
+                    $q->where('transaction_number', 'like', "%$search%")
+                      ->orWhere('customer_number', 'like', "%$search%")
+                      ->orWhereHas('digitalProduct', fn($dp) => $dp->where('name', 'like', "%$search%"));
+                });
+            }
+
+            $digitalList = $digitalQuery->get();
+            foreach ($digitalList as $ds) {
+                $unifiedSales->push((object)[
+                    'id' => $ds->id,
+                    'is_digital' => true,
+                    'date' => $ds->date,
+                    'invoice_number' => $ds->transaction_number,
+                    'sale_type' => 'digital',
+                    'customer_name' => ($ds->digitalProduct->name ?? 'Pulsa') . ' (' . $ds->customer_number . ')',
+                    'items_qty' => 1,
+                    'subtotal' => (float) $ds->selling_price,
+                    'discount' => 0,
+                    'total' => (float) $ds->selling_price,
+                    'paid_amount' => (float) $ds->selling_price,
+                    'remaining_receivable' => 0,
+                    'status' => $ds->status,
+                    'receipt_url' => route('receipt.thermal_digital', $ds->id),
+                ]);
+            }
         }
 
-        $sales = ($perPage === 'all')
-            ? $query->with(['customer', 'items'])->orderByDesc('date')->paginate(10000)->withQueryString()
-            : $query->with(['customer', 'items'])->orderByDesc('date')->paginate((int)$perPage)->withQueryString();
+        // Urutkan berdasarkan tanggal terbaru
+        $sortedSales = $unifiedSales->sortByDesc(fn($item) => $item->date ? $item->date->timestamp : 0)->values();
 
-        $totalQty = 0;
-        $totalSubtotal = 0;
-        $totalDiscount = 0;
-        $totalFinal = 0;
-        $totalPaid = 0;
-        $totalReceivable = 0;
+        // Hitung Total Summary Keseluruhan
+        $totalQty = $sortedSales->sum('items_qty');
+        $totalSubtotal = $sortedSales->sum('subtotal');
+        $totalDiscount = $sortedSales->sum('discount');
+        $totalFinal = $sortedSales->sum('total');
+        $totalPaid = $sortedSales->sum('paid_amount');
+        $totalReceivable = $sortedSales->sum('remaining_receivable');
 
-        foreach ($sales as $s) {
-            $totalQty += $s->items->sum('qty');
-            $totalSubtotal += $s->subtotal;
-            $totalDiscount += $s->discount;
-            $totalFinal += $s->total;
-            $totalPaid += $s->paid_amount;
-            $totalReceivable += $s->remaining_receivable;
-        }
+        // Manual Pagination untuk Unified Collection
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $itemsPerPage = ($perPage === 'all') ? 10000 : (int)$perPage;
+        $currentItems = $sortedSales->slice(($currentPage - 1) * $itemsPerPage, $itemsPerPage)->values();
+
+        $sales = new LengthAwarePaginator(
+            $currentItems,
+            $sortedSales->count(),
+            $itemsPerPage,
+            $currentPage,
+            ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         return view('reports.sales', compact(
             'sales', 'startDate', 'endDate', 'saleType',

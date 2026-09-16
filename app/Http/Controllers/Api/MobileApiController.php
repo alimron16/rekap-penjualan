@@ -788,6 +788,7 @@ class MobileApiController extends Controller
 
         try {
             $data['outlet_id'] = $user->outlet_id;
+            $data['user_id'] = $user->id;
             $sale = $this->posService->checkoutPos($data);
             $sale->load(['items.product', 'customer', 'outlet', 'user']);
             return response()->json([
@@ -843,8 +844,14 @@ class MobileApiController extends Controller
         ]);
 
         try {
-            $this->posService->processDigitalSale($data);
-            return response()->json(['success' => true, 'message' => 'Transaksi Pulsa / Elektrik berhasil!']);
+            $digitalSale = $this->posService->processDigitalSale($data);
+            $digitalSale->load(['digitalProduct', 'depositAccount', 'cashAccount']);
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaksi Pulsa / Elektrik berhasil!',
+                'digital_sale' => $digitalSale,
+                'setting' => StoreSetting::first(),
+            ]);
         } catch (Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -1146,16 +1153,30 @@ class MobileApiController extends Controller
 
         $request->validate([
             'source_account_id' => 'required|exists:accounts,id',
-            'proof_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'notes' => 'nullable|string|max:255',
         ]);
 
         $proofPath = null;
         if ($request->hasFile('proof_image')) {
+            $file = $request->file('proof_image');
+            $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+            $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+            if (!in_array($ext, $allowedExts)) {
+                return response()->json(['error' => 'Format file bukti harus berupa gambar (JPG, PNG, WEBP).'], 422);
+            }
+            if ($file->getSize() > 5 * 1024 * 1024) {
+                return response()->json(['error' => 'Ukuran file gambar maksimal 5MB.'], 422);
+            }
+
             $year = date('Y');
             $month = date('m');
-            $folder = "transfers/proofs/{$year}/{$month}";
-            $proofPath = $request->file('proof_image')->store($folder, 'public');
+            $filename = 'proof_' . time() . '_' . uniqid() . '.' . $ext;
+            $destinationDir = storage_path("app/public/transfers/proofs/{$year}/{$month}");
+            if (!file_exists($destinationDir)) {
+                mkdir($destinationDir, 0755, true);
+            }
+            $file->move($destinationDir, $filename);
+            $proofPath = "transfers/proofs/{$year}/{$month}/{$filename}";
         }
 
         $sourceAccount = Account::findOrFail($request->source_account_id);
@@ -1328,34 +1349,94 @@ class MobileApiController extends Controller
         $endDate = $request->query('end_date', date('Y-m-d'));
         $saleType = $request->query('sale_type', 'all');
 
-        $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
-            ->with(['customer', 'items.product']);
+        $unified = collect();
 
-        if ($saleType !== 'all') {
-            $query->where('sale_type', $saleType);
+        // 1. Penjualan Fisik (Retail / Grosir)
+        if ($saleType !== 'digital') {
+            $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->with(['customer', 'items.product', 'outlet', 'user']);
+
+            if ($saleType !== 'all') {
+                $query->where('sale_type', $saleType);
+            }
+
+            $sales = $query->orderByDesc('date')->get();
+            foreach ($sales as $s) {
+                $unified->push([
+                    'id' => $s->id,
+                    'is_digital' => false,
+                    'date' => $s->date ? $s->date->format('Y-m-d H:i:s') : null,
+                    'invoice_number' => $s->invoice_number,
+                    'sale_type' => $s->sale_type,
+                    'customer' => $s->customer,
+                    'customer_name' => $s->customer->name ?? 'UMUM',
+                    'items_qty' => (float) $s->items->sum('qty'),
+                    'subtotal' => (float) $s->subtotal,
+                    'discount' => (float) $s->discount,
+                    'total' => (float) $s->total,
+                    'paid_amount' => (float) $s->paid_amount,
+                    'remaining_receivable' => (float) $s->remaining_receivable,
+                    'payment_method' => $s->payment_method,
+                    'status' => $s->status,
+                    'items' => $s->items,
+                    'outlet' => $s->outlet,
+                    'user' => $s->user,
+                ]);
+            }
         }
 
-        $sales = $query->orderByDesc('date')->take(100)->get();
+        // 2. Penjualan Elektrik / Multi Pulsa (Digital)
+        if ($saleType === 'all' || $saleType === 'digital') {
+            $digitalSales = DigitalSale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->with(['digitalProduct', 'depositAccount', 'cashAccount'])
+                ->orderByDesc('date')
+                ->get();
 
-        $totalQty = 0;
-        $totalSubtotal = 0;
-        $totalDiscount = 0;
-        $totalFinal = 0;
-        $totalPaid = 0;
-        $totalReceivable = 0;
-
-        foreach ($sales as $s) {
-            $totalQty += $s->items->sum('qty');
-            $totalSubtotal += $s->subtotal;
-            $totalDiscount += $s->discount;
-            $totalFinal += $s->total;
-            $totalPaid += $s->paid_amount;
-            $totalReceivable += $s->remaining_receivable;
+            foreach ($digitalSales as $ds) {
+                $productName = $ds->digitalProduct->name ?? 'Pulsa / Elektrik';
+                $unified->push([
+                    'id' => $ds->id,
+                    'is_digital' => true,
+                    'date' => $ds->date ? $ds->date->format('Y-m-d H:i:s') : null,
+                    'invoice_number' => $ds->transaction_number,
+                    'sale_type' => 'digital',
+                    'customer' => ['name' => $productName . ' (' . $ds->customer_number . ')'],
+                    'customer_name' => $productName . ' (' . $ds->customer_number . ')',
+                    'items_qty' => 1.0,
+                    'subtotal' => (float) $ds->selling_price,
+                    'discount' => 0.0,
+                    'total' => (float) $ds->selling_price,
+                    'paid_amount' => (float) $ds->selling_price,
+                    'remaining_receivable' => 0.0,
+                    'payment_method' => 'TUNAI',
+                    'status' => $ds->status,
+                    'notes' => $ds->notes,
+                    'digital_product' => $ds->digitalProduct,
+                    'items' => [
+                        [
+                            'product' => ['name' => $productName],
+                            'product_name' => $productName,
+                            'qty' => 1.0,
+                            'price' => (float) $ds->selling_price,
+                            'subtotal' => (float) $ds->selling_price,
+                        ]
+                    ],
+                ]);
+            }
         }
+
+        $sorted = $unified->sortByDesc('date')->values()->take(150);
+
+        $totalQty = $sorted->sum('items_qty');
+        $totalSubtotal = $sorted->sum('subtotal');
+        $totalDiscount = $sorted->sum('discount');
+        $totalFinal = $sorted->sum('total');
+        $totalPaid = $sorted->sum('paid_amount');
+        $totalReceivable = $sorted->sum('remaining_receivable');
 
         return response()->json([
             'success' => true,
-            'data' => $sales,
+            'data' => $sorted,
             'summary' => [
                 'total_qty' => $totalQty,
                 'total_subtotal' => (float) $totalSubtotal,
@@ -1745,17 +1826,30 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user || !$user->isAdmin()) return response()->json(['error' => 'Unauthorized'], 403);
 
-        $request->validate([
-            'logo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+        if (!$request->hasFile('logo')) {
+            return response()->json(['error' => 'Berkas logo tidak ditemukan.'], 422);
+        }
+
+        $file = $request->file('logo');
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($ext, $allowedExts)) {
+            return response()->json(['error' => 'Format logo harus berupa gambar (PNG, JPG, WEBP).'], 422);
+        }
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            return response()->json(['error' => 'Ukuran logo maksimal 5MB.'], 422);
+        }
 
         $setting = StoreSetting::firstOrCreate(['id' => 1]);
 
-        if ($request->hasFile('logo')) {
-            $path = $request->file('logo')->store('settings/logos', 'public');
-            $setting->logo_path = $path;
-            $setting->save();
+        $filename = 'logo_' . time() . '.' . $ext;
+        $destinationDir = storage_path('app/public/settings/logos');
+        if (!file_exists($destinationDir)) {
+            mkdir($destinationDir, 0755, true);
         }
+        $file->move($destinationDir, $filename);
+        $setting->logo_path = 'settings/logos/' . $filename;
+        $setting->save();
 
         return response()->json([
             'success' => true,

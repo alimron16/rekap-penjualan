@@ -133,7 +133,6 @@ class AgentTransferController extends Controller
         // Bukti transfer bersifat OPSIONAL (nullable), mimes: jpeg, png, jpg, webp, max 5MB (5120KB)
         $request->validate([
             'source_account_id' => 'required|exists:accounts,id',
-            'proof_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'notes' => 'nullable|string|max:255',
         ]);
 
@@ -142,8 +141,25 @@ class AgentTransferController extends Controller
             // Upload proof of transfer jika ada (disimpan ke transfers/proofs/YYYY/MM/)
             $path = null;
             if ($request->hasFile('proof_image')) {
-                $dir = 'transfers/proofs/' . date('Y/m');
-                $path = $request->file('proof_image')->store($dir, 'public');
+                $file = $request->file('proof_image');
+                $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+                if (!in_array($ext, $allowedExts)) {
+                    return back()->with('error', 'Format file bukti harus berupa gambar (JPG, PNG, WEBP).');
+                }
+                if ($file->getSize() > 5 * 1024 * 1024) {
+                    return back()->with('error', 'Ukuran file gambar maksimal 5MB.');
+                }
+
+                $year = date('Y');
+                $month = date('m');
+                $filename = 'proof_' . time() . '_' . uniqid() . '.' . $ext;
+                $destinationDir = storage_path("app/public/transfers/proofs/{$year}/{$month}");
+                if (!file_exists($destinationDir)) {
+                    mkdir($destinationDir, 0755, true);
+                }
+                $file->move($destinationDir, $filename);
+                $path = "transfers/proofs/{$year}/{$month}/{$filename}";
             }
 
             $sourceAccount = Account::findOrFail($request->source_account_id);

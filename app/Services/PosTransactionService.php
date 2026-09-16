@@ -75,6 +75,10 @@ class PosTransactionService
                 $subtotal += $itemSubtotal;
 
                 $stockBefore = (float) $product->stock;
+                if ($stockBefore < $qty) {
+                    throw new Exception("Stok barang [{$product->name}] tidak mencukupi! Sisa stok saat ini: " . (int)$stockBefore . " pcs, diminta: " . (int)$qty . " pcs.");
+                }
+
                 $stockAfter = $stockBefore - $qty;
 
                 // Update product stock
@@ -103,6 +107,7 @@ class PosTransactionService
                 'date' => now(),
                 'customer_id' => $customerId,
                 'outlet_id' => $data['outlet_id'] ?? (auth()->check() ? auth()->user()->outlet_id : null),
+                'user_id' => $data['user_id'] ?? (auth()->check() ? auth()->id() : null),
                 'subtotal' => $subtotal,
                 'discount' => $discount,
                 'total' => $total,

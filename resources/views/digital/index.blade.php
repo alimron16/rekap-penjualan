@@ -185,19 +185,28 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    @if($item->status === 'SUKSES')
-                                        <form action="{{ route('digital.reverse', $item->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin transaksi multi ini GAGAL? Saldo deposit modal akan dikembalikan dan kas laci berkurang.')">
-                                            @csrf
-                                            <button type="submit" class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-300 text-[10px] font-bold inline-flex items-center gap-1">
-                                                <svg class="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                </svg>
-                                                <span>GAGALKAN</span>
-                                            </button>
-                                        </form>
-                                    @else
-                                        <span class="text-[10px] text-slate-400 font-semibold italic">Reversed</span>
-                                    @endif
+                                    <div class="inline-flex items-center gap-1">
+                                        <a href="{{ route('receipt.thermal_digital', $item->id) }}" target="_blank" class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 text-[10px] font-bold inline-flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                            </svg>
+                                            <span>STRUK</span>
+                                        </a>
+
+                                        @if($item->status === 'SUKSES')
+                                            <form action="{{ route('digital.reverse', $item->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin transaksi multi ini GAGAL? Saldo deposit modal akan dikembalikan dan kas laci berkurang.')">
+                                                @csrf
+                                                <button type="submit" class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-300 text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                    <span>GAGALKAN</span>
+                                                </button>
+                                            </form>
+                                        @else
+                                            <span class="text-[10px] text-slate-400 font-semibold italic">Reversed</span>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty

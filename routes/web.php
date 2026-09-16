@@ -197,6 +197,7 @@ Route::middleware('auth')->group(function () {
 Route::prefix('receipt')->name('receipt.')->group(function () {
     Route::get('/thermal/{sale}', [ReceiptController::class, 'thermal'])->name('thermal');
     Route::get('/invoice/{sale}', [ReceiptController::class, 'invoice'])->name('invoice');
+    Route::get('/thermal-digital/{digitalSale}', [ReceiptController::class, 'thermalDigital'])->name('thermal_digital');
 });
 
 
