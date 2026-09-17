@@ -17,11 +17,20 @@ class Account extends Model
         'is_system_locked',
     ];
 
+    protected $appends = [
+        'account_number',
+    ];
+
     protected $casts = [
         'initial_balance' => 'decimal:2',
         'current_balance' => 'decimal:2',
         'is_system_locked' => 'boolean',
     ];
+
+    public function getAccountNumberAttribute(): string
+    {
+        return (string) ($this->attributes['code'] ?? '');
+    }
 
     public function journalLines(): HasMany
     {
