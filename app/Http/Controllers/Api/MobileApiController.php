@@ -759,14 +759,26 @@ class MobileApiController extends Controller
 
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
-        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $cashAndBankAccounts = Account::where('group', 'AKTIVA')
+            ->where('type', 'D')
+            ->where(function ($q) {
+                $q->where('code', 'LIKE', '1-111%')
+                  ->orWhere('code', 'LIKE', '1-112%')
+                  ->orWhere('name', 'LIKE', '%KAS%')
+                  ->orWhere('name', 'LIKE', '%SALDO%')
+                  ->orWhere('name', 'LIKE', '%BRANGKAS%');
+            })
+            ->where('code', 'NOT LIKE', '1-2%') // Exclude Persediaan Barang
+            ->orderBy('code')
+            ->get();
         $setting = StoreSetting::first();
 
         return response()->json([
             'success' => true,
             'products' => $products,
             'customers' => $customers,
-            'accounts' => $accounts,
+            'accounts' => $cashAndBankAccounts,
+            'all_accounts' => Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->orderBy('code')->get(),
             'setting' => $setting,
             'outlet' => $user->outlet,
         ]);

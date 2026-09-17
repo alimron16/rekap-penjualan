@@ -308,9 +308,12 @@ class _PosScreenState extends State<PosScreen> {
                               isDense: true,
                               decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                               items: _accounts.map<DropdownMenuItem<int>>((a) {
+                                final String code = a['code'] ?? a['account_number'] ?? '';
+                                final String name = a['name'] ?? 'Kas';
+                                final String label = code.isNotEmpty ? '$code - $name' : name;
                                 return DropdownMenuItem<int>(
                                   value: a['id'],
-                                  child: Text(a['name'] ?? 'Kas', style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+                                  child: Text(label, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
                                 );
                               }).toList(),
                               onChanged: (val) => setSheetState(() => _selectedAccountId = val),
@@ -955,7 +958,13 @@ class _PosScreenState extends State<PosScreen> {
     final customerNameController = TextEditingController();
     final customerPhoneController = TextEditingController();
     final notesController = TextEditingController();
-    int? sourceAccountId = _accounts.isNotEmpty ? _accounts[0]['id'] : null;
+    // Filter valid cash/bank accounts
+    final validAccounts = _accounts.where((a) => (a['type'] == 'D') && (a['code'] != null)).toList();
+    final defaultAcc = validAccounts.firstWhere(
+      (a) => (a['code'] == '1-1110' || a['code'] == '1-1111'),
+      orElse: () => validAccounts.isNotEmpty ? validAccounts[0] : {'id': null},
+    );
+    int? sourceAccountId = defaultAcc['id'] as int?;
     bool isProcessing = false;
 
     showModalBottomSheet(
@@ -999,10 +1008,15 @@ class _PosScreenState extends State<PosScreen> {
                 DropdownButtonFormField<int>(
                   value: sourceAccountId,
                   decoration: const InputDecoration(),
-                  items: _accounts.map<DropdownMenuItem<int>>((a) {
+                  items: _accounts
+                      .where((a) => (a['type'] == 'D') && (a['code'] != null))
+                      .map<DropdownMenuItem<int>>((a) {
+                    final String code = a['code'] ?? a['account_number'] ?? '';
+                    final String name = a['name'] ?? '';
+                    final String label = code.isNotEmpty ? '$code - $name' : name;
                     return DropdownMenuItem<int>(
                       value: a['id'] as int,
-                      child: Text('${a['account_number']} - ${a['name']}'),
+                      child: Text(label, style: const TextStyle(fontSize: 13)),
                     );
                   }).toList(),
                   onChanged: (val) => setModalState(() => sourceAccountId = val),

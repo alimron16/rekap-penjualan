@@ -201,9 +201,12 @@ class _DigitalScreenState extends State<DigitalScreen> {
                   value: sourceAccountId,
                   decoration: const InputDecoration(),
                   items: _cashAccounts.map<DropdownMenuItem<int>>((a) {
+                    final String code = a['code'] ?? a['account_number'] ?? '';
+                    final String name = a['name'] ?? '';
+                    final String label = code.isNotEmpty ? '$code - $name' : name;
                     return DropdownMenuItem<int>(
                       value: a['id'] as int,
-                      child: Text('${a['account_number']} - ${a['name']}'),
+                      child: Text(label),
                     );
                   }).toList(),
                   onChanged: (val) => setModalState(() => sourceAccountId = val),
