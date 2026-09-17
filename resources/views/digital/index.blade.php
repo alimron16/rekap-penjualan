@@ -8,10 +8,18 @@
     <!-- Top Live Balances & Controls -->
     <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <!-- Saldo Multi Server -->
-        <div class="bg-[#14421b] text-white p-3 rounded-lg border-2 border-slate-200 shadow">
-            <span class="text-[10px] text-green-200 block font-semibold uppercase">SALDO MULTI (MODAL SERVER)</span>
-            <span class="text-xl font-mono font-extrabold text-white/80">Rp {{ number_format($saldoMulti, 0, ',', '.') }}</span>
-            <span class="text-[10px] text-green-300 block">Akun: 1-1131 SALDO MULTI</span>
+        <div class="bg-[#14421b] text-white p-3 rounded-lg border-2 border-slate-200 shadow flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-green-200 block font-semibold uppercase">SALDO MULTI (MODAL SERVER)</span>
+                    <button type="button" onclick="openTopupModal()" class="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-[10px] shadow-xs flex items-center gap-1 transition">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Top Up</span>
+                    </button>
+                </div>
+                <span class="text-xl font-mono font-extrabold text-white mt-1 block">Rp {{ number_format($saldoMulti, 0, ',', '.') }}</span>
+            </div>
+            <span class="text-[10px] text-green-300 block mt-1">Akun: 1-1131 SALDO MULTI</span>
         </div>
 
         <!-- Cash Laci Kasir -->
@@ -226,10 +234,62 @@
     </div>
 
 </div>
+
+<!-- Modal Top Up Saldo Multi Server -->
+<div id="modalTopupMulti" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-[#14421b] text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span>Top Up Saldo Multi (Server Pulsa)</span>
+            </h3>
+            <button onclick="closeTopupModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form action="{{ route('digital.topup') }}" method="POST" class="p-5 space-y-3.5 text-xs">
+            @csrf
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Sumber Rekening / Kas Pembayaran *</label>
+                <select name="source_account_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                    @foreach($cashAccounts as $acc)
+                        <option value="{{ $acc->id }}">{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
+                    @endforeach
+                    @foreach($depositAccounts->where('code', '!=', '1-1131') as $acc)
+                        <option value="{{ $acc->id }}">{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
+                    @endforeach
+                </select>
+                <span class="text-[10px] text-slate-400 mt-1 block">Kas atau Bank ini akan berkurang untuk membeli saldo deposit multi.</span>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nominal Top Up (Rp) *</label>
+                <input type="number" step="1000" min="1000" name="amount" required placeholder="Contoh: 500000" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-slate-900 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Catatan / Keterangan (Opsional)</label>
+                <input type="text" name="notes" placeholder="Top up deposit via transfer BCA / Tunai" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeTopupModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-xs">PROSES TOP UP</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
+    function openTopupModal() {
+        document.getElementById('modalTopupMulti').classList.remove('hidden');
+    }
+
+    function closeTopupModal() {
+        document.getElementById('modalTopupMulti').classList.add('hidden');
+    }
+
     function handleDigitalSelect() {
         const select = document.getElementById('selectDigitalProduct');
         const opt = select.options[select.selectedIndex];

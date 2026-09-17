@@ -439,24 +439,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 16),
 
                           // 3. 3 RINCIAN BREAKDOWN & TARGET PROFIT
-                          if (isTablet)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: _buildCashBreakdownCard()),
-                                const SizedBox(width: 12),
-                                Expanded(child: _buildTargetProfitCard()),
-                                const SizedBox(width: 12),
-                                Expanded(child: _buildDailyTrendCard()),
-                              ],
-                            )
-                          else ...[
-                            _buildCashBreakdownCard(),
-                            const SizedBox(height: 12),
-                            _buildTargetProfitCard(),
-                            const SizedBox(height: 12),
-                            _buildDailyTrendCard(),
-                          ],
+                          () {
+                            final role = (_userData?['role'] ?? '').toString().toLowerCase();
+                            final perms = _userData?['permissions'];
+                            final canViewFinalBalance = role == 'super_admin' ||
+                                (perms is Map && perms['view_final_balance'] == true) ||
+                                (role == 'admin' && (perms == null || perms['view_final_balance'] != false));
+
+                            if (isTablet) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (canViewFinalBalance) ...[
+                                    Expanded(child: _buildCashBreakdownCard()),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  Expanded(child: _buildTargetProfitCard()),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _buildDailyTrendCard()),
+                                ],
+                              );
+                            } else {
+                              return Column(
+                                children: [
+                                  if (canViewFinalBalance) ...[
+                                    _buildCashBreakdownCard(),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  _buildTargetProfitCard(),
+                                  const SizedBox(height: 12),
+                                  _buildDailyTrendCard(),
+                                ],
+                              );
+                            }
+                          }(),
                           const SizedBox(height: 16),
 
                           // 4. TABEL URUTAN PRODUK TERLARIS
@@ -643,8 +659,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final retailCount = Formatters.parseInt(d['retailSalesCount']);
     final grosirCount = Formatters.parseInt(d['grosirSalesCount']);
     final netProfit = Formatters.parseDouble(pl['net_profit']);
+    final bool canViewFinalBalance = () {
+      final role = (_userData?['role'] ?? '').toString().toLowerCase();
+      if (role == 'super_admin') return true;
+      final perms = _userData?['permissions'];
+      if (perms is Map && perms.containsKey('view_final_balance')) {
+        return perms['view_final_balance'] == true;
+      }
+      return role == 'admin';
+    }();
 
-    final kpis = [
+    final List<Map<String, dynamic>> kpis = [
       {
         'title': 'PERSEDIAAN BARANG',
         'value': Formatters.formatRupiah(totalPersediaan),
@@ -672,15 +697,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'iconBg': const Color(0xFFF1F5F9),
         'isDark': false,
       },
-      {
-        'title': 'TOTAL KAS & BANK',
-        'value': Formatters.formatRupiah(totalKasBank),
-        'desc': 'Cash laci, BCA, BRI & saldo multi',
-        'icon': Icons.account_balance_outlined,
-        'iconColor': AppColors.emeraldIcon,
-        'iconBg': AppColors.emeraldLight,
-        'isDark': false,
-      },
+      if (canViewFinalBalance)
+        {
+          'title': 'TOTAL KAS & BANK',
+          'value': Formatters.formatRupiah(totalKasBank),
+          'desc': 'Cash laci, BCA, BRI & saldo multi',
+          'icon': Icons.account_balance_outlined,
+          'iconColor': AppColors.emeraldIcon,
+          'iconBg': AppColors.emeraldLight,
+          'isDark': false,
+        },
       {
         'title': 'TOTAL PENDAPATAN',
         'value': Formatters.formatRupiah(totalPendapatan),
@@ -708,15 +734,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'iconBg': const Color(0xFFF1F5F9),
         'isDark': false,
       },
-      {
-        'title': 'LABA BERSIH REAL-TIME',
-        'value': Formatters.formatRupiah(netProfit),
-        'desc': 'Laba kotor - Biaya operasional',
-        'icon': Icons.monetization_on_outlined,
-        'iconColor': const Color(0xFFA7F3D0),
-        'iconBg': const Color(0x26FFFFFF),
-        'isDark': true,
-      },
+      if (canViewFinalBalance)
+        {
+          'title': 'LABA BERSIH REAL-TIME',
+          'value': Formatters.formatRupiah(netProfit),
+          'desc': 'Laba kotor - Biaya operasional',
+          'icon': Icons.monetization_on_outlined,
+          'iconColor': const Color(0xFFA7F3D0),
+          'iconBg': const Color(0x26FFFFFF),
+          'isDark': true,
+        },
     ];
 
     return GridView.builder(
@@ -1208,88 +1235,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
               accountEmail: Text(_userData?['email'] ?? 'user@pos.moonbyte.my.id'),
             ),
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _drawerItem(Icons.point_of_sale, 'Kasir Eceran (Retail)', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
-                  }),
-                  _drawerItem(Icons.storefront, 'Kasir Grosir', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
-                  }),
-                  _drawerItem(Icons.phone_android, 'Produk Multi / Pulsa', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
-                  }),
-                  const Divider(),
-                  _drawerItem(Icons.storefront, 'Master Cabang / Toko', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const OutletsScreen()));
-                  }),
-                  _drawerItem(Icons.inventory_2, 'Master Data Produk', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
-                  }),
-                  _drawerItem(Icons.people, 'Master Pelanggan', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()));
-                  }),
-                  _drawerItem(Icons.local_shipping, 'Master Supplier', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()));
-                  }),
-                  _drawerItem(Icons.account_tree, 'Bagan Akun (COA)', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
-                  }),
-                  const Divider(),
-                  _drawerItem(Icons.shopping_bag, 'Pembelian & Hutang', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasesScreen()));
-                  }),
-                  _drawerItem(Icons.receipt, 'Piutang Pelanggan', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
-                  }),
-                  _drawerItem(Icons.assignment_return, 'Retur Penjualan', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnsScreen()));
-                  }),
-                  _drawerItem(Icons.tune, 'Penyesuaian Stok (Opname)', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
-                  }),
-                  _drawerItem(Icons.attach_money, 'Kas Masuk & Keluar', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen()));
-                  }),
-                  _drawerItem(Icons.swap_horiz, 'Transfer Antar Akun', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
-                  }),
-                  const Divider(),
-                  _drawerItem(Icons.bar_chart, 'Laporan Keuangan', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
-                  }),
-                  _drawerItem(Icons.manage_accounts, 'Manajemen Pengguna', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersScreen()));
-                  }),
-                  _drawerItem(Icons.settings, 'Pengaturan & Printer', () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                  }),
-                  const Divider(),
-                  // ── LOGOUT ────────────────────────────────────────
-                  ListTile(
-                    leading: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
-                    title: const Text(
-                      'Keluar / Logout',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
-                    ),
+              child: Builder(
+                builder: (context) {
+                  final role = (_userData?['role'] ?? '').toString().toLowerCase();
+                  final perms = _userData?['permissions'] is Map ? Map<String, dynamic>.from(_userData!['permissions']) : <String, dynamic>{};
+                  final bool isSuperAdmin = role == 'super_admin';
+                  final bool isAdmin = role == 'admin';
+
+                  bool hasPerm(String key, {bool defaultAdmin = true, bool defaultFL = false}) {
+                    if (isSuperAdmin) return true;
+                    if (perms.containsKey(key)) return perms[key] == true;
+                    return isAdmin ? defaultAdmin : defaultFL;
+                  }
+
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      if (hasPerm('pos', defaultAdmin: true, defaultFL: true)) ...[
+                        _drawerItem(Icons.point_of_sale, 'Kasir Eceran (Retail)', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
+                        }),
+                        _drawerItem(Icons.storefront, 'Kasir Grosir', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
+                        }),
+                      ],
+                      if (hasPerm('digital', defaultAdmin: true, defaultFL: true))
+                        _drawerItem(Icons.phone_android, 'Produk Multi / Pulsa', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
+                        }),
+                      
+                      if (hasPerm('master') || hasPerm('accounting'))
+                        const Divider(),
+                      if (hasPerm('master')) ...[
+                        _drawerItem(Icons.storefront, 'Master Cabang / Toko', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const OutletsScreen()));
+                        }),
+                        _drawerItem(Icons.inventory_2, 'Master Data Produk', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
+                        }),
+                        _drawerItem(Icons.people, 'Master Pelanggan', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()));
+                        }),
+                        _drawerItem(Icons.local_shipping, 'Master Supplier', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()));
+                        }),
+                      ],
+                      if (hasPerm('accounting'))
+                        _drawerItem(Icons.account_tree, 'Bagan Akun (COA)', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
+                        }),
+                      
+                      if (hasPerm('purchase')) ...[
+                        const Divider(),
+                        _drawerItem(Icons.shopping_bag, 'Pembelian & Hutang', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasesScreen()));
+                        }),
+                        _drawerItem(Icons.receipt, 'Piutang Pelanggan', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
+                        }),
+                      ],
+
+                      const Divider(),
+                      _drawerItem(Icons.assignment_return, 'Retur Penjualan', () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnsScreen()));
+                      }),
+                      if (hasPerm('master'))
+                        _drawerItem(Icons.tune, 'Penyesuaian Stok (Opname)', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
+                        }),
+                      if (hasPerm('accounting'))
+                        _drawerItem(Icons.attach_money, 'Kas Masuk & Keluar', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen()));
+                        }),
+                      if (hasPerm('transfer', defaultAdmin: true, defaultFL: true))
+                        _drawerItem(Icons.swap_horiz, 'Transfer Antar Akun', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
+                        }),
+
+                      if (hasPerm('reports') || isSuperAdmin || hasPerm('settings'))
+                        const Divider(),
+                      if (hasPerm('reports'))
+                        _drawerItem(Icons.bar_chart, 'Laporan Keuangan', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
+                        }),
+                      if (isSuperAdmin || hasPerm('users', defaultAdmin: false, defaultFL: false))
+                        _drawerItem(Icons.manage_accounts, 'Manajemen Pengguna', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersScreen()));
+                        }),
+                      if (hasPerm('settings'))
+                        _drawerItem(Icons.settings, 'Pengaturan & Printer', () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                        }),
+                      const Divider(),
+                      // ── LOGOUT ────────────────────────────────────────
+                      ListTile(
+                        leading: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                        title: const Text(
+                          'Keluar / Logout',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
+                        ),
                     dense: true,
                     onTap: () async {
                       final confirmed = await showDialog<bool>(
@@ -1332,12 +1393,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
-      ),
-    );
+      ],
+    ),
+  ),
+);
   }
 
   Widget _drawerItem(IconData icon, String title, VoidCallback onTap) {

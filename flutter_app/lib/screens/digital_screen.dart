@@ -153,6 +153,131 @@ class _DigitalScreenState extends State<DigitalScreen> {
     }
   }
 
+  void _showTopupModal() {
+    final amountController = TextEditingController();
+    final notesController = TextEditingController(text: 'Top Up Deposit Server Multi');
+    int? sourceAccountId = _cashAccounts.isNotEmpty ? _cashAccounts[0]['id'] : null;
+    bool isProcessing = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.add_card, color: Color(0xFF0F766E), size: 22),
+                        SizedBox(width: 8),
+                        Text('Top Up Saldo Multi Server', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(height: 12),
+                const SizedBox(height: 8),
+                const Text('Sumber Kas / Bank Pembayaran', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<int>(
+                  value: sourceAccountId,
+                  decoration: const InputDecoration(),
+                  items: _cashAccounts.map<DropdownMenuItem<int>>((a) {
+                    return DropdownMenuItem<int>(
+                      value: a['id'] as int,
+                      child: Text('${a['account_number']} - ${a['name']}'),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setModalState(() => sourceAccountId = val),
+                ),
+                const SizedBox(height: 14),
+                const Text('Nominal Top Up (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: 'Contoh: 500000',
+                    prefixText: 'Rp ',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Catatan / Referensi (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(hintText: 'Misal: Transfer BCA ke Digipos'),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isProcessing
+                        ? null
+                        : () async {
+                            final double amount = Formatters.parseDouble(amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+                            if (sourceAccountId == null || amount <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Pilih sumber kas dan masukkan nominal valid'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+                            setModalState(() => isProcessing = true);
+                            final res = await ApiService.topupMulti(
+                              sourceAccountId: sourceAccountId!,
+                              amount: amount,
+                              notes: notesController.text.trim(),
+                            );
+                            if (res['success'] == true) {
+                              Navigator.pop(ctx);
+                              _loadDigitalData();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Top up saldo multi berhasil!'), backgroundColor: ThemeConfig.accent),
+                              );
+                            } else {
+                              setModalState(() => isProcessing = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Gagal top up saldo multi'), backgroundColor: Colors.red),
+                              );
+                            }
+                          },
+                    child: isProcessing
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Konfirmasi Tambah Saldo', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showDigitalReceiptModal(Map<String, dynamic> digitalSale) {
     final trxNo = digitalSale['transaction_number'] ?? 'PE-NOTA';
     final date = DateTime.now();
@@ -380,18 +505,29 @@ class _DigitalScreenState extends State<DigitalScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Column(
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Saldo Deposit Server Multi', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                SizedBox(height: 4),
-                                Text('Ready to Topup', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                const Text('Saldo Deposit Server Multi', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  Formatters.formatRupiah(_saldoMulti),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                                ),
                               ],
                             ),
-                            Text(
-                              Formatters.formatRupiah(_saldoMulti),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                            )
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF0F766E),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.add_circle, size: 16),
+                              label: const Text('Top Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              onPressed: _showTopupModal,
+                            ),
                           ],
                         ),
                       ),

@@ -83,6 +83,23 @@ class _UsersScreenState extends State<UsersScreen> {
     int? selectedOutletId;
     bool isSubmitting = false;
 
+    final Map<String, bool> permissions = {
+      'pos': true,
+      'digital': true,
+      'cash_withdrawal': true,
+      'transfer': true,
+      'master': false,
+      'edit_stock': false,
+      'multi_topup': false,
+      'purchase': false,
+      'accounting': false,
+      'manage_modal': false,
+      'view_final_balance': false,
+      'reports': false,
+      'settings': false,
+      'users': false,
+    };
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -134,7 +151,19 @@ class _UsersScreenState extends State<UsersScreen> {
                     DropdownMenuItem(value: 'admin', child: Text('Administrator')),
                     DropdownMenuItem(value: 'super_admin', child: Text('Super Admin / Pemilik')),
                   ],
-                  onChanged: (val) => setModalState(() => role = val!),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setModalState(() {
+                      role = val;
+                      if (role == 'super_admin') {
+                        permissions.updateAll((k, v) => true);
+                      } else if (role == 'admin') {
+                        permissions.updateAll((k, v) => k != 'users');
+                      } else {
+                        permissions.updateAll((k, v) => ['pos', 'digital', 'cash_withdrawal', 'transfer'].contains(k));
+                      }
+                    });
+                  },
                 ),
                 const SizedBox(height: 14),
                 const Text('Penugasan Cabang Toko / Outlet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -174,6 +203,38 @@ class _UsersScreenState extends State<UsersScreen> {
                 const Text('Nomor HP (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08...')),
+                const SizedBox(height: 16),
+                
+                // Granular Permissions Checklist
+                const Text('Pengaturan Hak Akses Fitur / Modul', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ThemeConfig.primary)),
+                const SizedBox(height: 4),
+                const Text('Super Admin dapat mengatur hak akses tiap user secara fleksibel:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPermSwitch('Kasir POS (Retail & Grosir)', 'pos', permissions, setModalState),
+                      _buildPermSwitch('Produk Multi / Elektrik', 'digital', permissions, setModalState),
+                      _buildPermSwitch('Tarik Tunai Kasir', 'cash_withdrawal', permissions, setModalState),
+                      _buildPermSwitch('Transfer Agen & Bank', 'transfer', permissions, setModalState),
+                      _buildPermSwitch('Master Data (Barang, Pelanggan, Supplier)', 'master', permissions, setModalState),
+                      _buildPermSwitch('Edit Angka Stok Fisik Barang', 'edit_stock', permissions, setModalState),
+                      _buildPermSwitch('Top Up Saldo Multi Server', 'multi_topup', permissions, setModalState),
+                      _buildPermSwitch('Menu Pembelian', 'purchase', permissions, setModalState),
+                      _buildPermSwitch('Akuntansi & Bagan Akun (COA)', 'accounting', permissions, setModalState),
+                      _buildPermSwitch('Kelola Modal Awal Kas', 'manage_modal', permissions, setModalState),
+                      _buildPermSwitch('Lihat Saldo Akhir & Laba Bersih di Dashboard', 'view_final_balance', permissions, setModalState),
+                      _buildPermSwitch('Laporan Keuangan', 'reports', permissions, setModalState),
+                      _buildPermSwitch('Pengaturan Toko & Printer', 'settings', permissions, setModalState),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -198,6 +259,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               'outlet_id': selectedOutletId,
                               'store_name': storeNameController.text.trim(),
                               'phone': phoneController.text.trim(),
+                              'permissions': permissions,
                             });
 
                             if (res['success'] == true) {
@@ -240,6 +302,29 @@ class _UsersScreenState extends State<UsersScreen> {
     String role = user['role'] ?? 'toko';
     int? selectedOutletId = user['outlet_id'];
     bool isSubmitting = false;
+
+    // Load existing permissions or defaults
+    Map<String, dynamic> rawPerms = {};
+    if (user['permissions'] is Map) {
+      rawPerms = Map<String, dynamic>.from(user['permissions']);
+    }
+
+    final Map<String, bool> permissions = {
+      'pos': rawPerms['pos'] ?? (role == 'super_admin' || role == 'admin' || role == 'toko'),
+      'digital': rawPerms['digital'] ?? (role == 'super_admin' || role == 'admin' || role == 'toko'),
+      'cash_withdrawal': rawPerms['cash_withdrawal'] ?? (role == 'super_admin' || role == 'admin' || role == 'toko'),
+      'transfer': rawPerms['transfer'] ?? (role == 'super_admin' || role == 'admin' || role == 'toko'),
+      'master': rawPerms['master'] ?? (role == 'super_admin' || role == 'admin'),
+      'edit_stock': rawPerms['edit_stock'] ?? (role == 'super_admin' || role == 'admin'),
+      'multi_topup': rawPerms['multi_topup'] ?? (role == 'super_admin' || role == 'admin'),
+      'purchase': rawPerms['purchase'] ?? (role == 'super_admin' || role == 'admin'),
+      'accounting': rawPerms['accounting'] ?? (role == 'super_admin' || role == 'admin'),
+      'manage_modal': rawPerms['manage_modal'] ?? (role == 'super_admin' || role == 'admin'),
+      'view_final_balance': rawPerms['view_final_balance'] ?? (role == 'super_admin' || role == 'admin'),
+      'reports': rawPerms['reports'] ?? (role == 'super_admin' || role == 'admin'),
+      'settings': rawPerms['settings'] ?? (role == 'super_admin' || role == 'admin'),
+      'users': rawPerms['users'] ?? (role == 'super_admin'),
+    };
 
     showModalBottomSheet(
       context: context,
@@ -292,7 +377,19 @@ class _UsersScreenState extends State<UsersScreen> {
                     DropdownMenuItem(value: 'admin', child: Text('Administrator')),
                     DropdownMenuItem(value: 'super_admin', child: Text('Super Admin / Pemilik')),
                   ],
-                  onChanged: (val) => setModalState(() => role = val!),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setModalState(() {
+                      role = val;
+                      if (role == 'super_admin') {
+                        permissions.updateAll((k, v) => true);
+                      } else if (role == 'admin') {
+                        permissions.updateAll((k, v) => k != 'users');
+                      } else {
+                        permissions.updateAll((k, v) => ['pos', 'digital', 'cash_withdrawal', 'transfer'].contains(k));
+                      }
+                    });
+                  },
                 ),
                 const SizedBox(height: 14),
                 const Text('Penugasan Cabang Toko / Outlet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -332,6 +429,39 @@ class _UsersScreenState extends State<UsersScreen> {
                 const Text('Nomor HP', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08...')),
+                const SizedBox(height: 16),
+
+                // Granular Permissions Checklist
+                const Text('Pengaturan Hak Akses Fitur / Modul', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ThemeConfig.primary)),
+                const SizedBox(height: 4),
+                const Text('Super Admin dapat mengatur hak akses tiap user secara fleksibel:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildPermSwitch('Kasir POS (Retail & Grosir)', 'pos', permissions, setModalState),
+                      _buildPermSwitch('Produk Multi / Elektrik', 'digital', permissions, setModalState),
+                      _buildPermSwitch('Tarik Tunai Kasir', 'cash_withdrawal', permissions, setModalState),
+                      _buildPermSwitch('Transfer Agen & Bank', 'transfer', permissions, setModalState),
+                      _buildPermSwitch('Master Data (Barang, Pelanggan, Supplier)', 'master', permissions, setModalState),
+                      _buildPermSwitch('Edit Angka Stok Fisik Barang', 'edit_stock', permissions, setModalState),
+                      _buildPermSwitch('Top Up Saldo Multi Server', 'multi_topup', permissions, setModalState),
+                      _buildPermSwitch('Menu Pembelian', 'purchase', permissions, setModalState),
+                      _buildPermSwitch('Akuntansi & Bagan Akun (COA)', 'accounting', permissions, setModalState),
+                      _buildPermSwitch('Kelola Modal Awal Kas', 'manage_modal', permissions, setModalState),
+                      _buildPermSwitch('Lihat Saldo Akhir & Laba Bersih di Dashboard', 'view_final_balance', permissions, setModalState),
+                      _buildPermSwitch('Laporan Keuangan', 'reports', permissions, setModalState),
+                      _buildPermSwitch('Pengaturan Toko & Printer', 'settings', permissions, setModalState),
+                      _buildPermSwitch('Kelola Pengguna Sistem', 'users', permissions, setModalState),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -355,6 +485,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               'outlet_id': selectedOutletId,
                               'store_name': storeNameController.text.trim(),
                               'phone': phoneController.text.trim(),
+                              'permissions': permissions,
                             };
                             if (passwordController.text.trim().isNotEmpty) {
                               payload['password'] = passwordController.text.trim();
@@ -732,6 +863,35 @@ class _UsersScreenState extends State<UsersScreen> {
           setState(() => _roleFilter = roleVal);
         }
       },
+    );
+  }
+
+  Widget _buildPermSwitch(String label, String key, Map<String, bool> perms, StateSetter setModalState) {
+    final val = perms[key] ?? false;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12, fontWeight: val ? FontWeight.w600 : FontWeight.normal, color: val ? ThemeConfig.textDark : Colors.grey.shade600),
+            ),
+          ),
+          Transform.scale(
+            scale: 0.8,
+            child: Switch(
+              value: val,
+              activeColor: ThemeConfig.primary,
+              onChanged: (bool newVal) {
+                setModalState(() {
+                  perms[key] = newVal;
+                });
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

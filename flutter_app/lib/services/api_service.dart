@@ -401,7 +401,30 @@ class ApiService {
     );
   }
 
-  // --- Digital / Pulsa ---
+  // --- Tarik Tunai Kasir POS ---
+  static Future<Map<String, dynamic>> withdrawPos({
+    required int sourceAccountId,
+    required double amount,
+    double adminFee = 0,
+    String? customerName,
+    String? customerPhone,
+    String? notes,
+  }) async {
+    return await _post(
+      '$baseUrl/pos/withdraw',
+      {
+        'source_account_id': sourceAccountId,
+        'amount': amount,
+        'admin_fee': adminFee,
+        'customer_name': customerName,
+        'customer_phone': customerPhone,
+        'notes': notes,
+      },
+      timeout: const Duration(seconds: 20),
+    );
+  }
+
+  // --- Digital / Pulsa & Top Up Saldo Multi ---
   static Future<Map<String, dynamic>> getDigitalData() async {
     return await _get('$baseUrl/digital/data');
   }
@@ -424,6 +447,22 @@ class ApiService {
         'cash_account_id': cashAccountId,
         'selling_price': sellingPrice,
         'hpp': hpp,
+        'notes': notes,
+      },
+      timeout: const Duration(seconds: 20),
+    );
+  }
+
+  static Future<Map<String, dynamic>> topupMulti({
+    required int sourceAccountId,
+    required double amount,
+    String? notes,
+  }) async {
+    return await _post(
+      '$baseUrl/digital/topup',
+      {
+        'source_account_id': sourceAccountId,
+        'amount': amount,
         'notes': notes,
       },
       timeout: const Duration(seconds: 20),

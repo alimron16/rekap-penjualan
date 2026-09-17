@@ -949,6 +949,177 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  void _showWithdrawModal() {
+    final amountController = TextEditingController();
+    final adminFeeController = TextEditingController(text: '0');
+    final customerNameController = TextEditingController();
+    final customerPhoneController = TextEditingController();
+    final notesController = TextEditingController();
+    int? sourceAccountId = _accounts.isNotEmpty ? _accounts[0]['id'] : null;
+    bool isProcessing = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.payments_outlined, color: Colors.amber, size: 24),
+                        SizedBox(width: 8),
+                        Text('Tarik Tunai Kasir POS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(height: 12),
+                const SizedBox(height: 8),
+                const Text('Sumber Kas Pengambilan Uang Fisik', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<int>(
+                  value: sourceAccountId,
+                  decoration: const InputDecoration(),
+                  items: _accounts.map<DropdownMenuItem<int>>((a) {
+                    return DropdownMenuItem<int>(
+                      value: a['id'] as int,
+                      child: Text('${a['account_number']} - ${a['name']}'),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setModalState(() => sourceAccountId = val),
+                ),
+                const SizedBox(height: 14),
+                const Text('Nominal Uang Tunai Ditarik (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: 'Contoh: 100000',
+                    prefixText: 'Rp ',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Biaya Admin / Jasa Transfer (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: adminFeeController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    hintText: '0',
+                    prefixText: 'Rp ',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Nama Pelanggan (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(height: 6),
+                          TextField(controller: customerNameController, decoration: const InputDecoration(hintText: 'Nama')),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('No. HP / WA (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(height: 6),
+                          TextField(controller: customerPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: '08...')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text('Catatan Tambahan (Opsional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(controller: notesController, decoration: const InputDecoration(hintText: 'Keterangan transaksi')),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.shade800,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isProcessing
+                        ? null
+                        : () async {
+                            final double amount = Formatters.parseDouble(amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+                            final double adminFee = Formatters.parseDouble(adminFeeController.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+                            if (sourceAccountId == null || amount <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Pilih sumber kas dan masukkan jumlah penarikan valid'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+                            setModalState(() => isProcessing = true);
+                            final res = await ApiService.withdrawPos(
+                              sourceAccountId: sourceAccountId!,
+                              amount: amount,
+                              adminFee: adminFee,
+                              customerName: customerNameController.text.trim(),
+                              customerPhone: customerPhoneController.text.trim(),
+                              notes: notesController.text.trim(),
+                            );
+                            if (res['success'] == true) {
+                              Navigator.pop(ctx);
+                              _loadPosData();
+                              NotificationService.showNotification(
+                                id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                                title: '💵 Tarik Tunai Berhasil! 🧾',
+                                body: 'Penarikan uang tunai ${Formatters.formatRupiah(amount)} sukses dibukukan.',
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Tarik tunai berhasil diproses!'), backgroundColor: ThemeConfig.accent),
+                              );
+                            } else {
+                              setModalState(() => isProcessing = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(res['message'] ?? 'Gagal memproses tarik tunai'), backgroundColor: Colors.red),
+                              );
+                            }
+                          },
+                    child: isProcessing
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Proses Penarikan Tunai', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = widget.saleType == 'grosir' ? 'Kasir Penjualan Grosir' : 'Kasir Penjualan Retail (Eceran)';
@@ -959,6 +1130,15 @@ class _PosScreenState extends State<PosScreen> {
         title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         backgroundColor: ThemeConfig.primary,
         actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.amber.shade200,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+            ),
+            icon: const Icon(Icons.payments_outlined, size: 18),
+            label: const Text('Tarik Tunai', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            onPressed: _showWithdrawModal,
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadPosData),
         ],
       ),

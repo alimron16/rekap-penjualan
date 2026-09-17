@@ -64,11 +64,17 @@ class UserController extends Controller
         }
 
         $permissions = [
-            'master' => isset($request->permissions['master']),
-            'purchase' => isset($request->permissions['purchase']),
             'pos' => isset($request->permissions['pos']),
+            'digital' => isset($request->permissions['digital']),
+            'cash_withdrawal' => isset($request->permissions['cash_withdrawal']),
             'transfer' => isset($request->permissions['transfer']),
+            'master' => isset($request->permissions['master']),
+            'edit_stock' => isset($request->permissions['edit_stock']),
+            'multi_topup' => isset($request->permissions['multi_topup']),
+            'purchase' => isset($request->permissions['purchase']),
             'accounting' => isset($request->permissions['accounting']),
+            'manage_modal' => isset($request->permissions['manage_modal']),
+            'view_final_balance' => isset($request->permissions['view_final_balance']),
             'reports' => isset($request->permissions['reports']),
             'settings' => isset($request->permissions['settings']),
             'users' => isset($request->permissions['users']),
@@ -125,11 +131,17 @@ class UserController extends Controller
         }
 
         $permissions = [
-            'master' => isset($request->permissions['master']),
-            'purchase' => isset($request->permissions['purchase']),
             'pos' => isset($request->permissions['pos']),
+            'digital' => isset($request->permissions['digital']),
+            'cash_withdrawal' => isset($request->permissions['cash_withdrawal']),
             'transfer' => isset($request->permissions['transfer']),
+            'master' => isset($request->permissions['master']),
+            'edit_stock' => isset($request->permissions['edit_stock']),
+            'multi_topup' => isset($request->permissions['multi_topup']),
+            'purchase' => isset($request->permissions['purchase']),
             'accounting' => isset($request->permissions['accounting']),
+            'manage_modal' => isset($request->permissions['manage_modal']),
+            'view_final_balance' => isset($request->permissions['view_final_balance']),
             'reports' => isset($request->permissions['reports']),
             'settings' => isset($request->permissions['settings']),
             'users' => isset($request->permissions['users']),

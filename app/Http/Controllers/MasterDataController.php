@@ -119,6 +119,12 @@ class MasterDataController extends Controller
             $data['wholesale_price'] = $data['retail_price'];
         }
 
+        // Hak akses edit stok: Jika role toko atau tidak memiliki permission edit_stock, abaikan perubahan angka stok fisik
+        $user = auth()->user();
+        if ($user && (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko()))) {
+            $data['stock'] = $product->stock;
+        }
+
         $product->update($data);
 
         return redirect()->route('master.items')->with('success', "Item [{$product->name}] berhasil diperbarui!");

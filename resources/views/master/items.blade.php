@@ -431,8 +431,14 @@
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">Stok Fisik *</label>
-                    <input type="number" step="any" name="stock" id="edit_item_stock" required min="0" class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        Stok Fisik *
+                        @if(auth()->check() && (auth()->user()->isToko() || !auth()->user()->hasPermission('edit_stock')))
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="any" name="stock" id="edit_item_stock" required min="0" 
+                           @if(auth()->check() && (auth()->user()->isToko() || !auth()->user()->hasPermission('edit_stock'))) readonly class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600" @endif>
                 </div>
                 <div>
                     <label class="font-bold text-slate-700 block mb-1">Stok Minimum Peringatan</label>

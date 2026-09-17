@@ -111,6 +111,7 @@
         </div>
 
         <!-- 4. Total Kas & Bank -->
+        @if(!auth()->check() || auth()->user()->hasPermission('view_final_balance'))
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between">
                 <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Kas & Bank</p>
@@ -121,6 +122,7 @@
             <p class="text-xl font-extrabold font-mono mt-2 text-emerald-800">Rp {{ number_format($totalKasBank, 0, ',', '.') }}</p>
             <span class="text-[11px] text-slate-400 mt-1">Cash laci, BCA, BRI & saldo multi</span>
         </div>
+        @endif
 
         <!-- 5. Total Pendapatan -->
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
@@ -159,6 +161,7 @@
         </div>
 
         <!-- 8. Laba Bersih Real-Time -->
+        @if(!auth()->check() || auth()->user()->hasPermission('view_final_balance'))
         <div class="bg-[#133e1c] text-white p-4 rounded-xl border border-emerald-800 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between">
                 <p class="text-[11px] font-bold text-emerald-200 uppercase tracking-wider">Laba Bersih Real-Time</p>
@@ -171,12 +174,14 @@
             </p>
             <span class="text-[11px] text-emerald-300/80 mt-1">Laba kotor - Biaya operasional</span>
         </div>
+        @endif
     </div>
 
     <!-- 3 RINCIAN BREAKDOWN & TARGET PROFIT GAUGE -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
         
         <!-- Kolom Kiri: Rincian Akun & Arus Kas -->
+        @if(!auth()->check() || auth()->user()->hasPermission('view_final_balance'))
         <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-xs space-y-3">
             <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200 flex items-center justify-between">
                 <span class="flex items-center gap-1.5">
@@ -223,6 +228,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- Kolom Tengah: Realisasi Target Profit -->
         <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-xs flex flex-col justify-between">

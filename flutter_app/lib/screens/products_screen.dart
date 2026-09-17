@@ -35,6 +35,9 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   final _searchItemController = TextEditingController();
   final _searchMultiController = TextEditingController();
 
+  Map<String, dynamic>? _currentUser;
+  bool _canEditStock = true;
+
   @override
   void initState() {
     super.initState();
@@ -45,8 +48,29 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
       }
     });
 
+    _loadUser();
     _loadItems();
     _loadMultiProducts();
+  }
+
+  void _loadUser() async {
+    final user = await ApiService.getUser();
+    if (user != null && mounted) {
+      setState(() {
+        _currentUser = user;
+        final role = (user['role'] ?? '').toString().toLowerCase();
+        if (role == 'super_admin') {
+          _canEditStock = true;
+        } else {
+          final perms = user['permissions'];
+          if (perms is Map && perms.containsKey('edit_stock')) {
+            _canEditStock = perms['edit_stock'] == true;
+          } else {
+            _canEditStock = role == 'admin';
+          }
+        }
+      });
+    }
   }
 
   @override
@@ -300,9 +324,28 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Stok Sekarang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Row(
+                            children: [
+                              const Text('Stok Sekarang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              if (!_canEditStock) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.lock_outline, size: 13, color: Colors.grey),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 4),
-                          TextField(controller: stockController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(
+                            controller: stockController,
+                            keyboardType: TextInputType.number,
+                            enabled: _canEditStock,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              filled: !_canEditStock,
+                              fillColor: !_canEditStock ? Colors.grey.shade100 : null,
+                              helperText: !_canEditStock ? 'Hanya Admin yg dapat mengubah stok' : null,
+                              helperStyle: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ),
                         ],
                       ),
                     ),

@@ -20,6 +20,10 @@
         </div>
 
         <div class="flex items-center gap-2 self-end md:self-auto w-full md:w-auto">
+            <button type="button" onclick="openWithdrawModal()" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Tarik Tunai</span>
+            </button>
             <span class="text-xs font-semibold text-slate-600 whitespace-nowrap">Pelanggan:</span>
             <select id="posCustomerSelect" class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white w-full md:w-48 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
                 @foreach($customers as $c)
@@ -490,5 +494,118 @@
             alert('Error transaksi: ' + err.message);
         });
     }
+
+    // Modal Tarik Tunai
+    function openWithdrawModal() {
+        document.getElementById('modalWithdrawPos').classList.remove('hidden');
+    }
+
+    function closeWithdrawModal() {
+        document.getElementById('modalWithdrawPos').classList.add('hidden');
+    }
+
+    function submitWithdrawPos(e) {
+        e.preventDefault();
+        const sourceAccountId = document.getElementById('withdrawSourceAccount').value;
+        const amount = parseFloat(document.getElementById('withdrawAmount').value || 0);
+        const adminFee = parseFloat(document.getElementById('withdrawAdminFee').value || 0);
+        const customerName = document.getElementById('withdrawCustomerName').value || 'Pelanggan';
+        const notes = document.getElementById('withdrawNotes').value || '';
+
+        if (amount < 1000) {
+            alert('Nominal tarik tunai minimal Rp 1.000');
+            return;
+        }
+
+        const btn = document.getElementById('btnSubmitWithdraw');
+        btn.disabled = true;
+        btn.innerText = 'Memproses...';
+
+        fetch("{{ route('pos.withdraw') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                source_account_id: sourceAccountId,
+                amount: amount,
+                admin_fee: adminFee,
+                customer_name: customerName,
+                notes: notes
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerText = 'PROSES TARIK TUNAI';
+            if (data.success) {
+                alert(data.message);
+                closeWithdrawModal();
+                window.location.reload();
+            } else {
+                alert('Gagal: ' + (data.message || 'Terjadi kesalahan'));
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerText = 'PROSES TARIK TUNAI';
+            alert('Error: ' + err.message);
+        });
+    }
 </script>
+
+<!-- Modal Tarik Tunai di Kasir POS -->
+<div id="modalWithdrawPos" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-amber-600 text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Tarik Tunai di Kasir (POS)</span>
+            </h3>
+            <button onclick="closeWithdrawModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form onsubmit="submitWithdrawPos(event)" class="p-5 space-y-3.5 text-xs">
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Sumber Kas Uang Keluar (Diberikan ke Nasabah) *</label>
+                <select id="withdrawSourceAccount" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    @foreach($accounts as $acc)
+                        <option value="{{ $acc->id }}" {{ $acc->code === '1-1110' ? 'selected' : '' }}>
+                            {{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})
+                        </option>
+                    @endforeach
+                </select>
+                <span class="text-[10px] text-slate-400 mt-1 block">Pilih kas laci atau rekening yang uang fisiknya Anda keluarkan untuk nasabah.</span>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nama Nasabah / Pelanggan *</label>
+                <input type="text" id="withdrawCustomerName" placeholder="Contoh: Budi Santoso" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none font-medium">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Nominal Tarik Tunai (Rp) *</label>
+                    <input type="number" id="withdrawAmount" step="1000" min="1000" placeholder="500000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-slate-900 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Biaya Admin / Fee (Rp)</label>
+                    <input type="number" id="withdrawAdminFee" step="500" min="0" value="5000" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-emerald-700 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Catatan Tambahan (Opsional)</label>
+                <input type="text" id="withdrawNotes" placeholder="No referensi transfer / catatan bank" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeWithdrawModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" id="btnSubmitWithdraw" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs">PROSES TARIK TUNAI</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endpush

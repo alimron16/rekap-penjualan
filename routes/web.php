@@ -98,12 +98,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/retail', [PosController::class, 'retail'])->name('retail');
         Route::get('/wholesale', [PosController::class, 'wholesale'])->name('wholesale');
         Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
+        Route::post('/withdraw', [PosController::class, 'withdraw'])->name('withdraw');
     });
 
     // Penjualan Pulsa & PPOB (Digital)
     Route::prefix('digital')->name('digital.')->group(function () {
         Route::get('/', [DigitalSaleController::class, 'index'])->name('index');
         Route::post('/', [DigitalSaleController::class, 'store'])->name('store');
+        Route::post('/topup', [DigitalSaleController::class, 'topupMulti'])->name('topup');
+        Route::post('/{digitalSale}/reverse', [DigitalSaleController::class, 'reverse'])->name('reverse');
     });
 
     // Transfer Agen & Bank (Approval & Bukti Transfer)

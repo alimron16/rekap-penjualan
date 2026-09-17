@@ -42,10 +42,12 @@ Route::post('/outlets/{id}/toggle-status', [MobileApiController::class, 'toggleO
 // 2. POS Kasir
 Route::get('/pos/data', [MobileApiController::class, 'posData']);
 Route::post('/pos/checkout', [MobileApiController::class, 'posCheckout']);
+Route::post('/pos/withdraw', [MobileApiController::class, 'posWithdraw']);
 
 // 3. Digital / Pulsa
 Route::get('/digital/data', [MobileApiController::class, 'digitalData']);
 Route::post('/digital/checkout', [MobileApiController::class, 'digitalCheckout']);
+Route::post('/digital/topup', [MobileApiController::class, 'topupMulti']);
 
 // 4. Piutang & Retur
 Route::get('/receivables', [MobileApiController::class, 'receivables']);

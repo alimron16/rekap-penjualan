@@ -391,6 +391,11 @@ class MobileApiController extends Controller
             Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
         }
 
+        // FL Toko cannot edit stock physical quantity unless granted permission
+        if (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko())) {
+            $data['stock'] = $product->stock;
+        }
+
         $product->update($data);
         return response()->json(['success' => true, 'message' => "Item [{$product->name}] berhasil diperbarui!", 'data' => $product]);
     }
@@ -851,6 +856,93 @@ class MobileApiController extends Controller
                 'message' => 'Transaksi Pulsa / Elektrik berhasil!',
                 'digital_sale' => $digitalSale,
                 'setting' => StoreSetting::first(),
+            ]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function posWithdraw(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'source_account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:1000',
+            'admin_fee' => 'nullable|numeric|min:0',
+            'customer_name' => 'nullable|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        $fee = (float) ($data['admin_fee'] ?? 0);
+        $amount = (float) $data['amount'];
+        $customerName = $data['customer_name'] ?? 'Pelanggan';
+
+        $bankAcc = Account::where('code', '1-1113')->first() // default SALDO BCA
+            ?: Account::where('code', '1-1111')->first() // CASH TRANSFER
+            ?: Account::find($data['source_account_id']);
+
+        try {
+            $trxNumber = $this->posService->generateTransactionNumber('TT');
+
+            $trx = CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => 'TRANSFER',
+                'date' => now(),
+                'debit_account_id' => $bankAcc->id,
+                'credit_account_id' => $data['source_account_id'],
+                'amount' => $amount,
+                'admin_fee' => $fee,
+                'notes' => "Tarik Tunai [{$customerName}] - " . ($data['notes'] ?? 'POS Mobile'),
+            ]);
+
+            $this->accountingService->recordCashTransaction($trx);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tarik Tunai Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!',
+                'transaction' => $trx,
+                'setting' => StoreSetting::first(),
+            ]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function topupMulti(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'source_account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:1000',
+            'notes' => 'nullable|string',
+        ]);
+
+        $multiAccount = Account::where('code', '1-1131')->firstOrFail();
+
+        try {
+            $trxNumber = $this->posService->generateTransactionNumber('TP');
+
+            $trx = CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => 'OUT',
+                'date' => now(),
+                'debit_account_id' => $multiAccount->id,
+                'credit_account_id' => $data['source_account_id'],
+                'amount' => $data['amount'],
+                'admin_fee' => 0,
+                'notes' => $data['notes'] ?? 'Top Up Saldo Multi Server',
+            ]);
+
+            $this->accountingService->recordCashTransaction($trx);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Top Up Saldo Multi sebesar Rp ' . number_format($data['amount'], 0, ',', '.') . ' berhasil!',
+                'transaction' => $trx,
             ]);
         } catch (Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -1602,7 +1694,43 @@ class MobileApiController extends Controller
             'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
+            'permissions' => 'nullable',
         ]);
+
+        $perms = is_array($request->permissions) ? $request->permissions : (is_string($request->permissions) ? json_decode($request->permissions, true) : []);
+        if (empty($perms)) {
+            $perms = $validated['role'] === 'toko' ? [
+                'pos' => true,
+                'digital' => true,
+                'cash_withdrawal' => true,
+                'transfer' => true,
+                'master' => false,
+                'edit_stock' => false,
+                'multi_topup' => false,
+                'purchase' => false,
+                'accounting' => false,
+                'manage_modal' => false,
+                'view_final_balance' => false,
+                'reports' => false,
+                'settings' => false,
+                'users' => false,
+            ] : [
+                'pos' => true,
+                'digital' => true,
+                'cash_withdrawal' => true,
+                'transfer' => true,
+                'master' => true,
+                'edit_stock' => true,
+                'multi_topup' => true,
+                'purchase' => true,
+                'accounting' => true,
+                'manage_modal' => true,
+                'view_final_balance' => true,
+                'reports' => true,
+                'settings' => true,
+                'users' => $validated['role'] === 'super_admin',
+            ];
+        }
 
         $newUser = User::create([
             'name' => $validated['name'],
@@ -1613,16 +1741,7 @@ class MobileApiController extends Controller
             'store_name' => $validated['store_name'],
             'phone' => $validated['phone'],
             'is_active' => true,
-            'permissions' => [
-                'master' => true,
-                'purchase' => true,
-                'pos' => true,
-                'transfer' => true,
-                'accounting' => true,
-                'reports' => true,
-                'settings' => true,
-                'users' => true,
-            ],
+            'permissions' => $perms,
         ]);
 
         return response()->json(['success' => true, 'message' => 'Pengguna berhasil dibuat!', 'data' => $newUser->load('outlet')]);
@@ -1642,6 +1761,7 @@ class MobileApiController extends Controller
             'outlet_id' => 'nullable|exists:outlets,id',
             'store_name' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:30',
+            'permissions' => 'nullable',
         ]);
 
         $targetUser->name = $validated['name'];
@@ -1653,6 +1773,14 @@ class MobileApiController extends Controller
         $targetUser->outlet_id = $validated['outlet_id'] ?? null;
         $targetUser->store_name = $validated['store_name'];
         $targetUser->phone = $validated['phone'];
+
+        if ($request->has('permissions')) {
+            $perms = is_array($request->permissions) ? $request->permissions : (is_string($request->permissions) ? json_decode($request->permissions, true) : null);
+            if ($perms !== null) {
+                $targetUser->permissions = $perms;
+            }
+        }
+
         $targetUser->save();
 
         return response()->json(['success' => true, 'message' => "Pengguna [{$targetUser->name}] berhasil diperbarui!", 'data' => $targetUser->load('outlet')]);

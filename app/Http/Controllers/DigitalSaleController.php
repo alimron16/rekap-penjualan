@@ -73,4 +73,36 @@ class DigitalSaleController extends Controller
             return redirect()->route('digital.index')->with('error', $e->getMessage());
         }
     }
+
+    public function topupMulti(Request $request)
+    {
+        $data = $request->validate([
+            'source_account_id' => 'required|exists:accounts,id',
+            'amount' => 'required|numeric|min:1000',
+            'notes' => 'nullable|string',
+        ]);
+
+        $multiAccount = Account::where('code', '1-1131')->firstOrFail();
+
+        try {
+            $trxNumber = $this->posService->generateTransactionNumber('TP');
+
+            $trx = \App\Models\CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => 'OUT',
+                'date' => now(),
+                'debit_account_id' => $multiAccount->id, // Saldo Multi bertambah
+                'credit_account_id' => $data['source_account_id'], // Kas / Bank berkurang
+                'amount' => $data['amount'],
+                'admin_fee' => 0,
+                'notes' => $data['notes'] ?? 'Top Up Saldo Multi Server',
+            ]);
+
+            app(\App\Services\AccountingService::class)->recordCashTransaction($trx);
+
+            return redirect()->route('digital.index')->with('success', 'Top Up Saldo Multi sebesar Rp ' . number_format($data['amount'], 0, ',', '.') . ' berhasil!');
+        } catch (Exception $e) {
+            return redirect()->route('digital.index')->with('error', 'Gagal top up saldo multi: ' . $e->getMessage());
+        }
+    }
 }

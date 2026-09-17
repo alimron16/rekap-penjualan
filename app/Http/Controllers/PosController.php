@@ -86,4 +86,55 @@ class PosController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * Tarik Tunai di Kasir POS (Pilih sumber uang kas laci/rekening)
+     */
+    public function withdraw(Request $request)
+    {
+        $data = $request->validate([
+            'source_account_id' => 'required|exists:accounts,id', // Kas laci / Bank yang berkurang diberikan ke nasabah
+            'amount' => 'required|numeric|min:1000',
+            'admin_fee' => 'nullable|numeric|min:0',
+            'customer_name' => 'nullable|string',
+            'notes' => 'nullable|string',
+        ]);
+
+        $fee = (float) ($data['admin_fee'] ?? 0);
+        $amount = (float) $data['amount'];
+        $customerName = $data['customer_name'] ?? 'Pelanggan';
+
+        // Rekening transit/masuk dari transfer nasabah (CASH TRANSFER atau Rekening Bank penampung)
+        $bankAcc = Account::where('code', '1-1113')->first() // default SALDO BCA
+            ?: Account::where('code', '1-1111')->first() // CASH TRANSFER
+            ?: Account::find($data['source_account_id']);
+
+        try {
+            $trxNumber = $this->posService->generateTransactionNumber('TT');
+
+            $trx = \App\Models\CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => 'TRANSFER',
+                'date' => now(),
+                'debit_account_id' => $bankAcc->id, // Bank/Transit bertambah (Uang transfer nasabah masuk)
+                'credit_account_id' => $data['source_account_id'], // Kas Laci berkurang (Uang fisik diberikan ke nasabah)
+                'amount' => $amount,
+                'admin_fee' => $fee,
+                'notes' => "Tarik Tunai [{$customerName}] - " . ($data['notes'] ?? 'POS Kasir'),
+            ]);
+
+            app(\App\Services\AccountingService::class)->recordCashTransaction($trx);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Tarik Tunai Rp " . number_format($amount, 0, ',', '.') . " berhasil dicatat!",
+                'transaction' => $trx,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses tarik tunai: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
 }

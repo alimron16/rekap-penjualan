@@ -107,10 +107,16 @@
                                         @php
                                             $moduleLabels = [
                                                 'pos' => 'Kasir POS',
+                                                'digital' => 'Produk Multi',
+                                                'cash_withdrawal' => 'Tarik Tunai',
                                                 'transfer' => 'Transfer Agen',
                                                 'master' => 'Master Data',
+                                                'edit_stock' => 'Edit Stok',
+                                                'multi_topup' => 'Top Up Multi',
                                                 'purchase' => 'Pembelian',
                                                 'accounting' => 'Akuntansi',
+                                                'manage_modal' => 'Kelola Modal',
+                                                'view_final_balance' => 'Saldo Akhir & Profit',
                                                 'reports' => 'Laporan',
                                                 'settings' => 'Pengaturan',
                                                 'users' => 'Kelola User',
@@ -258,6 +264,14 @@
                         <span>Kasir POS</span>
                     </label>
                     <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_digital" name="permissions[digital]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Produk Multi</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_cash_withdrawal" name="permissions[cash_withdrawal]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Tarik Tunai Kasir</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
                         <input type="checkbox" id="perm_transfer" name="permissions[transfer]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
                         <span>Transfer Agen</span>
                     </label>
@@ -266,12 +280,28 @@
                         <span>Master Data</span>
                     </label>
                     <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_edit_stock" name="permissions[edit_stock]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Edit Stok Fisik</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_multi_topup" name="permissions[multi_topup]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Tambah Saldo Multi</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
                         <input type="checkbox" id="perm_purchase" name="permissions[purchase]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
                         <span>Pembelian</span>
                     </label>
                     <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
                         <input type="checkbox" id="perm_accounting" name="permissions[accounting]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
                         <span>Akuntansi & COA</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_manage_modal" name="permissions[manage_modal]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Kelola Modal Awal</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="perm_view_final_balance" name="permissions[view_final_balance]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
+                        <span>Lihat Saldo Akhir & Laba</span>
                     </label>
                     <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
                         <input type="checkbox" id="perm_reports" name="permissions[reports]" value="1" class="rounded text-emerald-700 focus:ring-emerald-600">
@@ -303,7 +333,7 @@
 </div>
 
 <script>
-    const permKeys = ['pos', 'transfer', 'master', 'purchase', 'accounting', 'reports', 'settings', 'users'];
+    const permKeys = ['pos', 'digital', 'cash_withdrawal', 'transfer', 'master', 'edit_stock', 'multi_topup', 'purchase', 'accounting', 'manage_modal', 'view_final_balance', 'reports', 'settings', 'users'];
 
     function openAddUserModal() {
         document.getElementById('modalTitle').innerHTML = '<span>Tambah Pengguna Baru</span>';

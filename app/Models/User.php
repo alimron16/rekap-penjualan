@@ -62,9 +62,6 @@ class User extends Authenticatable
         return $this->role === $roles;
     }
 
-    /**
-     * Check if user has permission to a specific module
-     */
     public function hasPermission(string $module): bool
     {
         // Super Admin has all permissions unconditionally
@@ -79,8 +76,14 @@ class User extends Authenticatable
 
         // Default role-based permissions fallback
         return match ($this->role) {
-            'admin' => in_array($module, ['master', 'purchase', 'pos', 'transfer', 'accounting', 'reports', 'settings']),
-            'toko' => in_array($module, ['pos', 'transfer', 'reports_toko']),
+            'admin' => in_array($module, [
+                'pos', 'digital', 'cash_withdrawal', 'transfer', 'master',
+                'edit_stock', 'multi_topup', 'accounting', 'manage_modal',
+                'view_final_balance', 'reports', 'settings'
+            ]),
+            'toko' => in_array($module, [
+                'pos', 'digital', 'cash_withdrawal', 'transfer'
+            ]), // FL toko defaults: CANNOT edit stock, CANNOT view final balance, NO purchase/hutang/piutang
             default => false,
         };
     }
