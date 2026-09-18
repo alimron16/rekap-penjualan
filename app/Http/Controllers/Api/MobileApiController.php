@@ -1379,13 +1379,24 @@ class MobileApiController extends Controller
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $type = strtoupper((string) $request->query('type', ''));
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
         $query = CashTransaction::with(['debitAccount', 'creditAccount'])->latest('date');
 
         if (!empty($type) && in_array($type, ['IN', 'OUT', 'TRANSFER'])) {
             $query->where('type', $type);
         }
 
-        $transactions = $query->take(50)->get()->map(function ($trx) {
+        if ($startDate && $endDate) {
+            $query->whereBetween('date', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+        } elseif ($startDate) {
+            $query->whereDate('date', '>=', $startDate);
+        } elseif ($endDate) {
+            $query->whereDate('date', '<=', $endDate);
+        }
+
+        $transactions = $query->take(100)->get()->map(function ($trx) {
             return [
                 'id' => $trx->id,
                 'transaction_number' => $trx->transaction_number,
@@ -2195,13 +2206,25 @@ class MobileApiController extends Controller
 
         $type = $request->query('type', 'all'); // 'withdraw', 'in', 'out', 'return'
         $date = $request->query('date');
+        $startDate = $request->query('start_date', $date);
+        $endDate = $request->query('end_date', $date);
+
+        $applyDateFilter = function ($q) use ($startDate, $endDate) {
+            if ($startDate && $endDate) {
+                $q->whereBetween('date', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
+            } elseif ($startDate) {
+                $q->whereDate('date', '>=', $startDate);
+            } elseif ($endDate) {
+                $q->whereDate('date', '<=', $endDate);
+            }
+        };
 
         // 1. Tarik Tunai
         $withdrawals = CashTransaction::where('type', 'TRANSFER')
             ->where('notes', 'like', 'Tarik Tunai%')
-            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
-            ->take(50)
+            ->take(100)
             ->get()
             ->map(function ($t) {
                 return [
@@ -2219,9 +2242,9 @@ class MobileApiController extends Controller
 
         // 2. Barang Masuk (Pembelian & Opname IN)
         $purchases = Purchase::with(['supplier', 'items.product'])
-            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
-            ->take(50)
+            ->take(100)
             ->get()
             ->map(function ($p) {
                 $itemNames = $p->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
@@ -2240,9 +2263,9 @@ class MobileApiController extends Controller
 
         // 3. Barang Keluar (Penjualan Sales Items)
         $sales = Sale::with(['customer', 'items.product'])
-            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
-            ->take(50)
+            ->take(100)
             ->get()
             ->map(function ($s) {
                 $itemNames = $s->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
@@ -2261,9 +2284,9 @@ class MobileApiController extends Controller
 
         // 4. Retur Penjualan
         $returns = SaleReturn::with(['sale', 'customer', 'items.product'])
-            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
-            ->take(50)
+            ->take(100)
             ->get()
             ->map(function ($r) {
                 $itemNames = $r->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');

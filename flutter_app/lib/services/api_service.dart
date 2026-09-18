@@ -443,9 +443,14 @@ class ApiService {
   }
 
   // --- Histori Terpadu Toko (Tarik Tunai, Masuk, Keluar, Retur) ---
-  static Future<Map<String, dynamic>> getUnifiedLogs({String? date, String type = 'all'}) async {
-    final d = date ?? '';
-    return await _get('$baseUrl/pos/unified-logs?date=$d&type=$type');
+  static Future<Map<String, dynamic>> getUnifiedLogs({String? date, String? startDate, String? endDate, String type = 'all'}) async {
+    final params = <String>[];
+    if (date != null && date.isNotEmpty) params.add('date=$date');
+    if (startDate != null && startDate.isNotEmpty) params.add('start_date=$startDate');
+    if (endDate != null && endDate.isNotEmpty) params.add('end_date=$endDate');
+    if (type.isNotEmpty) params.add('type=$type');
+    final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/pos/unified-logs$q');
   }
 
   // --- Digital / Pulsa & Top Up Saldo Multi ---
@@ -610,9 +615,13 @@ class ApiService {
   }
 
   // --- Kas & Akuntansi ---
-  static Future<Map<String, dynamic>> getCashTransactions({String? type}) async {
-    final url = type != null ? '$baseUrl/cash-transactions?type=$type' : '$baseUrl/cash-transactions';
-    return await _get(url);
+  static Future<Map<String, dynamic>> getCashTransactions({String? type, String? startDate, String? endDate}) async {
+    final params = <String>[];
+    if (type != null && type.isNotEmpty) params.add('type=$type');
+    if (startDate != null && startDate.isNotEmpty) params.add('start_date=$startDate');
+    if (endDate != null && endDate.isNotEmpty) params.add('end_date=$endDate');
+    final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/cash-transactions$q');
   }
 
   static Future<Map<String, dynamic>> storeCashTransaction({

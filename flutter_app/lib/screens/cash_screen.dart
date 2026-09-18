@@ -33,6 +33,11 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
     {'title': 'Lain-lain', 'code': '6-2300', 'desc': 'Biaya operasional lainnya', 'icon': Icons.more_horiz},
   ];
 
+  DateTime? _startDate;
+  DateTime? _endDate;
+  final dateFormatter = DateFormat('yyyy-MM-dd');
+  final displayDateFormatter = DateFormat('d MMM yyyy', 'id_ID');
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +65,14 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   void _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final res = await ApiService.getCashTransactions(type: _currentType);
+      final s = _startDate != null ? dateFormatter.format(_startDate!) : null;
+      final e = _endDate != null ? dateFormatter.format(_endDate!) : null;
+
+      final res = await ApiService.getCashTransactions(
+        type: _currentType,
+        startDate: s,
+        endDate: e,
+      );
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -75,6 +87,46 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _selectDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2023),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : DateTimeRange(start: now, end: now),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: ThemeConfig.primary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+      _loadData();
+    }
+  }
+
+  void _clearDateFilter() {
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+    _loadData();
   }
 
   void _openAddModal({String? defaultExpenseTitle, String? defaultExpenseDesc}) {
@@ -326,24 +378,48 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final isOut = _currentType == 'out';
     final totalAmount = _transactions.fold<double>(0.0, (acc, item) => acc + (double.tryParse(item['amount'].toString()) ?? 0.0));
+    final hasDateFilter = _startDate != null && _endDate != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: const Text('Kas Masuk & Kas Keluar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Kas Masuk & Kas Keluar',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         backgroundColor: ThemeConfig.primary,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 1,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
+          IconButton(
+            icon: Icon(hasDateFilter ? Icons.filter_alt : Icons.filter_alt_outlined, color: hasDateFilter ? Colors.amberAccent : Colors.white),
+            tooltip: 'Filter Tanggal',
+            onPressed: _selectDateRange,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Muat Ulang',
+            onPressed: _loadData,
+          ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.amber,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: const [
-            Tab(icon: Icon(Icons.arrow_circle_down, size: 18), text: 'KAS MASUK'),
-            Tab(icon: Icon(Icons.arrow_circle_up, size: 18), text: 'KAS KELUAR'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            color: const Color(0xFF0F3216),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.amberAccent,
+              indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              tabs: const [
+                Tab(icon: Icon(Icons.arrow_circle_down_outlined, size: 18), text: 'KAS MASUK'),
+                Tab(icon: Icon(Icons.arrow_circle_up_outlined, size: 18), text: 'KAS KELUAR'),
+              ],
+            ),
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -359,6 +435,35 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
           : Column(
               children: [
+                // Filter indicator banner if active
+                if (hasDateFilter)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    color: Colors.amber.shade50,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.date_range, size: 16, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Periode: ${displayDateFormatter.format(_startDate!)} - ${displayDateFormatter.format(_endDate!)}',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: _clearDateFilter,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade200,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('Reset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Header Summary Card
                 Container(
                   width: double.infinity,

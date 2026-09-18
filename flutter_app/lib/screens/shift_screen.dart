@@ -131,10 +131,15 @@ class _ShiftScreenState extends State<ShiftScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Rekap Shift & Setor Penjualan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Rekap Shift & Setor Penjualan',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         backgroundColor: ThemeConfig.primary,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 1,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadShiftData),
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.white), onPressed: _loadShiftData),
         ],
       ),
       body: _isLoading
@@ -225,41 +230,41 @@ class _ShiftScreenState extends State<ShiftScreen> {
                     child: Column(
                       children: [
                         _buildSummaryRow(
-                          '💵 Penjualan Tunai (Cash)',
+                          'Penjualan Tunai (Cash)',
                           summary['cash_sales'] ?? 0,
-                          icon: Icons.payments,
-                          color: Colors.green,
+                          icon: Icons.payments_outlined,
+                          color: Colors.green.shade700,
                         ),
                         const Divider(height: 16),
                         _buildSummaryRow(
-                          '💳 Penjualan Non-Tunai (TF / QRIS)',
+                          'Penjualan Non-Tunai (TF / QRIS)',
                           summary['non_cash_sales'] ?? 0,
-                          icon: Icons.qr_code,
-                          color: Colors.blue,
+                          icon: Icons.qr_code_2_outlined,
+                          color: Colors.blue.shade700,
                           subtitle: 'Masuk langsung ke rekening Bank Pusat',
                         ),
                         const Divider(height: 16),
                         _buildSummaryRow(
-                          '📝 Penjualan Tempo (Piutang)',
+                          'Penjualan Tempo (Piutang)',
                           summary['receivable_sales'] ?? 0,
-                          icon: Icons.receipt_long,
-                          color: Colors.orange,
+                          icon: Icons.receipt_long_outlined,
+                          color: Colors.orange.shade800,
                         ),
                         const Divider(height: 16),
                         _buildSummaryRow(
-                          '🏧 Tarik Tunai Pelanggan (Uang Keluar)',
+                          'Tarik Tunai Pelanggan (Uang Keluar)',
                           summary['total_withdraw_cash'] ?? 0,
-                          icon: Icons.atm,
+                          icon: Icons.local_atm_outlined,
                           color: Colors.amber.shade900,
                           isNegative: true,
                           subtitle: 'Fee admin masuk: ${currencyFormatter.format(summary['total_withdraw_fee'] ?? 0)}',
                         ),
                         const Divider(height: 16),
                         _buildSummaryRow(
-                          '🍱 Biaya Kas Keluar (Makan, Sampah, dll)',
+                          'Biaya Kas Keluar (Makan, Sampah, dll)',
                           summary['total_expense'] ?? 0,
                           icon: Icons.shopping_bag_outlined,
-                          color: Colors.red,
+                          color: Colors.red.shade700,
                           isNegative: true,
                         ),
                         const Divider(height: 20, thickness: 1.5),
