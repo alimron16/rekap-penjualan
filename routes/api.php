@@ -98,6 +98,6 @@ Route::get('/settings', [MobileApiController::class, 'storeSettings']);
 Route::put('/settings', [MobileApiController::class, 'updateSettings']);
 Route::post('/settings/logo', [MobileApiController::class, 'uploadSettingsLogo']);
 
-// 11. AI Assistant (Gemini)
-Route::post('/ai/ask', [MobileApiController::class, 'askAi']);
+// 11. AI Assistant (Gemini - Throttled max 15 requests per minute)
+Route::post('/ai/ask', [MobileApiController::class, 'askAi'])->middleware('throttle:15,1');
 

@@ -49,8 +49,10 @@ Route::middleware('auth')->group(function () {
     // Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // AI Assistant (Gemini)
-    Route::post('/ai/ask', [\App\Http\Controllers\AiAssistantController::class, 'askWeb'])->name('ai.ask');
+    // AI Assistant (Gemini - Throttled max 15 requests per minute)
+    Route::post('/ai/ask', [\App\Http\Controllers\AiAssistantController::class, 'askWeb'])
+        ->name('ai.ask')
+        ->middleware('throttle:15,1');
 
     // Master Data
     Route::prefix('master')->name('master.')->group(function () {
