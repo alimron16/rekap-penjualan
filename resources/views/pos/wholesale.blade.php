@@ -19,7 +19,19 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-2 self-end md:self-auto w-full md:w-auto">
+        <div class="flex items-center gap-2 self-end md:self-auto w-full md:w-auto flex-wrap">
+            <button type="button" onclick="openExpenseModal()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Kas Keluar Toko</span>
+            </button>
+            <button type="button" onclick="openWithdrawModal()" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Tarik Tunai</span>
+            </button>
+            <button type="button" onclick="openShiftModal()" class="px-3 py-1.5 rounded-lg bg-[#133e1c] hover:bg-[#0d2c14] text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition border border-emerald-800">
+                <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Tutup Shift & Setor</span>
+            </button>
             <span class="text-xs font-semibold text-slate-600 whitespace-nowrap">Pelanggan Grosir:</span>
             <select id="posCustomerSelect" class="text-xs px-3 py-1.5 border border-slate-300 rounded-lg font-semibold bg-white w-full md:w-56 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
                 @foreach($customers as $c)
@@ -464,5 +476,348 @@
             alert('Error: ' + err.message);
         });
     }
+
+    // --- Modal Tarik Tunai di Kasir POS ---
+    function openWithdrawModal() {
+        document.getElementById('modalWithdrawPos').classList.remove('hidden');
+    }
+    function closeWithdrawModal() {
+        document.getElementById('modalWithdrawPos').classList.add('hidden');
+    }
+    function submitWithdrawPos(e) {
+        e.preventDefault();
+        const sourceAccountId = document.getElementById('withdrawSourceAccount').value;
+        const amount = parseFloat(document.getElementById('withdrawAmount').value || 0);
+        const adminFee = parseFloat(document.getElementById('withdrawAdminFee').value || 0);
+        const customerName = document.getElementById('withdrawCustomerName').value || 'Pelanggan';
+        const notes = document.getElementById('withdrawNotes').value || '';
+
+        if (amount < 1000) {
+            alert('Nominal tarik tunai minimal Rp 1.000');
+            return;
+        }
+
+        const btn = document.getElementById('btnSubmitWithdraw');
+        btn.disabled = true;
+        btn.innerText = 'Memproses...';
+
+        fetch("{{ route('pos.withdraw') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                source_account_id: sourceAccountId,
+                amount: amount,
+                admin_fee: adminFee,
+                customer_name: customerName,
+                notes: notes
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerText = 'PROSES TARIK TUNAI';
+            if (data.success) {
+                alert(data.message);
+                closeWithdrawModal();
+                window.location.reload();
+            } else {
+                alert('Gagal: ' + (data.message || 'Terjadi kesalahan'));
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerText = 'PROSES TARIK TUNAI';
+            alert('Error: ' + err.message);
+        });
+    }
+
+    // --- Modal Kas Keluar Toko (Makan, Sampah, Operasional) ---
+    function openExpenseModal() {
+        document.getElementById('modalExpensePos').classList.remove('hidden');
+    }
+    function closeExpenseModal() {
+        document.getElementById('modalExpensePos').classList.add('hidden');
+    }
+    function setQuickExpense(desc) {
+        document.getElementById('expenseNotes').value = desc;
+    }
+    function submitExpensePos(e) {
+        e.preventDefault();
+        const sourceAccId = document.getElementById('expenseSourceAccount').value;
+        const debitAccId = document.getElementById('expenseCategoryAccount').value;
+        const amount = parseFloat(document.getElementById('expenseAmount').value || 0);
+        const notes = document.getElementById('expenseNotes').value || 'Kas Keluar Toko';
+
+        if (amount <= 0) {
+            alert('Nominal kas keluar harus lebih dari 0');
+            return;
+        }
+
+        const btn = document.getElementById('btnSubmitExpense');
+        btn.disabled = true;
+        btn.innerText = 'Menyimpan...';
+
+        fetch("{{ route('accounting.cash_out.store') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                credit_account_id: sourceAccId,
+                debit_account_id: debitAccId,
+                amount: amount,
+                notes: notes
+            })
+        })
+        .then(res => {
+            btn.disabled = false;
+            btn.innerText = 'SIMPAN KAS KELUAR';
+            alert('Pengeluaran kas berhasil dicatat!');
+            closeExpenseModal();
+            window.location.reload();
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerText = 'SIMPAN KAS KELUAR';
+            alert('Error: ' + err.message);
+        });
+    }
+
+    // --- Modal Tutup Shift & Setor Kasir ---
+    function openShiftModal() {
+        fetch("/api/pos/shift-summary?date={{ date('Y-m-d') }}", {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('shiftDrawerBalanceLabel').innerText = 'Rp ' + Number(data.cash_drawer_balance).toLocaleString('id-ID');
+                document.getElementById('shiftRecommendedLabel').innerText = 'Rp ' + Number(data.recommended_deposit).toLocaleString('id-ID');
+                document.getElementById('shiftDepositAmount').value = data.recommended_deposit > 0 ? data.recommended_deposit : 0;
+            }
+            document.getElementById('modalShiftPos').classList.remove('hidden');
+        })
+        .catch(() => {
+            document.getElementById('modalShiftPos').classList.remove('hidden');
+        });
+    }
+    function closeShiftModal() {
+        document.getElementById('modalShiftPos').classList.add('hidden');
+    }
+    function submitShiftDeposit(e) {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('shiftDepositAmount').value || 0);
+        const notes = document.getElementById('shiftNotes').value || 'Tutup Shift Kasir';
+
+        if (amount <= 0) {
+            alert('Nominal setoran harus lebih dari 0');
+            return;
+        }
+
+        if (!confirm(`Uang tunai sebesar Rp ${amount.toLocaleString('id-ID')} akan disetorkan ke brankas/pusat.\nSisa modal awal Rp 400.000 akan tetap di laci kasir.\n\nLanjutkan?`)) {
+            return;
+        }
+
+        const btn = document.getElementById('btnSubmitShift');
+        btn.disabled = true;
+        btn.innerText = 'Memproses...';
+
+        fetch("/api/pos/close-shift", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                deposit_amount: amount,
+                notes: notes
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerText = 'SETOR UANG & TUTUP SHIFT';
+            if (data.success) {
+                alert(data.message);
+                closeShiftModal();
+                window.location.reload();
+            } else {
+                alert('Gagal: ' + (data.message || 'Terjadi kesalahan'));
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerText = 'SETOR UANG & TUTUP SHIFT';
+            alert('Error: ' + err.message);
+        });
+    }
 </script>
+
+<!-- Modal Tarik Tunai di Kasir POS -->
+<div id="modalWithdrawPos" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-amber-600 text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span>Tarik Tunai di Kasir (POS)</span>
+            </h3>
+            <button onclick="closeWithdrawModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form onsubmit="submitWithdrawPos(event)" class="p-5 space-y-3.5 text-xs">
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Sumber Kas Uang Keluar (Diberikan ke Nasabah) *</label>
+                <select id="withdrawSourceAccount" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    @foreach($accounts as $acc)
+                        <option value="{{ $acc->id }}" {{ $acc->code === '1-1110' ? 'selected' : '' }}>
+                            {{ $acc->code }} - {{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})
+                        </option>
+                    @endforeach
+                </select>
+                <span class="text-[10px] text-slate-400 mt-1 block">Pilih kas laci atau rekening yang uang fisiknya Anda keluarkan untuk nasabah.</span>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nama Nasabah / Pelanggan *</label>
+                <input type="text" id="withdrawCustomerName" placeholder="Contoh: Budi Santoso" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none font-medium">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Nominal Tarik Tunai (Rp) *</label>
+                    <input type="number" id="withdrawAmount" step="1000" min="1000" placeholder="500000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-slate-900 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Biaya Admin / Fee (Rp)</label>
+                    <input type="number" id="withdrawAdminFee" step="500" min="0" value="5000" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-emerald-700 bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Catatan Tambahan (Opsional)</label>
+                <input type="text" id="withdrawNotes" placeholder="No referensi transfer / catatan bank" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeWithdrawModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" id="btnSubmitWithdraw" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs">PROSES TARIK TUNAI</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Kas Keluar Operasional Toko (Makan, Sampah, dll) -->
+<div id="modalExpensePos" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-rose-600 text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Catat Kas Keluar Toko (Operasional)</span>
+            </h3>
+            <button onclick="closeExpenseModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form onsubmit="submitExpensePos(event)" class="p-5 space-y-3.5 text-xs">
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Pilihan Cepat Beban:</label>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="setQuickExpense('Uang makan siang kasir toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🍱 Uang Makan</button>
+                    <button type="button" onclick="setQuickExpense('Iuran sampah & kebersihan toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🗑️ Sampah / Kebersihan</button>
+                    <button type="button" onclick="setQuickExpense('Beli kantong plastik kresek')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🛍️ Kresek / ATK</button>
+                    <button type="button" onclick="setQuickExpense('Beli token listrik toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">💡 Token Listrik</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Ambil Uang Dari (Kas Sumber) *</label>
+                <select id="expenseSourceAccount" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                    @foreach($accounts as $acc)
+                        <option value="{{ $acc->id }}" {{ $acc->code === '1-1110' ? 'selected' : '' }}>
+                            {{ $acc->code }} - {{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Kategori Beban / Pengeluaran *</label>
+                <select id="expenseCategoryAccount" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                    @foreach($expenseAccounts as $exp)
+                        <option value="{{ $exp->id }}" {{ $exp->code === '6-2300' ? 'selected' : '' }}>
+                            {{ $exp->code }} - {{ $exp->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nominal Kas Keluar (Rp) *</label>
+                <input type="number" id="expenseAmount" step="1000" min="1000" placeholder="15000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-sm text-rose-700 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Keterangan Pengeluaran *</label>
+                <input type="text" id="expenseNotes" placeholder="Contoh: Uang makan siang kasir" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-rose-500 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeExpenseModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" id="btnSubmitExpense" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs">SIMPAN KAS KELUAR</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Tutup Shift & Setor Penjualan -->
+<div id="modalShiftPos" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-[#133e1c] text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Rekap Shift & Setor Penjualan</span>
+            </h3>
+            <button onclick="closeShiftModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form onsubmit="submitShiftDeposit(event)" class="p-5 space-y-3.5 text-xs">
+            <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-slate-600">Saldo Kas Laci Fisik:</span>
+                    <span id="shiftDrawerBalanceLabel" class="font-mono font-bold text-slate-900 text-sm">-</span>
+                </div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-slate-600">Wajib Cadangan Modal:</span>
+                    <span class="font-mono font-bold text-amber-700">Rp 400.000</span>
+                </div>
+                <div class="flex justify-between items-center pt-1 border-t border-emerald-200">
+                    <span class="font-bold text-emerald-900">Rekomendasi Setoran:</span>
+                    <span id="shiftRecommendedLabel" class="font-mono font-extrabold text-emerald-800 text-sm">-</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nominal Uang Disetor ke Brankas/Pusat (Rp) *</label>
+                <input type="number" id="shiftDepositAmount" step="1000" min="1000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold text-base text-slate-900 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                <span class="text-[10px] text-slate-400 mt-1 block">Sisa modal awal Rp 400.000 akan otomatis ditinggal di laci kasir untuk shift berikutnya.</span>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Catatan Setoran</label>
+                <input type="text" id="shiftNotes" placeholder="Contoh: Setoran uang shift 1" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeShiftModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" id="btnSubmitShift" class="px-4 py-2 rounded-lg bg-[#133e1c] hover:bg-[#0d2c14] text-white font-bold shadow-xs">SETOR UANG & TUTUP SHIFT</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endpush

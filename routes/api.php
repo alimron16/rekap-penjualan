@@ -75,6 +75,9 @@ Route::post('/transfers/{id}/reject', [MobileApiController::class, 'rejectTransf
 // 8. Kas & Akuntansi
 Route::get('/cash-transactions', [MobileApiController::class, 'cashTransactions']);
 Route::post('/cash-transactions', [MobileApiController::class, 'storeCashTransaction']);
+Route::get('/pos/shift-summary', [MobileApiController::class, 'shiftSummary']);
+Route::post('/pos/close-shift', [MobileApiController::class, 'closeShift']);
+Route::get('/pos/unified-logs', [MobileApiController::class, 'unifiedLogs']);
 
 // 9. Laporan Keuangan
 Route::get('/reports', [MobileApiController::class, 'financialReports']);

@@ -23,6 +23,8 @@ import 'reports_screen.dart';
 import 'users_screen.dart';
 import 'settings_screen.dart';
 import 'outlets_screen.dart';
+import 'shift_screen.dart';
+import 'store_logs_screen.dart';
 
 class AppColors {
   static const Color slateBorder = Color(0xFFE2E8F0);
@@ -1306,6 +1308,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
 
                       const Divider(),
+                      _drawerItem(Icons.schedule, 'Rekap Shift & Setor Kasir', () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ShiftScreen()));
+                      }),
+                      _drawerItem(Icons.history, 'Histori Operasional Toko', () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreLogsScreen()));
+                      }),
                       _drawerItem(Icons.assignment_return, 'Retur Penjualan', () {
                         Navigator.pop(context);
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnsScreen()));
@@ -1315,7 +1325,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Navigator.pop(context);
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
                         }),
-                      if (hasPerm('accounting'))
+                      if (hasPerm('accounting', defaultAdmin: true, defaultFL: true))
                         _drawerItem(Icons.attach_money, 'Kas Masuk & Keluar', () {
                           Navigator.pop(context);
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen()));

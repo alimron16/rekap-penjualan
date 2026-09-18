@@ -424,6 +424,30 @@ class ApiService {
     );
   }
 
+  // --- Shift Kasir & Setor Penjualan ---
+  static Future<Map<String, dynamic>> getShiftSummary({String? date}) async {
+    final d = date ?? '';
+    return await _get('$baseUrl/pos/shift-summary?date=$d');
+  }
+
+  static Future<Map<String, dynamic>> closeShift({
+    required double depositAmount,
+    String? notes,
+    int? destinationAccountId,
+  }) async {
+    return await _post('$baseUrl/pos/close-shift', {
+      'deposit_amount': depositAmount,
+      'notes': notes,
+      'destination_account_id': destinationAccountId,
+    });
+  }
+
+  // --- Histori Terpadu Toko (Tarik Tunai, Masuk, Keluar, Retur) ---
+  static Future<Map<String, dynamic>> getUnifiedLogs({String? date, String type = 'all'}) async {
+    final d = date ?? '';
+    return await _get('$baseUrl/pos/unified-logs?date=$d&type=$type');
+  }
+
   // --- Digital / Pulsa & Top Up Saldo Multi ---
   static Future<Map<String, dynamic>> getDigitalData() async {
     return await _get('$baseUrl/digital/data');

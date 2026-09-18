@@ -1378,15 +1378,64 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $type = $request->query('type');
-        $query = CashTransaction::with(['account', 'oppositeAccount'])->latest();
+        $type = strtoupper((string) $request->query('type', ''));
+        $query = CashTransaction::with(['debitAccount', 'creditAccount'])->latest('date');
 
-        if ($type) {
+        if (!empty($type) && in_array($type, ['IN', 'OUT', 'TRANSFER'])) {
             $query->where('type', $type);
         }
 
-        $transactions = $query->take(50)->get();
-        return response()->json(['success' => true, 'data' => $transactions]);
+        $transactions = $query->take(50)->get()->map(function ($trx) {
+            return [
+                'id' => $trx->id,
+                'transaction_number' => $trx->transaction_number,
+                'type' => strtolower($trx->type),
+                'amount' => (float) $trx->amount,
+                'admin_fee' => (float) $trx->admin_fee,
+                'description' => $trx->notes,
+                'transaction_date' => $trx->date ? $trx->date->format('Y-m-d H:i') : '',
+                'debit_account' => $trx->debitAccount ? [
+                    'id' => $trx->debitAccount->id,
+                    'code' => $trx->debitAccount->code,
+                    'name' => $trx->debitAccount->name,
+                ] : null,
+                'credit_account' => $trx->creditAccount ? [
+                    'id' => $trx->creditAccount->id,
+                    'code' => $trx->creditAccount->code,
+                    'name' => $trx->creditAccount->name,
+                ] : null,
+            ];
+        });
+
+        // Expense categories for cash out & income categories for cash in
+        $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
+            ->where('type', 'D')
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        $incomeAccounts = Account::whereIn('group', ['PENDAPATAN', 'PENDAPATAN LAIN', 'MODAL'])
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        $cashAccounts = Account::where('group', 'AKTIVA')
+            ->where('type', 'D')
+            ->where(function ($q) {
+                $q->where('code', 'LIKE', '1-111%')
+                  ->orWhere('name', 'LIKE', '%KAS%')
+                  ->orWhere('name', 'LIKE', '%SALDO%')
+                  ->orWhere('name', 'LIKE', '%BRANGKAS%');
+            })
+            ->where('code', 'NOT LIKE', '1-2%')
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'current_balance']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $transactions,
+            'expense_accounts' => $expenseAccounts,
+            'income_accounts' => $incomeAccounts,
+            'cash_accounts' => $cashAccounts,
+        ]);
     }
 
     public function storeCashTransaction(Request $request)
@@ -1395,21 +1444,41 @@ class MobileApiController extends Controller
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $data = $request->validate([
-            'type' => 'required|in:in,out,transfer',
-            'account_id' => 'required|exists:accounts,id',
-            'opposite_account_id' => 'required|exists:accounts,id',
+            'type' => 'required|in:in,out,transfer,IN,OUT,TRANSFER',
+            'account_id' => 'required|exists:accounts,id', // Kas sumber / penampung
+            'opposite_account_id' => 'nullable|exists:accounts,id', // Akun lawan (kategori beban/pendapatan)
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:255',
             'transaction_date' => 'nullable|date',
         ]);
 
-        $data['transaction_date'] = $data['transaction_date'] ?? date('Y-m-d H:i:s');
+        $type = strtoupper($data['type']);
+        $prefix = $type === 'IN' ? 'KM' : ($type === 'OUT' ? 'KK' : 'KT');
+        $trxNumber = $this->posService->generateTransactionNumber($prefix);
+
+        // Map debit and credit accounts based on transaction type:
+        // IN: Debit = Kas/Bank (account_id), Credit = Pendapatan/Modal (opposite_account_id)
+        // OUT: Debit = Beban/Pengeluaran (opposite_account_id), Credit = Kas/Bank (account_id)
+        $debitAccountId = $type === 'IN' ? $data['account_id'] : ($data['opposite_account_id'] ?? Account::where('code', '6-2300')->value('id') ?? $data['account_id']);
+        $creditAccountId = $type === 'IN' ? ($data['opposite_account_id'] ?? Account::where('code', '4-2000')->value('id') ?? $data['account_id']) : $data['account_id'];
 
         try {
-            $trx = $this->accountingService->recordCashTransaction($data);
+            $trx = CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => $type,
+                'date' => $data['transaction_date'] ?? now(),
+                'debit_account_id' => $debitAccountId,
+                'credit_account_id' => $creditAccountId,
+                'amount' => $data['amount'],
+                'admin_fee' => 0,
+                'notes' => $data['description'],
+            ]);
+
+            $this->accountingService->recordCashTransaction($trx);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Transaksi kas berhasil dicatat!',
+                'message' => ($type === 'IN' ? 'Kas Masuk' : 'Kas Keluar') . ' berhasil dicatat!',
                 'data' => $trx,
             ]);
         } catch (Exception $e) {
@@ -1996,6 +2065,227 @@ class MobileApiController extends Controller
             'message' => 'Logo toko berhasil diperbarui!',
             'logo_url' => asset('storage/' . $setting->logo_path),
             'setting' => $setting,
+        ]);
+    }
+
+    // ==========================================
+    // 11. SHIFT KASIR & SETOR PENJUALAN
+    // ==========================================
+
+    /**
+     * Get real-time shift summary for cashier
+     */
+    public function shiftSummary(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $date = $request->query('date', date('Y-m-d'));
+        $outletId = $user->outlet_id;
+
+        // Sales today
+        $salesQuery = Sale::whereDate('date', $date);
+        if ($outletId) $salesQuery->where('outlet_id', $outletId);
+
+        $sales = $salesQuery->with('customer')->get();
+        $cashSales = $sales->where('payment_method', 'cash')->sum('paid_amount');
+        $nonCashSales = $sales->where('payment_method', '!=', 'cash')->sum('paid_amount');
+        $receivableSales = $sales->sum('remaining_receivable');
+
+        // Tarik Tunai today
+        $withdrawQuery = CashTransaction::where('type', 'TRANSFER')
+            ->where('notes', 'like', 'Tarik Tunai%')
+            ->whereDate('date', $date);
+        $totalWithdraw = (float) $withdrawQuery->sum('amount');
+        $totalWithdrawFee = (float) $withdrawQuery->sum('admin_fee');
+
+        // Kas Keluar (Beban Makan, Sampah, Operasional)
+        $expenseQuery = CashTransaction::where('type', 'OUT')
+            ->whereDate('date', $date);
+        $totalExpense = (float) $expenseQuery->sum('amount');
+
+        // Laci Cash Retail current balance
+        $cashRetailAcc = Account::where('code', '1-1110')->first();
+        $currentCashDrawer = (float) ($cashRetailAcc?->current_balance ?? 0);
+
+        // Required drawer reserve (modal awal)
+        $requiredReserve = 400000.0;
+        $recommendedDeposit = max(0.0, $currentCashDrawer - $requiredReserve);
+
+        return response()->json([
+            'success' => true,
+            'date' => $date,
+            'cash_drawer_balance' => $currentCashDrawer,
+            'required_reserve' => $requiredReserve,
+            'recommended_deposit' => $recommendedDeposit,
+            'summary' => [
+                'total_sales' => (float) $sales->sum('total'),
+                'cash_sales' => (float) $cashSales,
+                'non_cash_sales' => (float) $nonCashSales,
+                'receivable_sales' => (float) $receivableSales,
+                'total_withdraw_cash' => $totalWithdraw,
+                'total_withdraw_fee' => $totalWithdrawFee,
+                'total_expense' => $totalExpense,
+                'total_transactions' => $sales->count(),
+            ],
+            'user' => [
+                'name' => $user->name,
+                'store_name' => $user->outlet?->name ?? 'Toko Kasir',
+            ],
+        ]);
+    }
+
+    /**
+     * Close shift / Setor Uang Penjualan dan Sisakan Modal Awal
+     */
+    public function closeShift(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $request->validate([
+            'deposit_amount' => 'required|numeric|min:1',
+            'notes' => 'nullable|string',
+            'destination_account_id' => 'nullable|exists:accounts,id',
+        ]);
+
+        $cashRetailAcc = Account::where('code', '1-1110')->firstOrFail();
+        $brangkasAcc = $request->destination_account_id 
+            ? Account::find($request->destination_account_id)
+            : (Account::where('name', 'like', '%BRANGKAS%')->first() ?: Account::where('code', '1-1113')->first() ?: $cashRetailAcc);
+
+        $amount = (float) $request->deposit_amount;
+        $trxNumber = $this->posService->generateTransactionNumber('ST'); // Setor Toko
+
+        try {
+            // Transfer from CASH RETAIL to BRANGKAS / PUSAT
+            $trx = CashTransaction::create([
+                'transaction_number' => $trxNumber,
+                'type' => 'TRANSFER',
+                'date' => now(),
+                'debit_account_id' => $brangkasAcc->id,
+                'credit_account_id' => $cashRetailAcc->id,
+                'amount' => $amount,
+                'admin_fee' => 0,
+                'notes' => "Setor Kas Penjualan Shift [{$user->name}] - " . ($request->notes ?? 'Tutup Shift'),
+            ]);
+
+            $this->accountingService->recordCashTransaction($trx);
+
+            $remainingDrawer = (float) $cashRetailAcc->fresh()->current_balance;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Setor uang penjualan Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!',
+                'remaining_drawer' => $remainingDrawer,
+                'transaction' => $trx,
+            ]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Unified Store Operational Logs (Tarik Tunai, Barang Masuk, Barang Keluar, Retur)
+     */
+    public function unifiedLogs(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $type = $request->query('type', 'all'); // 'withdraw', 'in', 'out', 'return'
+        $date = $request->query('date');
+
+        // 1. Tarik Tunai
+        $withdrawals = CashTransaction::where('type', 'TRANSFER')
+            ->where('notes', 'like', 'Tarik Tunai%')
+            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->latest('date')
+            ->take(50)
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'type' => 'withdraw',
+                    'badge' => 'TARIK TUNAI',
+                    'number' => $t->transaction_number,
+                    'date' => $t->date->format('d/m/Y H:i'),
+                    'title' => $t->notes,
+                    'amount' => (float) $t->amount,
+                    'fee' => (float) $t->admin_fee,
+                    'is_negative' => true,
+                ];
+            });
+
+        // 2. Barang Masuk (Pembelian & Opname IN)
+        $purchases = Purchase::with(['supplier', 'items.product'])
+            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->latest('date')
+            ->take(50)
+            ->get()
+            ->map(function ($p) {
+                $itemNames = $p->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
+                return [
+                    'id' => $p->id,
+                    'type' => 'in',
+                    'badge' => 'KULAKAN MASUK',
+                    'number' => $p->invoice_number,
+                    'date' => $p->date->format('d/m/Y H:i'),
+                    'title' => ($p->supplier->name ?? 'Supplier') . ' - ' . $itemNames,
+                    'amount' => (float) $p->total,
+                    'items_count' => $p->items->sum('qty'),
+                    'is_negative' => false,
+                ];
+            });
+
+        // 3. Barang Keluar (Penjualan Sales Items)
+        $sales = Sale::with(['customer', 'items.product'])
+            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->latest('date')
+            ->take(50)
+            ->get()
+            ->map(function ($s) {
+                $itemNames = $s->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
+                return [
+                    'id' => $s->id,
+                    'type' => 'out',
+                    'badge' => 'PENJUALAN',
+                    'number' => $s->invoice_number,
+                    'date' => $s->date->format('d/m/Y H:i'),
+                    'title' => ($s->customer->name ?? 'UMUM') . ' - ' . $itemNames,
+                    'amount' => (float) $s->total,
+                    'items_count' => $s->items->sum('qty'),
+                    'is_negative' => true,
+                ];
+            });
+
+        // 4. Retur Penjualan
+        $returns = SaleReturn::with(['sale', 'customer', 'items.product'])
+            ->when($date, fn($q) => $q->whereDate('date', $date))
+            ->latest('date')
+            ->take(50)
+            ->get()
+            ->map(function ($r) {
+                $itemNames = $r->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
+                return [
+                    'id' => $r->id,
+                    'type' => 'return',
+                    'badge' => 'RETUR',
+                    'number' => $r->return_number,
+                    'date' => $r->date->format('d/m/Y H:i'),
+                    'title' => ($r->customer->name ?? 'Pelanggan') . ' - ' . $itemNames . ' [' . ($r->reason ?? 'Retur') . ']',
+                    'amount' => (float) $r->total_amount,
+                    'refund_method' => $r->refund_method,
+                    'is_negative' => false,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'withdrawals' => $withdrawals,
+            'stock_in' => $purchases,
+            'stock_out' => $sales,
+            'returns' => $returns,
         ]);
     }
 

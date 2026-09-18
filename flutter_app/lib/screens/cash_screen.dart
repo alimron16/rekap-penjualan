@@ -7,46 +7,67 @@ import '../utils/theme_config.dart';
 class CashScreen extends StatefulWidget {
   final String initialType; // 'in' or 'out'
 
-  const CashScreen({super.key, this.initialType = 'in'});
+  const CashScreen({super.key, this.initialType = 'out'});
 
   @override
   State<CashScreen> createState() => _CashScreenState();
 }
 
-class _CashScreenState extends State<CashScreen> {
+class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<dynamic> _transactions = [];
-  List<dynamic> _accounts = [];
+  List<dynamic> _cashAccounts = [];
+  List<dynamic> _expenseAccounts = [];
+  List<dynamic> _incomeAccounts = [];
   bool _isLoading = true;
-  late String _currentType;
-
-  final _amountController = TextEditingController();
-  final _descController = TextEditingController();
-  int? _sourceAccountId;
-  int? _oppositeAccountId;
-  bool _isSubmitting = false;
 
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+
+  // Quick Expense Presets for Toko / Kasir
+  final List<Map<String, dynamic>> _quickExpenses = [
+    {'title': 'Uang Makan Kasir', 'code': '6-2300', 'desc': 'Uang makan kasir / karyawan toko', 'icon': Icons.restaurant},
+    {'title': 'Sampah & Kebersihan', 'code': '6-2400', 'desc': 'Iuran sampah & kebersihan toko', 'icon': Icons.cleaning_services},
+    {'title': 'Plastik / ATK Toko', 'code': '6-2200', 'desc': 'Beli kantong plastik kresek & perlengkapan', 'icon': Icons.shopping_bag_outlined},
+    {'title': 'Listrik / Token PLN', 'code': '6-2100', 'desc': 'Beli token listrik toko', 'icon': Icons.bolt},
+    {'title': 'Bensin / Operasional', 'code': '6-2500', 'desc': 'Operasional kurir / toko', 'icon': Icons.two_wheeler},
+    {'title': 'Lain-lain', 'code': '6-2300', 'desc': 'Biaya operasional lainnya', 'icon': Icons.more_horiz},
+  ];
 
   @override
   void initState() {
     super.initState();
-    _currentType = widget.initialType;
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialType == 'in' ? 0 : 1,
+    );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _loadData();
+      }
+    });
     _loadData();
   }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  String get _currentType => _tabController.index == 0 ? 'in' : 'out';
 
   void _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final accRes = await ApiService.getAccounts();
-      final trxRes = await ApiService.getCashTransactions(type: _currentType);
-
+      final res = await ApiService.getCashTransactions(type: _currentType);
       if (mounted) {
         setState(() {
-          _accounts = accRes['data'] ?? [];
-          _transactions = trxRes['data'] ?? [];
-          if (_accounts.length >= 2) {
-            _sourceAccountId = _accounts[0]['id'];
-            _oppositeAccountId = _accounts[1]['id'];
+          if (res['success'] == true) {
+            _transactions = res['data'] ?? [];
+            _cashAccounts = res['cash_accounts'] ?? [];
+            _expenseAccounts = res['expense_accounts'] ?? [];
+            _incomeAccounts = res['income_accounts'] ?? [];
           }
           _isLoading = false;
         });
@@ -56,104 +77,239 @@ class _CashScreenState extends State<CashScreen> {
     }
   }
 
-  void _submitCashTransaction() async {
-    final double? amount = double.tryParse(_amountController.text.replaceAll('.', '').replaceAll(',', ''));
-    if (amount == null || amount <= 0 || _descController.text.isEmpty || _sourceAccountId == null || _oppositeAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Harap lengkapi semua kolom!'), backgroundColor: Colors.red),
+  void _openAddModal({String? defaultExpenseTitle, String? defaultExpenseDesc}) {
+    final amountController = TextEditingController();
+    final descController = TextEditingController(text: defaultExpenseDesc ?? defaultExpenseTitle ?? '');
+    
+    // Default source account: Laci Retail (1-1110)
+    int? sourceId;
+    if (_cashAccounts.isNotEmpty) {
+      final defaultCash = _cashAccounts.firstWhere(
+        (a) => (a['code'] == '1-1110' || a['code'] == '1-1111'),
+        orElse: () => _cashAccounts[0],
       );
-      return;
+      sourceId = defaultCash['id'];
     }
 
-    setState(() => _isSubmitting = true);
-
-    try {
-      final res = await ApiService.storeCashTransaction(
-        type: _currentType,
-        accountId: _sourceAccountId!,
-        oppositeAccountId: _oppositeAccountId!,
-        amount: amount,
-        description: _descController.text.trim(),
+    // Default opposite account
+    int? oppositeId;
+    if (_currentType == 'out' && _expenseAccounts.isNotEmpty) {
+      final defaultExp = _expenseAccounts.firstWhere(
+        (a) => a['code'] == '6-2300', // Beban Operasional Lainnya
+        orElse: () => _expenseAccounts[0],
       );
-
-      setState(() => _isSubmitting = false);
-
-      if (res['success'] == true) {
-        if (!mounted) return;
-        Navigator.pop(context);
-
-        _amountController.clear();
-        _descController.clear();
-
-        final label = _currentType == 'in' ? 'Kas Masuk' : 'Kas Keluar';
-        NotificationService.showNotification(
-          id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '💰 $label Berhasil Dicatat',
-          body: '$label senilai ${currencyFormatter.format(amount)} berhasil disimpan.',
-        );
-
-        _loadData();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label berhasil disimpan!'), backgroundColor: ThemeConfig.primary),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(res['message'] ?? 'Gagal menyimpan transaksi'), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      oppositeId = defaultExp['id'];
+    } else if (_currentType == 'in' && _incomeAccounts.isNotEmpty) {
+      final defaultInc = _incomeAccounts.firstWhere(
+        (a) => a['code'] == '3-1000' || a['code'] == '4-2000', // Modal Usaha / Pendapatan Lain
+        orElse: () => _incomeAccounts[0],
       );
+      oppositeId = defaultInc['id'];
     }
-  }
 
-  void _openAddModal() {
+    bool isSubmitting = false;
+    final isOut = _currentType == 'out';
+    final label = isOut ? 'Kas Keluar' : 'Kas Masuk';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
+      builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
-              final label = _currentType == 'in' ? 'Kas Masuk' : 'Kas Keluar';
-
               return SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Catat $label Baru', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Nominal (Rp)', hintText: '50000'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              isOut ? Icons.arrow_circle_up_outlined : Icons.arrow_circle_down_outlined,
+                              color: isOut ? Colors.red.shade700 : Colors.green.shade700,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text('Catat $label Baru', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const Divider(height: 16),
+
+                    // Quick Chips for Kas Keluar
+                    if (isOut) ...[
+                      const Text('Pilihan Cepat Pengeluaran:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blueGrey)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _quickExpenses.map((qe) {
+                          final isSelected = descController.text.contains(qe['title']);
+                          return ActionChip(
+                            avatar: Icon(qe['icon'] as IconData, size: 14, color: isSelected ? Colors.white : Colors.red.shade700),
+                            label: Text(qe['title'] as String, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : Colors.black87)),
+                            backgroundColor: isSelected ? Colors.red.shade700 : Colors.red.shade50,
+                            side: BorderSide(color: isSelected ? Colors.red.shade700 : Colors.red.shade200),
+                            onPressed: () {
+                              setModalState(() {
+                                descController.text = qe['desc'] as String;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Akun Kas Sumber
+                    Text(
+                      isOut ? 'Ambil Uang Dari (Kas Sumber) *' : 'Uang Disimpan Ke (Kas Penampung) *',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<int>(
+                      value: sourceId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                      items: _cashAccounts.map<DropdownMenuItem<int>>((a) {
+                        final code = a['code'] ?? '';
+                        final name = a['name'] ?? '';
+                        return DropdownMenuItem<int>(
+                          value: a['id'] as int,
+                          child: Text('$code - $name', style: const TextStyle(fontSize: 12)),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setModalState(() => sourceId = val),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Kategori Akun Lawan
+                    Text(
+                      isOut ? 'Kategori Beban / Pengeluaran *' : 'Kategori Sumber Penerimaan / Modal *',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<int>(
+                      value: oppositeId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                      items: (isOut ? _expenseAccounts : _incomeAccounts).map<DropdownMenuItem<int>>((a) {
+                        final code = a['code'] ?? '';
+                        final name = a['name'] ?? '';
+                        return DropdownMenuItem<int>(
+                          value: a['id'] as int,
+                          child: Text('$code - $name', style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setModalState(() => oppositeId = val),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Nominal
+                    const Text('Nominal (Rp) *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    const SizedBox(height: 6),
                     TextField(
-                      controller: _descController,
-                      decoration: const InputDecoration(labelText: 'Keterangan Transaksi', hintText: 'Beban operasional / penerimaan'),
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        hintText: 'Contoh: 15000',
+                        prefixText: 'Rp ',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Keterangan Transaksi
+                    const Text('Keterangan / Catatan *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descController,
+                      decoration: InputDecoration(
+                        hintText: isOut ? 'Contoh: Uang makan siang kasir toko' : 'Contoh: Tambah saldo modal toko',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
                     ),
                     const SizedBox(height: 20),
+
+                    // Submit Button
                     SizedBox(
                       width: double.infinity,
+                      height: 46,
                       child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitCashTransaction,
-                        style: ElevatedButton.styleFrom(backgroundColor: ThemeConfig.primary),
-                        child: _isSubmitting
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final double? amount = double.tryParse(amountController.text.replaceAll('.', '').replaceAll(',', ''));
+                                if (amount == null || amount <= 0 || descController.text.trim().isEmpty || sourceId == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Harap lengkapi semua kolom dan nominal valid!'), backgroundColor: Colors.red),
+                                  );
+                                  return;
+                                }
+
+                                setModalState(() => isSubmitting = true);
+
+                                try {
+                                  final res = await ApiService.storeCashTransaction(
+                                    type: _currentType,
+                                    accountId: sourceId!,
+                                    oppositeAccountId: oppositeId ?? sourceId!,
+                                    amount: amount,
+                                    description: descController.text.trim(),
+                                  );
+
+                                  if (res['success'] == true) {
+                                    if (!mounted) return;
+                                    Navigator.pop(ctx);
+                                    _loadData();
+
+                                    NotificationService.showNotification(
+                                      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                                      title: '💰 $label Berhasil Disimpan',
+                                      body: '$label senilai ${currencyFormatter.format(amount)} (${descController.text}) sukses dibukukan.',
+                                    );
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('$label berhasil disimpan!'),
+                                        backgroundColor: isOut ? Colors.orange.shade800 : ThemeConfig.primary,
+                                      ),
+                                    );
+                                  } else {
+                                    setModalState(() => isSubmitting = false);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(res['message'] ?? 'Gagal menyimpan transaksi'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setModalState(() => isSubmitting = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isOut ? Colors.red.shade700 : ThemeConfig.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: isSubmitting
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text('Simpan $label', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            : Text('Simpan $label', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       ),
                     ),
                   ],
@@ -168,70 +324,191 @@ class _CashScreenState extends State<CashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _currentType == 'in' ? 'Kas Masuk' : 'Kas Keluar';
+    final isOut = _currentType == 'out';
+    final totalAmount = _transactions.fold<double>(0.0, (acc, item) => acc + (double.tryParse(item['amount'].toString()) ?? 0.0));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Kas Masuk & Kas Keluar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: ThemeConfig.primary,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.amber,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          tabs: const [
+            Tab(icon: Icon(Icons.arrow_circle_down, size: 18), text: 'KAS MASUK'),
+            Tab(icon: Icon(Icons.arrow_circle_up, size: 18), text: 'KAS KELUAR'),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddModal,
-        backgroundColor: ThemeConfig.primary,
+        onPressed: () => _openAddModal(),
+        backgroundColor: isOut ? Colors.red.shade700 : ThemeConfig.primary,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text('Tambah $title', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: Text(
+          isOut ? 'Tambah Kas Keluar' : 'Tambah Kas Masuk',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-          : _transactions.isEmpty
-              ? Center(child: Text('Belum ada data riwayat $title'))
-              : ListView.separated(
+          : Column(
+              children: [
+                // Header Summary Card
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.all(14),
                   padding: const EdgeInsets.all(16),
-                  itemCount: _transactions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final t = _transactions[index];
-                    final amount = double.tryParse(t['amount'].toString()) ?? 0;
-                    final desc = t['description'] ?? '-';
-                    final date = t['transaction_date'] ?? '-';
-
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isOut ? Colors.red.shade50 : Colors.green.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isOut ? Icons.trending_down : Icons.trending_up,
+                          color: isOut ? Colors.red.shade700 : Colors.green.shade700,
+                          size: 24,
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(desc, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                const SizedBox(height: 2),
-                                Text(date, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                              ],
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isOut ? 'Total Pengeluaran Kas Tercatat' : 'Total Kas Masuk Tercatat',
+                              style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade600, fontWeight: FontWeight.w600),
                             ),
-                          ),
-                          Text(
-                            currencyFormatter.format(amount),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: _currentType == 'in' ? Colors.green : Colors.red,
+                            const SizedBox(height: 2),
+                            Text(
+                              currencyFormatter.format(totalAmount),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: isOut ? Colors.red.shade700 : Colors.green.shade800,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
+
+                // Transactions List
+                Expanded(
+                  child: _transactions.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isOut ? Icons.receipt_long_outlined : Icons.account_balance_wallet_outlined,
+                                size: 54,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                isOut ? 'Belum ada riwayat Kas Keluar.' : 'Belum ada riwayat Kas Masuk.',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                isOut
+                                    ? 'Tekan tombol "Tambah Kas Keluar" untuk catat uang makan, sampah, dll.'
+                                    : 'Tekan tombol "Tambah Kas Masuk" untuk catat saldo modal atau penerimaan.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          itemCount: _transactions.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final t = _transactions[index];
+                            final amount = double.tryParse(t['amount'].toString()) ?? 0;
+                            final desc = t['description'] ?? '-';
+                            final date = t['transaction_date'] ?? '-';
+                            final number = t['transaction_number'] ?? '';
+                            final debitAcc = t['debit_account'];
+                            final creditAcc = t['credit_account'];
+
+                            return Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isOut ? Colors.red.shade50 : Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      isOut ? Icons.arrow_upward : Icons.arrow_downward,
+                                      size: 16,
+                                      color: isOut ? Colors.red.shade700 : Colors.green.shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(desc, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        const SizedBox(height: 4),
+                                        if (number.isNotEmpty)
+                                          Text(number, style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.blueGrey)),
+                                        const SizedBox(height: 2),
+                                        if (isOut && debitAcc != null)
+                                          Text('Pos: ${debitAcc['name']}', style: TextStyle(fontSize: 10, color: Colors.grey.shade600))
+                                        else if (!isOut && creditAcc != null)
+                                          Text('Sumber: ${creditAcc['name']}', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                                        const SizedBox(height: 2),
+                                        Text(date, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    (isOut ? '- ' : '+ ') + currencyFormatter.format(amount),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isOut ? Colors.red.shade700 : Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
     );
   }
 }

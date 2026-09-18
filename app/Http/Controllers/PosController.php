@@ -23,7 +23,10 @@ class PosController extends Controller
     {
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
-        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
+            ->where('type', 'D')
+            ->orderBy('code')
+            ->get();
 
         $recentSales = Sale::where('sale_type', 'retail')
             ->with(['customer', 'items.product'])
@@ -31,7 +34,7 @@ class PosController extends Controller
             ->limit(15)
             ->get();
 
-        return view('pos.retail', compact('products', 'customers', 'accounts', 'recentSales'));
+        return view('pos.retail', compact('products', 'customers', 'accounts', 'expenseAccounts', 'recentSales'));
     }
 
     /**
@@ -42,6 +45,10 @@ class PosController extends Controller
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
+            ->where('type', 'D')
+            ->orderBy('code')
+            ->get();
 
         $recentSales = Sale::where('sale_type', 'grosir')
             ->with(['customer', 'items.product'])
@@ -49,7 +56,7 @@ class PosController extends Controller
             ->limit(15)
             ->get();
 
-        return view('pos.wholesale', compact('products', 'customers', 'accounts', 'recentSales'));
+        return view('pos.wholesale', compact('products', 'customers', 'accounts', 'expenseAccounts', 'recentSales'));
     }
 
     /**
