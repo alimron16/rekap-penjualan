@@ -25,6 +25,7 @@ import 'settings_screen.dart';
 import 'outlets_screen.dart';
 import 'shift_screen.dart';
 import 'store_logs_screen.dart';
+import '../widgets/ai_assistant_modal.dart';
 
 class AppColors {
   static const Color slateBorder = Color(0xFFE2E8F0);
@@ -284,6 +285,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : const Icon(Icons.refresh),
             tooltip: 'Segarkan Dashboard',
             onPressed: () => _loadDashboardData(isBackgroundSync: false),
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent),
+            tooltip: 'Tanya AI Asisten',
+            onPressed: () => AiAssistantModal.show(context),
           ),
           IconButton(
             icon: Stack(
@@ -1308,6 +1314,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
 
                       const Divider(),
+                      _drawerItem(Icons.auto_awesome, 'Tanya AI Asisten Kasir', () {
+                        Navigator.pop(context);
+                        AiAssistantModal.show(context);
+                      }),
                       _drawerItem(Icons.schedule, 'Rekap Shift & Setor Kasir', () {
                         Navigator.pop(context);
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ShiftScreen()));

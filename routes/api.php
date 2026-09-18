@@ -98,3 +98,6 @@ Route::get('/settings', [MobileApiController::class, 'storeSettings']);
 Route::put('/settings', [MobileApiController::class, 'updateSettings']);
 Route::post('/settings/logo', [MobileApiController::class, 'uploadSettingsLogo']);
 
+// 11. AI Assistant (Gemini)
+Route::post('/ai/ask', [MobileApiController::class, 'askAi']);
+

@@ -684,6 +684,10 @@
         });
     </script>
 
+    @auth
+        @include('partials.ai_assistant')
+    @endauth
+
     @stack('scripts')
 </body>
 </html>

@@ -49,6 +49,9 @@ Route::middleware('auth')->group(function () {
     // Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    // AI Assistant (Gemini)
+    Route::post('/ai/ask', [\App\Http\Controllers\AiAssistantController::class, 'askWeb'])->name('ai.ask');
+
     // Master Data
     Route::prefix('master')->name('master.')->group(function () {
         Route::get('/items', [MasterDataController::class, 'items'])->name('items');

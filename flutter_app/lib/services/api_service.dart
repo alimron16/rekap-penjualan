@@ -856,5 +856,16 @@ class ApiService {
       debugPrint('updateFcmToken error: $e');
     }
   }
+
+  /// Ask Google Gemini AI Assistant
+  static Future<Map<String, dynamic>> askAi({
+    required String message,
+    List<Map<String, String>> history = const [],
+  }) async {
+    return await _post('$baseUrl/ai/ask', {
+      'message': message,
+      'history': history,
+    });
+  }
 }
 

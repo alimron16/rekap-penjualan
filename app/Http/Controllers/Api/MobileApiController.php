@@ -41,7 +41,8 @@ class MobileApiController extends Controller
         protected PosTransactionService $posService,
         protected AccountingService $accountingService,
         protected FinancialReportService $reportService,
-        protected YearlyClosingService $closingService
+        protected YearlyClosingService $closingService,
+        protected \App\Services\GeminiAiService $geminiService
     ) {}
 
     /**
@@ -2366,6 +2367,33 @@ class MobileApiController extends Controller
     }
 
     /**
+     * Ask AI Assistant for mobile app
+     */
+    public function askAi(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $request->validate([
+            'message' => 'required|string|max:1000',
+            'history' => 'nullable|array',
+        ]);
+
+        $userContext = [
+            'name' => $user->name,
+            'role' => $user->role,
+            'outlet' => $user->outlet?->name ?? 'Toko Kasir',
+        ];
+
+        $history = $request->input('history', []);
+        $response = $this->geminiService->ask($request->message, $history, $userContext);
+
+        return response()->json($response);
+    }
+
+    /**
      * Helper to authenticate token
      */
     private function getUserFromToken(Request $request)
@@ -2378,3 +2406,4 @@ class MobileApiController extends Controller
         return User::where('remember_token', $token)->first();
     }
 }
+
