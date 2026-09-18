@@ -267,7 +267,7 @@ class _UsersScreenState extends State<UsersScreen> {
                               _loadData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: 'Pengguna Berhasil Ditambahkan! 👥',
+                                title: 'Pengguna Berhasil Ditambahkan',
                                 body: 'Akun "${nameController.text}" ($role) berhasil didaftarkan.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(

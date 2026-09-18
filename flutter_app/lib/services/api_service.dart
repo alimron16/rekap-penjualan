@@ -862,10 +862,15 @@ class ApiService {
     required String message,
     List<Map<String, String>> history = const [],
   }) async {
-    return await _post('$baseUrl/ai/ask', {
-      'message': message,
-      'history': history,
-    });
+    // AI calls can take longer due to model fallback chain and Gemini processing
+    return await _post(
+      '$baseUrl/ai/ask',
+      {
+        'message': message,
+        'history': history,
+      },
+      timeout: const Duration(seconds: 45),
+    );
   }
 }
 

@@ -115,7 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Pengaturan toko berhasil disimpan!'),
+              content: Text('Pengaturan toko berhasil disimpan'),
               backgroundColor: ThemeConfig.primary,
             ),
           );
@@ -151,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (res['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Logo toko berhasil diperbarui!'),
+              content: Text('Logo toko berhasil diperbarui'),
               backgroundColor: ThemeConfig.primary,
             ),
           );

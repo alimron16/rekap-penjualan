@@ -30,8 +30,9 @@ import '../widgets/ai_assistant_modal.dart';
 class AppColors {
   static const Color slateBorder = Color(0xFFE2E8F0);
   static const Color slateText = Color(0xFF64748B);
-  static const Color emeraldLight = Color(0xFFECFDF5);
+  static const Color emeraldLight = Color(0xFFD1FAE5);
   static const Color emeraldIcon = Color(0xFF047857);
+  static const Color emeraldSurface = Color(0xFFECFDF5);
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -117,7 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               NotificationService.showNotification(
                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                title: '⚠️ Pengajuan Transfer Baru! 🏦',
+                title: 'Pengajuan Transfer Baru',
                 body: '$sender mengajukan transfer $bank sebesar ${Formatters.formatRupiah(amount)}. Menunggu persetujuan Anda.',
               );
             }
@@ -184,7 +185,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (pendingCount > 0 && (role == 'admin' || role == 'super_admin' || role == 'superadmin')) {
             NotificationService.showNotification(
               id: 101,
-              title: '⚠️ Pengajuan Transfer Menunggu ACC',
+              title: 'Pengajuan Transfer Menunggu ACC',
               body: 'Ada $pendingCount pengajuan transfer agen yang butuh persetujuan Anda.',
             );
           }
@@ -262,57 +263,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isAdmin = role == 'admin' || role == 'super_admin' || role == 'superadmin';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: ThemeConfig.bgLight,
       appBar: AppBar(
+        backgroundColor: ThemeConfig.primary,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Dashboard Operasional', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            const Text(
+              'Dashboard Operasional',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
+            ),
             Text(
               _userData?['store_name'] ?? 'ELEPHANT CELL',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
+              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.65)),
             ),
           ],
         ),
         actions: [
+          if (_isSyncing)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 22),
+              tooltip: 'Segarkan Dashboard',
+              onPressed: () => _loadDashboardData(isBackgroundSync: false),
+            ),
           IconButton(
-            icon: _isSyncing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.refresh),
-            tooltip: 'Segarkan Dashboard',
-            onPressed: () => _loadDashboardData(isBackgroundSync: false),
-          ),
-          IconButton(
-            icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent),
+            icon: const Icon(Icons.smart_toy_outlined, color: Colors.white70, size: 22),
             tooltip: 'Tanya AI Asisten',
             onPressed: () => AiAssistantModal.show(context),
           ),
-          IconButton(
-            icon: Stack(
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                const Icon(Icons.notifications_outlined),
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: Colors.white70, size: 22),
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
+                  },
+                ),
                 if (_lastPendingTransferCount > 0 && isAdmin)
                   Positioned(
-                    right: 0,
-                    top: 0,
+                    right: 6,
+                    top: 8,
                     child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      child: Text(
-                        '$_lastPendingTransferCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      width: 16,
+                      height: 16,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$_lastPendingTransferCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
                   ),
               ],
             ),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
-            },
           ),
         ],
       ),
@@ -411,29 +431,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               margin: const EdgeInsets.only(bottom: 12),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
+                                color: ThemeConfig.warningSurface,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.amber.shade300),
+                                border: Border.all(color: const Color(0xFFFCD34D)),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.wifi_off_rounded, size: 18, color: Colors.amber.shade800),
+                                  const Icon(Icons.wifi_off_rounded, size: 17, color: ThemeConfig.warning),
                                   const SizedBox(width: 10),
-                                  Expanded(
+                                  const Expanded(
                                     child: Text(
-                                      'Mode Offline: Menampilkan data tersimpan di HP.',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.amber.shade900),
+                                      'Mode Offline — Data yang ditampilkan berasal dari cache lokal.',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: ThemeConfig.warning),
                                     ),
                                   ),
-                                  InkWell(
-                                    onTap: () => _loadDashboardData(isBackgroundSync: false),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      child: Text(
-                                        'Segarkan',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary, decoration: TextDecoration.underline),
-                                      ),
+                                  TextButton(
+                                    onPressed: () => _loadDashboardData(isBackgroundSync: false),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: ThemeConfig.primary,
+                                      minimumSize: Size.zero,
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     ),
+                                    child: const Text('Segarkan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
@@ -761,7 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisCount: isTablet ? 4 : 2,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: isTablet ? 1.4 : 1.3,
+        childAspectRatio: isTablet ? 1.5 : 1.25,
       ),
       itemCount: kpis.length,
       itemBuilder: (ctx, i) {
@@ -769,15 +789,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isDark = it['isDark'] == true;
 
         return Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF133E1C) : Colors.white,
+            color: isDark ? ThemeConfig.primary : Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isDark ? const Color(0xFF064E3B) : AppColors.slateBorder),
+            border: Border.all(
+              color: isDark ? ThemeConfig.primaryLight : AppColors.slateBorder,
+            ),
             boxShadow: [
               BoxShadow(
-                color: isDark ? const Color(0x14000000) : const Color(0x05000000),
-                blurRadius: 4,
+                color: Colors.black.withValues(alpha: isDark ? 0.08 : 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -787,28 +810,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       it['title'] as String,
                       style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF64748B),
-                        letterSpacing: 0.3,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white60 : ThemeConfig.textMuted,
+                        letterSpacing: 0.2,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 4),
                   Container(
-                    width: 28,
-                    height: 28,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: it['iconBg'] as Color,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : (it['iconBg'] as Color),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(it['icon'] as IconData, size: 16, color: it['iconColor'] as Color),
+                    child: Icon(
+                      it['icon'] as IconData,
+                      size: 16,
+                      color: isDark ? Colors.white70 : (it['iconColor'] as Color),
+                    ),
                   ),
                 ],
               ),
@@ -817,13 +848,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   FittedBox(
                     fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
                     child: Text(
                       it['value'] as String,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        fontFamily: 'monospace',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : ThemeConfig.textDark,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
@@ -831,8 +863,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     it['desc'] as String,
                     style: TextStyle(
-                      fontSize: 9.5,
-                      color: isDark ? Colors.white70 : const Color(0xFF94A3B8),
+                      fontSize: 10,
+                      color: isDark ? Colors.white54 : ThemeConfig.textLight,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1032,22 +1064,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: progressPct >= 100 ? const Color(0xFFD1FAE5) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: progressPct >= 100 ? const Color(0xFF6EE7B7) : const Color(0xFFCBD5E1)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: progressPct >= 100 ? ThemeConfig.successSurface : ThemeConfig.bgInput,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: progressPct >= 100 ? const Color(0xFF6EE7B7) : ThemeConfig.border,
               ),
-              child: Text(
-                progressPct >= 100 ? '🎉 TARGET BULANAN TERCAPAI' : 'Menuju target profit bulan berjalan',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  color: progressPct >= 100 ? const Color(0xFF065F46) : const Color(0xFF475569),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  progressPct >= 100 ? Icons.check_circle_rounded : Icons.track_changes_rounded,
+                  size: 14,
+                  color: progressPct >= 100 ? ThemeConfig.success : ThemeConfig.textMuted,
                 ),
-              ),
+                const SizedBox(width: 6),
+                Text(
+                  progressPct >= 100 ? 'Target Bulanan Tercapai' : 'Menuju target profit bulan berjalan',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: progressPct >= 100 ? ThemeConfig.success : ThemeConfig.textMuted,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1059,6 +1102,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final d = _dashboardData ?? {};
     final rawDaily = d['dailySales'];
     final Map<dynamic, dynamic> dailySales = (rawDaily is Map) ? rawDaily : {};
+
+    // Calculate max value for relative bar sizing
+    final entries = dailySales.entries.take(7).toList();
+    final maxVal = entries.isEmpty
+        ? 1.0
+        : entries.map((e) => Formatters.parseDouble(e.value)).reduce((a, b) => a > b ? a : b);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1073,9 +1122,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           Row(
             children: const [
-              Icon(Icons.show_chart, size: 16, color: ThemeConfig.primary),
+              Icon(Icons.bar_chart_rounded, size: 17, color: ThemeConfig.primary),
               SizedBox(width: 6),
-              Text('Tren Penjualan Harian', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('Tren Penjualan Harian', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ThemeConfig.textDark)),
             ],
           ),
           const Divider(height: 16),
@@ -1083,20 +1132,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: Text('Belum ada transaksi penjualan pada periode ini', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                child: Text(
+                  'Belum ada transaksi penjualan pada periode ini',
+                  style: TextStyle(fontSize: 12, color: ThemeConfig.textMuted),
+                ),
               ),
             )
           else ...[
-            ...dailySales.entries.take(7).map((e) {
+            ...entries.map((e) {
               final day = e.key.toString();
               final rev = Formatters.parseDouble(e.value);
+              final ratio = (maxVal > 0) ? (rev / maxVal).clamp(0.0, 1.0) : 0.0;
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(day, style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
-                    Text(Formatters.formatRupiah(rev), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(day, style: const TextStyle(fontSize: 11, color: ThemeConfig.textMuted)),
+                        Text(Formatters.formatRupiah(rev), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: ThemeConfig.textDark)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 5,
+                        backgroundColor: AppColors.slateBorder,
+                        valueColor: const AlwaysStoppedAnimation<Color>(ThemeConfig.accent),
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -1226,22 +1294,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildAppDrawer() {
     return Drawer(
+      backgroundColor: Colors.white,
       child: SafeArea(
         bottom: true,
         child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: ThemeConfig.primary),
-              currentAccountPicture: const CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.store, color: ThemeConfig.primary, size: 36),
-              ),
-              accountName: Text(
-                _userData?['name'] ?? 'User Kasir',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              accountEmail: Text(_userData?['email'] ?? 'user@pos.moonbyte.my.id'),
+            // Drawer Header
+            Container(
+              width: double.infinity,
+              color: ThemeConfig.primary,
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+              child: Builder(builder: (context) {
+                final name = _userData?['name'] ?? 'User Kasir';
+                final email = _userData?['email'] ?? '-';
+                final role = (_userData?['role'] ?? 'kasir').toString();
+                final roleLabel = {
+                  'super_admin': 'Super Admin',
+                  'admin': 'Admin',
+                  'kasir': 'Kasir',
+                  'front_liner': 'Front Liner',
+                }[role.toLowerCase()] ?? role;
+
+                return Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                      ),
+                      child: const Icon(Icons.person_rounded, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            email,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                            ),
+                            child: Text(
+                              roleLabel,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ),
+
+            // Menu List
             Expanded(
               child: Builder(
                 builder: (context) {
@@ -1257,178 +1380,234 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }
 
                   return ListView(
-                    padding: EdgeInsets.zero,
+                    padding: const EdgeInsets.only(bottom: 12),
                     children: [
-                      if (hasPerm('pos', defaultAdmin: true, defaultFL: true)) ...[
-                        _drawerItem(Icons.point_of_sale, 'Kasir Eceran (Retail)', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
-                        }),
-                        _drawerItem(Icons.storefront, 'Kasir Grosir', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
-                        }),
-                      ],
-                      if (hasPerm('digital', defaultAdmin: true, defaultFL: true))
-                        _drawerItem(Icons.phone_android, 'Produk Multi / Pulsa', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
-                        }),
-                      
-                      if (hasPerm('master') || hasPerm('accounting'))
-                        const Divider(),
-                      if (hasPerm('master')) ...[
-                        _drawerItem(Icons.storefront, 'Master Cabang / Toko', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const OutletsScreen()));
-                        }),
-                        _drawerItem(Icons.inventory_2, 'Master Data Produk', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
-                        }),
-                        _drawerItem(Icons.people, 'Master Pelanggan', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()));
-                        }),
-                        _drawerItem(Icons.local_shipping, 'Master Supplier', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()));
-                        }),
-                      ],
-                      if (hasPerm('accounting'))
-                        _drawerItem(Icons.account_tree, 'Bagan Akun (COA)', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
-                        }),
-                      
-                      if (hasPerm('purchase')) ...[
-                        const Divider(),
-                        _drawerItem(Icons.shopping_bag, 'Pembelian & Hutang', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasesScreen()));
-                        }),
-                        _drawerItem(Icons.receipt, 'Piutang Pelanggan', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
-                        }),
+                      // --- Kasir & Transaksi ---
+                      if (hasPerm('pos', defaultAdmin: true, defaultFL: true) ||
+                          hasPerm('digital', defaultAdmin: true, defaultFL: true)) ...[
+                        _drawerSectionHeader('KASIR & TRANSAKSI'),
+                        if (hasPerm('pos', defaultAdmin: true, defaultFL: true)) ...[
+                          _drawerItem(Icons.point_of_sale_rounded, 'Kasir Eceran (Retail)', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'retail')));
+                          }, iconColor: ThemeConfig.primary),
+                          _drawerItem(Icons.storefront_rounded, 'Kasir Grosir', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const PosScreen(saleType: 'grosir')));
+                          }, iconColor: ThemeConfig.primaryLight),
+                        ],
+                        if (hasPerm('digital', defaultAdmin: true, defaultFL: true))
+                          _drawerItem(Icons.phone_android_rounded, 'Produk Multi / Pulsa', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalScreen()));
+                          }, iconColor: const Color(0xFF7C3AED)),
                       ],
 
-                      const Divider(),
-                      _drawerItem(Icons.auto_awesome, 'Tanya AI Asisten Kasir', () {
+                      // --- Operasional Kasir ---
+                      _drawerSectionHeader('OPERASIONAL KASIR'),
+                      _drawerItem(Icons.smart_toy_outlined, 'Tanya AI Asisten', () {
                         Navigator.pop(context);
                         AiAssistantModal.show(context);
-                      }),
-                      _drawerItem(Icons.schedule, 'Rekap Shift & Setor Kasir', () {
+                      }, iconColor: const Color(0xFF0EA5E9)),
+                      _drawerItem(Icons.punch_clock_rounded, 'Rekap Shift & Setor Kasir', () {
                         Navigator.pop(context);
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ShiftScreen()));
-                      }),
-                      _drawerItem(Icons.history, 'Histori Operasional Toko', () {
+                      }, iconColor: ThemeConfig.warning),
+                      _drawerItem(Icons.history_rounded, 'Histori Operasional Toko', () {
                         Navigator.pop(context);
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreLogsScreen()));
-                      }),
-                      _drawerItem(Icons.assignment_return, 'Retur Penjualan', () {
+                      }, iconColor: ThemeConfig.textMuted),
+                      _drawerItem(Icons.assignment_return_rounded, 'Retur Penjualan', () {
                         Navigator.pop(context);
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnsScreen()));
-                      }),
-                      if (hasPerm('master'))
-                        _drawerItem(Icons.tune, 'Penyesuaian Stok (Opname)', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
-                        }),
+                      }, iconColor: Colors.orange),
                       if (hasPerm('accounting', defaultAdmin: true, defaultFL: true))
-                        _drawerItem(Icons.attach_money, 'Kas Masuk & Keluar', () {
+                        _drawerItem(Icons.account_balance_wallet_rounded, 'Kas Masuk & Keluar', () {
                           Navigator.pop(context);
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const CashScreen()));
-                        }),
+                        }, iconColor: AppColors.emeraldIcon),
                       if (hasPerm('transfer', defaultAdmin: true, defaultFL: true))
-                        _drawerItem(Icons.swap_horiz, 'Transfer Antar Akun', () {
+                        _drawerItem(Icons.swap_horiz_rounded, 'Transfer Antar Akun', () {
                           Navigator.pop(context);
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferScreen()));
-                        }),
+                        }, iconColor: ThemeConfig.info),
 
-                      if (hasPerm('reports') || isSuperAdmin || hasPerm('settings'))
-                        const Divider(),
-                      if (hasPerm('reports'))
-                        _drawerItem(Icons.bar_chart, 'Laporan Keuangan', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
-                        }),
-                      if (isSuperAdmin || hasPerm('users', defaultAdmin: false, defaultFL: false))
-                        _drawerItem(Icons.manage_accounts, 'Manajemen Pengguna', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersScreen()));
-                        }),
-                      if (hasPerm('settings'))
-                        _drawerItem(Icons.settings, 'Pengaturan & Printer', () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-                        }),
-                      const Divider(),
-                      // ── LOGOUT ────────────────────────────────────────
+                      // --- Master Data ---
+                      if (hasPerm('master') || hasPerm('accounting') || hasPerm('purchase')) ...[
+                        _drawerSectionHeader('MASTER DATA'),
+                        if (hasPerm('master')) ...[
+                          _drawerItem(Icons.store_rounded, 'Master Cabang / Toko', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const OutletsScreen()));
+                          }, iconColor: ThemeConfig.textMuted),
+                          _drawerItem(Icons.inventory_2_rounded, 'Master Data Produk', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()));
+                          }, iconColor: ThemeConfig.primary),
+                          _drawerItem(Icons.people_rounded, 'Master Pelanggan', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()));
+                          }, iconColor: const Color(0xFF0EA5E9)),
+                          _drawerItem(Icons.local_shipping_rounded, 'Master Supplier', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()));
+                          }, iconColor: ThemeConfig.warning),
+                          _drawerItem(Icons.tune_rounded, 'Penyesuaian Stok (Opname)', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryScreen()));
+                          }, iconColor: ThemeConfig.textMuted),
+                        ],
+                        if (hasPerm('accounting'))
+                          _drawerItem(Icons.account_tree_rounded, 'Bagan Akun (COA)', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountsScreen()));
+                          }, iconColor: AppColors.emeraldIcon),
+                        if (hasPerm('purchase')) ...[
+                          _drawerItem(Icons.shopping_bag_rounded, 'Pembelian & Hutang', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchasesScreen()));
+                          }, iconColor: Colors.orange),
+                          _drawerItem(Icons.receipt_long_rounded, 'Piutang Pelanggan', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
+                          }, iconColor: ThemeConfig.danger),
+                        ],
+                      ],
+
+                      // --- Laporan & Pengaturan ---
+                      if (hasPerm('reports') || isSuperAdmin || hasPerm('settings') ||
+                          hasPerm('users', defaultAdmin: false, defaultFL: false)) ...[
+                        _drawerSectionHeader('LAPORAN & PENGATURAN'),
+                        if (hasPerm('reports'))
+                          _drawerItem(Icons.bar_chart_rounded, 'Laporan Keuangan', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()));
+                          }, iconColor: ThemeConfig.primary),
+                        if (isSuperAdmin || hasPerm('users', defaultAdmin: false, defaultFL: false))
+                          _drawerItem(Icons.manage_accounts_rounded, 'Manajemen Pengguna', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersScreen()));
+                          }, iconColor: ThemeConfig.textMuted),
+                        if (hasPerm('settings'))
+                          _drawerItem(Icons.settings_rounded, 'Pengaturan & Printer', () {
+                            Navigator.pop(context);
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                          }, iconColor: ThemeConfig.textMuted),
+                      ],
+
+                      // --- Logout ---
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Divider(height: 24),
+                      ),
                       ListTile(
-                        leading: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: ThemeConfig.dangerSurface,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.logout_rounded, color: ThemeConfig.danger, size: 17),
+                        ),
                         title: const Text(
-                          'Keluar / Logout',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.red),
+                          'Keluar dari Aplikasi',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ThemeConfig.danger),
                         ),
-                    dense: true,
-                    onTap: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          title: const Row(
-                            children: [
-                              Icon(Icons.logout_rounded, color: Colors.red, size: 22),
-                              SizedBox(width: 8),
-                              Text('Konfirmasi Logout'),
-                            ],
-                          ),
-                          content: const Text(
-                            'Apakah Anda yakin ingin keluar dari aplikasi? Semua sesi akan dihapus.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Batal'),
-                            ),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                        onTap: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              title: const Text('Konfirmasi Keluar',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                              content: const Text(
+                                'Apakah Anda yakin ingin keluar? Semua sesi aktif akan dihapus.',
+                                style: TextStyle(fontSize: 13, color: ThemeConfig.textBody),
                               ),
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Ya, Keluar'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Batal', style: TextStyle(color: ThemeConfig.textMuted)),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: ThemeConfig.danger,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Ya, Keluar'),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true && context.mounted) {
-                        await ApiService.logout();
-                        if (context.mounted) {
-                          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                        }
-                      }
-                    },
-                  ),
-                ],
-              );
-            },
-          ),
+                          );
+                          if (confirmed == true && context.mounted) {
+                            await ApiService.logout();
+                            if (context.mounted) {
+                              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
   }
 
-  Widget _drawerItem(IconData icon, String title, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: ThemeConfig.primary, size: 20),
-      title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      dense: true,
-      onTap: onTap,
+  Widget _drawerSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: ThemeConfig.textLight,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem(IconData icon, String title, VoidCallback onTap, {Color? iconColor}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: (iconColor ?? ThemeConfig.primary).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 17, color: iconColor ?? ThemeConfig.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ThemeConfig.textBody),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

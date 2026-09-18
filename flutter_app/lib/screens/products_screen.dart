@@ -398,7 +398,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                               _loadItems();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: isEditing ? 'Item Diperbarui! ✅' : 'Item Baru Disimpan! 🛍️',
+                                title: isEditing ? 'Item Diperbarui' : 'Item Baru Disimpan',
                                 body: 'Barang "${nameController.text}" berhasil disimpan ke sistem.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -628,7 +628,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                               _loadMultiProducts();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: isEditing ? 'Produk Multi Diperbarui! ✅' : 'Produk Multi Disimpan! ⚡',
+                                title: isEditing ? 'Produk Multi Diperbarui' : 'Produk Multi Disimpan',
                                 body: 'Produk "${nameController.text}" berhasil disimpan ke sistem.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(

@@ -36,7 +36,7 @@ void callbackDispatcher() {
             final amount = Formatters.parseDouble(latestPending['amount']);
             await NotificationService.showNotification(
               id: 1001,
-              title: '🔔 Request Transfer Masuk! (${Formatters.formatRupiah(amount)})',
+              title: 'Request Transfer Masuk (${Formatters.formatRupiah(amount)})',
               body: 'Pengajuan transfer dari $sender senilai ${Formatters.formatRupiah(amount)}. Silakan buka aplikasi untuk menyetujui.',
             );
           }
@@ -52,7 +52,7 @@ void callbackDispatcher() {
             final isApproved = status == 'APPROVED';
             await NotificationService.showNotification(
               id: 1002,
-              title: isApproved ? '✅ Transfer Berhasil Disetujui!' : '❌ Transfer Ditolak',
+              title: isApproved ? 'Transfer Berhasil Disetujui' : 'Transfer Ditolak',
               body: 'Pengajuan transfer saldo Anda (${Formatters.formatRupiah(amount)}) telah ${isApproved ? 'disetujui' : 'ditolak'}.',
             );
           }
@@ -113,7 +113,7 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       final title = message.notification?.title ??
           message.data['title'] ??
-          '🔔 Elephant POS';
+          'Elephant POS';
       final body = message.notification?.body ??
           message.data['body'] ??
           'Ada notifikasi baru.';

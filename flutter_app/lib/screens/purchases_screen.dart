@@ -346,7 +346,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                           _loadData();
                           NotificationService.showNotification(
                             id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                            title: 'Faktur Pembelian Disimpan! 📦',
+                            title: 'Faktur Pembelian Disimpan',
                             body: 'Pembelian barang dari supplier sebesar ${Formatters.formatRupiah(totalAmount)} berhasil dicatat.',
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -483,7 +483,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                       _loadData();
                       NotificationService.showNotification(
                         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                        title: 'Pembayaran Hutang Berhasil! 💸',
+                        title: 'Pembayaran Hutang Berhasil',
                         body: 'Hutang supplier sebesar ${Formatters.formatRupiah(amt)} berhasil dibayarkan.',
                       );
                       ScaffoldMessenger.of(context).showSnackBar(

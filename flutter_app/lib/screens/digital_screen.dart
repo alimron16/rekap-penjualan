@@ -130,7 +130,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
 
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '⚡ Transaksi Elektrik Berhasil! 🧾',
+          title: 'Transaksi Elektrik Berhasil',
           body: 'Penjualan pulsa/data ke ${_phoneController.text} sebesar ${Formatters.formatRupiah(price)} sukses.',
         );
 
@@ -495,14 +495,10 @@ class _DigitalScreenState extends State<DigitalScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: const Color(0xFF0F766E),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
-                            BoxShadow(color: const Color(0xFF0F766E).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))
                           ],
                         ),
                         child: Row(

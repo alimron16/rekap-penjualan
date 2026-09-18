@@ -190,7 +190,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                               _loadData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: isEditing ? 'Supplier Diperbarui! ✅' : 'Supplier Baru Disimpan! 🏢',
+                                title: isEditing ? 'Supplier Diperbarui' : 'Supplier Baru Disimpan',
                                 body: 'Supplier "${nameController.text}" berhasil disimpan ke sistem.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -343,14 +343,40 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                           children: [
                                             Text(s['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ThemeConfig.textDark)),
                                             const SizedBox(height: 3),
-                                            Text(
-                                              s['phone'] != null && s['phone'].toString().isNotEmpty ? '📞 ${s['phone']}' : '📞 Tidak ada telepon',
-                                              style: TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.phone_outlined, size: 12, color: ThemeConfig.textMuted),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  s['phone'] != null && s['phone'].toString().isNotEmpty ? s['phone'].toString() : 'Tidak ada telepon',
+                                                  style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
+                                                ),
+                                              ],
                                             ),
-                                            if (s['address'] != null && s['address'].toString().isNotEmpty)
-                                              Text('📍 ${s['address']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                            if (s['bank_name'] != null && s['account_number'] != null)
-                                              Text('🏦 ${s['bank_name']}: ${s['account_number']} a/n ${s['account_name'] ?? '-'}', style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 11)),
+                                            if (s['address'] != null && s['address'].toString().isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.place_outlined, size: 12, color: Colors.grey),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(s['address'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                            if (s['bank_name'] != null && s['account_number'] != null) ...[
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.account_balance_outlined, size: 12, color: Colors.blueGrey.shade700),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text('${s['bank_name']}: ${s['account_number']} a/n ${s['account_name'] ?? '-'}', style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),

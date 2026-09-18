@@ -21,7 +21,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   await NotificationService.init();
 
-  final title = message.notification?.title ?? message.data['title'] ?? '🔔 Elephant POS';
+  final title = message.notification?.title ?? message.data['title'] ?? 'Elephant POS';
   final body = message.notification?.body ?? message.data['body'] ?? 'Ada notifikasi baru untuk Anda.';
   final notifId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 

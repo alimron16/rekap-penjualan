@@ -587,7 +587,7 @@ class _PosScreenState extends State<PosScreen> {
 
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '✅ Transaksi Kasir Sukses! 🧾',
+          title: 'Transaksi Kasir Berhasil',
           body: 'Penjualan ${saleData?['invoice_number'] ?? ''} senilai ${Formatters.formatRupiah(_grandTotal)} berhasil disimpan!',
         );
 
@@ -1108,7 +1108,7 @@ class _PosScreenState extends State<PosScreen> {
                               _loadPosData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: '💵 Tarik Tunai Berhasil! 🧾',
+                                title: 'Tarik Tunai Berhasil',
                                 body: 'Penarikan uang tunai ${Formatters.formatRupiah(amount)} sukses dibukukan.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(

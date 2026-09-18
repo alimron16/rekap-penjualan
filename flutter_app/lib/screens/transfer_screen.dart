@@ -155,7 +155,7 @@ class _TransferScreenState extends State<TransferScreen> with SingleTickerProvid
 
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '🔔 Pengajuan Transfer Terkirim!',
+          title: 'Pengajuan Transfer Terkirim',
           body: 'Pengajuan transfer sebesar ${Formatters.formatRupiah(amount)} telah dikirim ke Admin.',
         );
 
@@ -416,7 +416,7 @@ class _TransferScreenState extends State<TransferScreen> with SingleTickerProvid
                               _loadTransfers();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: '✅ Transfer Disetujui!',
+                                title: 'Transfer Disetujui',
                                 body: 'Transfer ${transfer['reference_no']} senilai ${Formatters.formatRupiah(transfer['amount'])} berhasil disetujui.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -486,7 +486,7 @@ class _TransferScreenState extends State<TransferScreen> with SingleTickerProvid
                         _loadTransfers();
                         NotificationService.showNotification(
                           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                          title: '❌ Pengajuan Transfer Ditolak',
+                          title: 'Pengajuan Transfer Ditolak',
                           body: 'Pengajuan transfer ${transfer['reference_no']} telah ditolak.',
                         );
                         ScaffoldMessenger.of(context).showSnackBar(

@@ -606,7 +606,7 @@
         // 1. Trigger Native Android Notification (APK)
         if (window.AndroidBridge && typeof window.AndroidBridge.showNotification === 'function') {
             try {
-                window.AndroidBridge.showNotification('🔔 Pengajuan Transfer Baru!', 'Elephant POS: Kasir Toko mengajukan transfer saldo.');
+                window.AndroidBridge.showNotification('Pengajuan Transfer Baru', 'Elephant POS: Kasir Toko mengajukan transfer saldo.');
                 return;
             } catch (err) {
                 alert('Error AndroidBridge: ' + err.message);
@@ -616,7 +616,7 @@
         // 2. If opened in Chrome / Browser / PWA
         if ('Notification' in window) {
             if (Notification.permission === 'granted') {
-                new Notification('🔔 Tes Notifikasi Berhasil!', {
+                new Notification('Tes Notifikasi Berhasil', {
                     body: 'Elephant POS: Bunyi suara & izin notifikasi sistem berfungsi normal.',
                     icon: '/logo.png',
                     badge: '/icons/icon-192x192.png'
@@ -624,7 +624,7 @@
             } else if (Notification.permission !== 'denied') {
                 Notification.requestPermission().then(permission => {
                     if (permission === 'granted') {
-                        new Notification('🔔 Notifikasi Diaktifkan!', {
+                        new Notification('Notifikasi Diaktifkan', {
                             body: 'Sekarang Anda akan menerima pemberitahuan setiap ada pengajuan transfer baru.',
                             icon: '/logo.png'
                         });

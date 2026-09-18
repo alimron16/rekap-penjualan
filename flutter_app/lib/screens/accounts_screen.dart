@@ -218,7 +218,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               _loadData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: isEditing ? 'Akun Diperbarui! ✅' : 'Akun Baru Disimpan! 🏦',
+                                title: isEditing ? 'Akun Diperbarui' : 'Akun Baru Disimpan',
                                 body: 'Akun "${nameController.text}" berhasil disimpan.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -427,7 +427,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              '${a['group'] ?? ''} • ${isHeader ? 'Header' : 'Detail'} ${isLocked ? '🔒 Sistem' : ''}',
+                                              '${a['group'] ?? ''} • ${isHeader ? 'Header' : 'Detail'}${isLocked ? ' • [Sistem]' : ''}',
                                               style: TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
                                             ),
                                           ],

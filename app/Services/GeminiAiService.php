@@ -15,7 +15,7 @@ class GeminiAiService
     public function __construct()
     {
         $this->apiKey = config('services.gemini.key', env('GEMINI_API_KEY', ''));
-        $this->model = config('services.gemini.model', env('GEMINI_MODEL', 'gemini-3.6-flash'));
+        $this->model = config('services.gemini.model', env('GEMINI_MODEL', 'gemini-2.0-flash'));
         $this->baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent";
     }
 
@@ -62,10 +62,10 @@ class GeminiAiService
             // Candidate models to try in order of preference (handles high demand / spikes)
             $candidateModels = array_unique([
                 $this->model,
-                'gemini-3.5-flash',
-                'gemini-3.5-flash-lite',
-                'gemini-3.1-flash-lite',
-                'gemini-3.7-flash',
+                'gemini-2.0-flash',
+                'gemini-2.0-flash-lite',
+                'gemini-1.5-flash',
+                'gemini-1.5-flash-8b',
             ]);
 
             $lastErrorMessage = 'Gagal menghubungi server Google Gemini.';
@@ -73,7 +73,7 @@ class GeminiAiService
             foreach ($candidateModels as $currentModel) {
                 $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$currentModel}:generateContent?key={$this->apiKey}";
 
-                $response = Http::timeout(25)->post($endpoint, [
+                $response = Http::timeout(30)->post($endpoint, [
                     'system_instruction' => [
                         'parts' => [
                             ['text' => $systemInstruction]
@@ -82,7 +82,9 @@ class GeminiAiService
                     'contents' => $contents,
                     'generationConfig' => [
                         'temperature' => 0.4,
-                        'maxOutputTokens' => 800,
+                        'maxOutputTokens' => 1200,
+                        'topK' => 40,
+                        'topP' => 0.95,
                     ]
                 ]);
 
@@ -184,6 +186,7 @@ ATURAN KEAMANAN & BATASAN KETAT (GUARDRAILS):
 Gaya Komunikasi:
 - Berbahasa Indonesia yang ramah, sopan, jelas, ringkas, dan to-the-point.
 - Berikan panduan langkah tombol yang konkret (misal: "1. Buka menu ..., 2. Klik tombol ...").
+- JANGAN gunakan emoticon atau emoji dalam jawaban Anda. Gunakan format teks bersih, profesional, dan poin-poin terstruktur.
 TEXT;
     }
 }

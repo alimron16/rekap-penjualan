@@ -96,7 +96,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
       if (res['success'] == true) {
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-          title: '💵 Setoran Shift Kasir Berhasil! 🧾',
+          title: 'Setoran Shift Kasir Berhasil',
           body: 'Uang penjualan ${currencyFormatter.format(amount)} sukses disetor ke brankas/pusat.',
         );
 
@@ -154,14 +154,10 @@ class _ShiftScreenState extends State<ShiftScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF133E1C), Color(0xFF1D5A2B)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: ThemeConfig.primary,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
-                        BoxShadow(color: Colors.green.shade900.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
                       ],
                     ),
                     child: Column(

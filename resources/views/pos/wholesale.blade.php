@@ -728,10 +728,10 @@
             <div>
                 <label class="font-bold text-slate-700 block mb-1">Pilihan Cepat Beban:</label>
                 <div class="flex flex-wrap gap-1.5">
-                    <button type="button" onclick="setQuickExpense('Uang makan siang kasir toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🍱 Uang Makan</button>
-                    <button type="button" onclick="setQuickExpense('Iuran sampah & kebersihan toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🗑️ Sampah / Kebersihan</button>
-                    <button type="button" onclick="setQuickExpense('Beli kantong plastik kresek')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">🛍️ Kresek / ATK</button>
-                    <button type="button" onclick="setQuickExpense('Beli token listrik toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">💡 Token Listrik</button>
+                    <button type="button" onclick="setQuickExpense('Uang makan siang kasir toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">Uang Makan</button>
+                    <button type="button" onclick="setQuickExpense('Iuran sampah & kebersihan toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">Sampah / Kebersihan</button>
+                    <button type="button" onclick="setQuickExpense('Beli kantong plastik kresek')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">Kresek / ATK</button>
+                    <button type="button" onclick="setQuickExpense('Beli token listrik toko')" class="px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px]">Token Listrik</button>
                 </div>
             </div>
 

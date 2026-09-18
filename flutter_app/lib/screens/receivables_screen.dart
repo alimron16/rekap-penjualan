@@ -212,7 +212,7 @@ class _ReceivablesScreenState extends State<ReceivablesScreen> with SingleTicker
                                 _loadData();
                                 NotificationService.showNotification(
                                   id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                  title: 'Pelunasan Piutang Berhasil! 💰',
+                                  title: 'Pelunasan Piutang Berhasil',
                                   body: 'Pembayaran sebesar ${Formatters.formatRupiah(amt)} untuk ${sale['customer']?['name'] ?? 'Pelanggan'} berhasil dicatat.',
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(

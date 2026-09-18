@@ -215,7 +215,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               _loadData();
                               NotificationService.showNotification(
                                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                title: isEditing ? 'Pelanggan Diperbarui! ✅' : 'Pelanggan Baru Disimpan! 👤',
+                                title: isEditing ? 'Pelanggan Diperbarui' : 'Pelanggan Baru Disimpan',
                                 body: 'Pelanggan "${nameController.text}" berhasil disimpan ke sistem.',
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -397,13 +397,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                             ),
                                             const SizedBox(height: 3),
                                             Text(
-                                              c['phone'] != null && c['phone'].toString().isNotEmpty ? '📞 ${c['phone']}' : '📞 Tidak ada telepon',
+                                              c['phone'] != null && c['phone'].toString().isNotEmpty ? 'Telp: ${c['phone']}' : 'Tidak ada telepon',
                                               style: TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
                                             ),
                                             if (c['address'] != null && c['address'].toString().isNotEmpty)
-                                              Text('📍 ${c['address']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                              Text('Alamat: ${c['address']}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
                                             if (c['bank_name'] != null && c['account_number'] != null)
-                                              Text('🏦 ${c['bank_name']}: ${c['account_number']}', style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 11)),
+                                              Text('Bank: ${c['bank_name']} - ${c['account_number']}', style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 11)),
                                           ],
                                         ),
                                       ),

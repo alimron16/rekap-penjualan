@@ -179,7 +179,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 _loadData();
                                 NotificationService.showNotification(
                                   id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                  title: 'Penyesuaian Stok Berhasil! 📊',
+                                  title: 'Penyesuaian Stok Berhasil',
                                   body: 'Penyesuaian stok (${type == 'IN' ? '+' : '-'}$qty) berhasil disimpan.',
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(

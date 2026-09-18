@@ -63,7 +63,7 @@ class _WebFeatureScreenState extends State<WebFeatureScreen> {
             if (url.contains('receipt') || url.contains('invoice') || url.contains('success')) {
               NotificationService.showNotification(
                 id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                title: '✅ Transaksi Berhasil Disimpan',
+                title: 'Transaksi Berhasil Disimpan',
                 body: 'Struk / data transaksi telah berhasil dicatat ke sistem!',
               );
             }

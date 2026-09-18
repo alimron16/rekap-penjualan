@@ -331,7 +331,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
 
                                     NotificationService.showNotification(
                                       id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                      title: '💰 $label Berhasil Disimpan',
+                                      title: '$label Berhasil Disimpan',
                                       body: '$label senilai ${currencyFormatter.format(amount)} (${descController.text}) sukses dibukukan.',
                                     );
 

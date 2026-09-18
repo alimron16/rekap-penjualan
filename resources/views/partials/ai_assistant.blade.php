@@ -3,10 +3,12 @@
     <!-- Chat Drawer / Modal -->
     <div id="aiChatDrawer" class="hidden w-[92vw] sm:w-[400px] h-[520px] max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden mb-3 animate-in fade-in slide-in-from-bottom-5 duration-200">
         <!-- Header -->
-        <div class="bg-gradient-to-r from-emerald-800 via-forest-900 to-forest-950 text-white px-4 py-3.5 flex items-center justify-between shadow-md">
+        <div class="bg-emerald-800 text-white px-4 py-3.5 flex items-center justify-between shadow-md">
             <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-full bg-emerald-700/80 border border-emerald-400 flex items-center justify-center text-lg shadow-xs">
-                    🤖
+                <div class="w-8 h-8 rounded-full bg-emerald-700 border border-emerald-500/40 flex items-center justify-center text-white shadow-xs">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
                 </div>
                 <div>
                     <div class="font-bold text-xs flex items-center gap-1.5 tracking-wide">
@@ -31,7 +33,7 @@
                     AI
                 </div>
                 <div class="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-200/80 shadow-xs text-slate-800 max-w-[85%] leading-relaxed">
-                    Halo <strong>{{ Auth::user()->name ?? 'Kasir' }}</strong>! 👋<br>
+                    Halo <strong>{{ Auth::user()->name ?? 'Kasir' }}</strong>!<br>
                     Ada yang bisa saya bantu terkait transaksi POS, tarik tunai, transfer, stok, atau laporan keuangan?
                 </div>
             </div>
@@ -39,16 +41,16 @@
             <!-- Quick Questions Chips -->
             <div id="aiQuickChips" class="flex flex-wrap gap-1.5 pt-1">
                 <button onclick="sendQuickPrompt('Bagaimana cara proses Tarik Tunai nasabah di kasir?')" class="text-[11px] bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-900 px-2.5 py-1 rounded-full shadow-2xs transition">
-                    💵 Cara Tarik Tunai?
+                    Cara Tarik Tunai?
                 </button>
                 <button onclick="sendQuickPrompt('Bagaimana SOP rekap shift dan setor uang kasir saat tutup toko?')" class="text-[11px] bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-900 px-2.5 py-1 rounded-full shadow-2xs transition">
-                    📝 Tutup Shift & Setor?
+                    Tutup Shift & Setor?
                 </button>
                 <button onclick="sendQuickPrompt('Bagaimana cara catat pengeluaran kas keluar operasional toko?')" class="text-[11px] bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-900 px-2.5 py-1 rounded-full shadow-2xs transition">
-                    💸 Catat Kas Keluar?
+                    Catat Kas Keluar?
                 </button>
                 <button onclick="sendQuickPrompt('Bagaimana cara retur penjualan barang cacat/rusak?')" class="text-[11px] bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-900 px-2.5 py-1 rounded-full shadow-2xs transition">
-                    🔄 Cara Retur Barang?
+                    Cara Retur Barang?
                 </button>
             </div>
         </div>
@@ -70,8 +72,10 @@
     </div>
 
     <!-- Floating Toggle Button -->
-    <button onclick="toggleAiDrawer()" id="aiFloatingBtn" class="group bg-gradient-to-tr from-emerald-800 to-forest-900 hover:from-emerald-700 hover:to-forest-800 text-white p-3.5 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-200 flex items-center gap-2 border-2 border-emerald-400/40">
-        <span class="text-xl">🤖</span>
+    <button onclick="toggleAiDrawer()" id="aiFloatingBtn" class="group bg-emerald-800 hover:bg-emerald-900 text-white p-3.5 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-200 flex items-center gap-2 border border-emerald-600">
+        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
         <span class="hidden sm:inline font-bold text-xs pr-1">Tanya AI</span>
     </button>
 </div>
@@ -152,11 +156,11 @@
                 aiHistory.push({ role: 'user', content: text });
                 aiHistory.push({ role: 'model', content: data.reply });
             } else {
-                appendMessage('model', '⚠️ ' + (data.message || 'Gagal memproses jawaban. Pastikan API key Google Gemini telah diatur.'));
+                appendMessage('model', (data.message || 'Gagal memproses jawaban. Pastikan API key Google Gemini telah diatur.'));
             }
         } catch (err) {
             document.getElementById(loadingId)?.remove();
-            appendMessage('model', '⚠️ Gagal terhubung ke server AI: ' + err.message);
+            appendMessage('model', 'Gagal terhubung ke server AI: ' + err.message);
         } finally {
             btnSend.disabled = false;
             container.scrollTop = container.scrollHeight;

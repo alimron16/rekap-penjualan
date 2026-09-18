@@ -264,7 +264,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                 _loadData();
                                 NotificationService.showNotification(
                                   id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-                                  title: 'Retur Berhasil Dicatat! 🔄',
+                                  title: 'Retur Berhasil Dicatat',
                                   body: 'Retur barang senilai ${Formatters.formatRupiah(refund)} berhasil disimpan dan stok telah disesuaikan.',
                                 );
                                 ScaffoldMessenger.of(context).showSnackBar(
