@@ -27,7 +27,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
 
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
   final dateFormatter = DateFormat('yyyy-MM-dd');
-  final displayDateFormatter = DateFormat('d MMM yyyy', 'id_ID');
+  final displayDateFormatter = DateFormat('d MMM yyyy');
 
   @override
   void initState() {
@@ -138,6 +138,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
             child: TabBar(
               controller: _tabController,
               isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorColor: Colors.amberAccent,
               indicatorWeight: 3,
               labelColor: Colors.white,
@@ -145,10 +146,46 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
               tabs: const [
-                Tab(icon: Icon(Icons.payments_outlined, size: 16), text: 'TARIK TUNAI'),
-                Tab(icon: Icon(Icons.input_outlined, size: 16), text: 'BARANG MASUK'),
-                Tab(icon: Icon(Icons.output_outlined, size: 16), text: 'BARANG KELUAR'),
-                Tab(icon: Icon(Icons.assignment_return_outlined, size: 16), text: 'RETUR PENJUALAN'),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.payments_outlined, size: 16),
+                      SizedBox(width: 6),
+                      Text('TARIK TUNAI'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.input_outlined, size: 16),
+                      SizedBox(width: 6),
+                      Text('BARANG MASUK'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.output_outlined, size: 16),
+                      SizedBox(width: 6),
+                      Text('BARANG KELUAR'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.assignment_return_outlined, size: 16),
+                      SizedBox(width: 6),
+                      Text('RETUR PENJUALAN'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

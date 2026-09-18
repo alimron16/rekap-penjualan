@@ -36,7 +36,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   DateTime? _startDate;
   DateTime? _endDate;
   final dateFormatter = DateFormat('yyyy-MM-dd');
-  final displayDateFormatter = DateFormat('d MMM yyyy', 'id_ID');
+  final displayDateFormatter = DateFormat('d MMM yyyy');
 
   @override
   void initState() {
@@ -415,8 +415,26 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               tabs: const [
-                Tab(icon: Icon(Icons.arrow_circle_down_outlined, size: 18), text: 'KAS MASUK'),
-                Tab(icon: Icon(Icons.arrow_circle_up_outlined, size: 18), text: 'KAS KELUAR'),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.arrow_circle_down_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('KAS MASUK'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.arrow_circle_up_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('KAS KELUAR'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
