@@ -59,35 +59,57 @@ class GeminiAiService
                 ]
             ];
 
-            $response = Http::timeout(35)->post("{$this->baseUrl}?key={$this->apiKey}", [
-                'system_instruction' => [
-                    'parts' => [
-                        ['text' => $systemInstruction]
-                    ]
-                ],
-                'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => 0.4,
-                    'maxOutputTokens' => 800,
-                ]
+            // Candidate models to try in order of preference (handles high demand / spikes)
+            $candidateModels = array_unique([
+                $this->model,
+                'gemini-3.5-flash',
+                'gemini-3.5-flash-lite',
+                'gemini-3.1-flash-lite',
+                'gemini-3.7-flash',
             ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $reply = $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Maaf, saya belum dapat menjawab pertanyaan ini saat ini.';
-                return [
-                    'success' => true,
-                    'reply' => $reply,
-                ];
-            }
+            $lastErrorMessage = 'Gagal menghubungi server Google Gemini.';
 
-            Log::error('Gemini API Error: ' . $response->body());
-            $errorJson = $response->json();
-            $errorMessage = $errorJson['error']['message'] ?? 'Gagal menghubungi server Google Gemini.';
+            foreach ($candidateModels as $currentModel) {
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$currentModel}:generateContent?key={$this->apiKey}";
+
+                $response = Http::timeout(25)->post($endpoint, [
+                    'system_instruction' => [
+                        'parts' => [
+                            ['text' => $systemInstruction]
+                        ]
+                    ],
+                    'contents' => $contents,
+                    'generationConfig' => [
+                        'temperature' => 0.4,
+                        'maxOutputTokens' => 800,
+                    ]
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $reply = $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
+                    if (!empty($reply)) {
+                        return [
+                            'success' => true,
+                            'reply' => $reply,
+                        ];
+                    }
+                }
+
+                $errorJson = $response->json();
+                $lastErrorMessage = $errorJson['error']['message'] ?? $response->body();
+                Log::warning("Gemini model {$currentModel} failed: {$lastErrorMessage}. Trying fallback...");
+
+                // If error is not high demand / overloaded / 503 / 429, don't uselessly retry invalid API keys
+                if (isset($errorJson['error']['code']) && $errorJson['error']['code'] === 400 && str_contains($lastErrorMessage, 'API_KEY_INVALID')) {
+                    break;
+                }
+            }
 
             return [
                 'success' => false,
-                'message' => 'Google Gemini error: ' . $errorMessage,
+                'message' => 'Google Gemini: ' . $lastErrorMessage,
             ];
         } catch (\Exception $e) {
             Log::error('Gemini Exception: ' . $e->getMessage());
