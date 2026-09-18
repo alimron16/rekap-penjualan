@@ -7,6 +7,7 @@ use App\Models\AgentTransfer;
 use App\Models\JournalEntry;
 use App\Models\JournalItem;
 use App\Models\Outlet;
+use App\Services\AccountingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +17,12 @@ use Illuminate\Support\Str;
 
 class AgentTransferController extends Controller
 {
+    protected AccountingService $accountingService;
+
+    public function __construct(AccountingService $accountingService)
+    {
+        $this->accountingService = $accountingService;
+    }
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -176,11 +183,6 @@ class AgentTransferController extends Controller
                 'approved_at' => Carbon::now(),
             ]);
 
-            // Deduct source bank balance in accounts table
-            $sourceAccount->current_balance -= $transfer->total_amount;
-            $sourceAccount->save();
-
-            // Auto-record double-entry journal entry
             // Find target Cash Transfer account (1-1111 CASH TRANSFER)
             $cashTransferAccount = Account::where('code', '1-1111')->first();
             if (!$cashTransferAccount) {
@@ -197,43 +199,47 @@ class AgentTransferController extends Controller
                 );
             }
 
-            // Increase cash transfer account balance
-            $cashTransferAccount->current_balance += $transfer->amount;
-            $cashTransferAccount->save();
+            // Record double-entry journal with AccountingService (automatically updates account balances & balance checks)
+            $feeAcc = Account::where('code', '4-1200')->first(); // PENDAPATAN JASA
 
-            $journal = JournalEntry::create([
-                'entry_number' => 'JRN-' . date('Ymd') . '-' . strtoupper(Str::random(4)),
-                'entry_date' => Carbon::now(),
-                'reference_type' => 'AGENT_TRANSFER',
-                'reference_id' => $transfer->id,
-                'description' => "Penyelesaian Transfer Agen Toko {$transfer->store_name} ({$transfer->bank_name} {$transfer->account_number} a.n {$transfer->account_holder})",
-                'total_debit' => $transfer->total_amount,
-                'total_credit' => $transfer->total_amount,
-                'is_balanced' => true,
-                'created_by' => $user->name,
-            ]);
+            $journalLines = [
+                // 1. Debit: Cash Transfer (Nominal diterima/ditransfer)
+                [
+                    'account_id' => $cashTransferAccount->id,
+                    'debit' => (float) $transfer->amount,
+                    'credit' => 0,
+                    'memo' => "Transfer Toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
+                ],
+                // 2. Credit: Source Bank/Cash (Saldo rekening terpotong sejumlah total amount)
+                [
+                    'account_id' => $sourceAccount->id,
+                    'debit' => 0,
+                    'credit' => (float) $transfer->total_amount,
+                    'memo' => "Pengurangan saldo transfer {$transfer->reference_no}",
+                ],
+            ];
 
-            // Debit: Cash Transfer
-            JournalItem::create([
-                'journal_entry_id' => $journal->id,
-                'account_id' => $cashTransferAccount->id,
-                'account_code' => $cashTransferAccount->code,
-                'account_name' => $cashTransferAccount->name,
-                'debit' => $transfer->amount,
-                'credit' => 0,
-                'memo' => "Transfer Toko {$transfer->store_name}",
-            ]);
+            // 3. Credit: Pendapatan Fee Transfer jika ada admin fee
+            if ($transfer->admin_fee > 0 && $feeAcc) {
+                $journalLines[] = [
+                    'account_id' => $feeAcc->id,
+                    'debit' => 0,
+                    'credit' => (float) $transfer->admin_fee,
+                    'memo' => "Pendapatan jasa transfer fee {$transfer->reference_no}",
+                ];
+            } else if ($transfer->admin_fee > 0) {
+                // If fee account not found, adjust cash transfer debit to keep balanced
+                $journalLines[0]['debit'] = (float) $transfer->total_amount;
+            }
 
-            // Credit: Source Bank
-            JournalItem::create([
-                'journal_entry_id' => $journal->id,
-                'account_id' => $sourceAccount->id,
-                'account_code' => $sourceAccount->code,
-                'account_name' => $sourceAccount->name,
-                'debit' => 0,
-                'credit' => $transfer->total_amount,
-                'memo' => "Debet dari {$sourceAccount->name}",
-            ]);
+            $this->accountingService->createJournalEntry(
+                "JRN-{$transfer->reference_no}",
+                now()->format('Y-m-d'),
+                'agent_transfer',
+                $transfer->id,
+                "Transfer Agen {$transfer->store_name} ({$transfer->bank_name} {$transfer->account_number} a.n {$transfer->account_holder})",
+                $journalLines
+            );
 
             DB::commit();
 

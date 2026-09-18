@@ -1296,8 +1296,61 @@ class MobileApiController extends Controller
             'notes' => $request->notes ?? $transfer->notes,
         ]);
 
-        $sourceAccount->current_balance -= $transfer->total_amount;
-        $sourceAccount->save();
+        // Find target Cash Transfer account (1-1111 CASH TRANSFER)
+        $cashTransferAccount = Account::where('code', '1-1111')->first();
+        if (!$cashTransferAccount) {
+            $cashTransferAccount = Account::firstOrCreate(
+                ['code' => '1-1111'],
+                [
+                    'name' => 'CASH TRANSFER',
+                    'type' => 'D',
+                    'group' => 'AKTIVA',
+                    'initial_balance' => 0,
+                    'current_balance' => 0,
+                    'is_system_locked' => true,
+                ]
+            );
+        }
+
+        // Record double-entry journal with AccountingService
+        $feeAcc = Account::where('code', '4-1200')->first(); // PENDAPATAN JASA
+
+        $journalLines = [
+            // 1. Debit: Cash Transfer
+            [
+                'account_id' => $cashTransferAccount->id,
+                'debit' => (float) $transfer->amount,
+                'credit' => 0,
+                'memo' => "Transfer Toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
+            ],
+            // 2. Credit: Source Bank/Cash
+            [
+                'account_id' => $sourceAccount->id,
+                'debit' => 0,
+                'credit' => (float) $transfer->total_amount,
+                'memo' => "Pengurangan saldo transfer {$transfer->reference_no}",
+            ],
+        ];
+
+        if ($transfer->admin_fee > 0 && $feeAcc) {
+            $journalLines[] = [
+                'account_id' => $feeAcc->id,
+                'debit' => 0,
+                'credit' => (float) $transfer->admin_fee,
+                'memo' => "Pendapatan jasa transfer fee {$transfer->reference_no}",
+            ];
+        } else if ($transfer->admin_fee > 0) {
+            $journalLines[0]['debit'] = (float) $transfer->total_amount;
+        }
+
+        $this->accountingService->createJournalEntry(
+            "JRN-{$transfer->reference_no}",
+            now()->format('Y-m-d'),
+            'agent_transfer',
+            $transfer->id,
+            "Transfer Agen {$transfer->store_name} ({$transfer->bank_name} {$transfer->account_number} a.n {$transfer->account_holder})",
+            $journalLines
+        );
 
         $transfer->proof_image_url = $transfer->proof_image ? asset('storage/' . $transfer->proof_image) : null;
 
