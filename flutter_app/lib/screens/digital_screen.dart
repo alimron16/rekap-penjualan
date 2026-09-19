@@ -16,8 +16,10 @@ class _DigitalScreenState extends State<DigitalScreen> {
   List<dynamic> _products = [];
   List<dynamic> _depositAccounts = [];
   List<dynamic> _cashAccounts = [];
+  List<dynamic> _recentSales = [];
   Map<String, dynamic>? _storeSetting;
   double _saldoMulti = 0;
+  double _saldoBca = 0;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -50,7 +52,9 @@ class _DigitalScreenState extends State<DigitalScreen> {
             _products = res['products'] ?? [];
             _depositAccounts = res['deposit_accounts'] ?? [];
             _cashAccounts = res['cash_accounts'] ?? [];
+            _recentSales = res['recent_sales'] ?? [];
             _saldoMulti = Formatters.parseDouble(res['saldo_multi']);
+            _saldoBca = Formatters.parseDouble(res['saldo_bca']);
             _storeSetting = res['setting'];
 
             if (_products.isNotEmpty && _selectedProductId == null) {
@@ -156,7 +160,8 @@ class _DigitalScreenState extends State<DigitalScreen> {
   void _showTopupModal() {
     final amountController = TextEditingController();
     final notesController = TextEditingController(text: 'Top Up Deposit Server Multi');
-    int? sourceAccountId = _cashAccounts.isNotEmpty ? _cashAccounts[0]['id'] : null;
+    final bcaAcc = _cashAccounts.firstWhere((a) => (a['code'] ?? '') == '1-1113', orElse: () => null);
+    int? sourceAccountId = bcaAcc != null ? (bcaAcc['id'] as int) : (_cashAccounts.isNotEmpty ? (_cashAccounts[0]['id'] as int) : null);
     bool isProcessing = false;
 
     showModalBottomSheet(
@@ -199,14 +204,16 @@ class _DigitalScreenState extends State<DigitalScreen> {
                 const SizedBox(height: 6),
                 DropdownButtonFormField<int>(
                   value: sourceAccountId,
+                  isExpanded: true,
                   decoration: const InputDecoration(),
                   items: _cashAccounts.map<DropdownMenuItem<int>>((a) {
                     final String code = a['code'] ?? a['account_number'] ?? '';
                     final String name = a['name'] ?? '';
-                    final String label = code.isNotEmpty ? '$code - $name' : name;
+                    final double bal = Formatters.parseDouble(a['current_balance']);
+                    final String label = code.isNotEmpty ? '$code - $name (${Formatters.formatRupiah(bal)})' : name;
                     return DropdownMenuItem<int>(
                       value: a['id'] as int,
-                      child: Text(label),
+                      child: Text(label, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
                     );
                   }).toList(),
                   onChanged: (val) => setModalState(() => sourceAccountId = val),
@@ -491,44 +498,82 @@ class _DigitalScreenState extends State<DigitalScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Saldo Multi Card
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F766E),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Saldo Deposit Server Multi', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  Formatters.formatRupiah(_saldoMulti),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                                ),
-                              ],
-                            ),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF0F766E),
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      // Saldo Multi & Saldo BCA Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F766E),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3)),
+                                ],
                               ),
-                              icon: const Icon(Icons.add_circle, size: 16),
-                              label: const Text('Top Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                              onPressed: _showTopupModal,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Saldo Multi Server', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    Formatters.formatRupiah(_saldoMulti),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    height: 28,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: const Color(0xFF0F766E),
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      icon: const Icon(Icons.add_circle_outline, size: 14),
+                                      label: const Text('Top Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                      onPressed: _showTopupModal,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E3A8A),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3)),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Saldo BCA (Bank)', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    Formatters.formatRupiah(_saldoBca),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text('1-1113 Saldo BCA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
@@ -642,7 +687,123 @@ class _DigitalScreenState extends State<DigitalScreen> {
                             )
                           ],
                         ),
-                      )
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Riwayat Transaksi Pulsa / Elektrik Hari Ini
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.history, size: 18, color: ThemeConfig.primary),
+                              SizedBox(width: 6),
+                              Text(
+                                'Riwayat Pulsa & Elektrik Hari Ini',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${_recentSales.length} Transaksi',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      if (_recentSales.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Belum ada transaksi pulsa / elektrik hari ini.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _recentSales.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final sale = _recentSales[index];
+                            final productName = sale['digital_product']?['name'] ?? 'Pulsa / Elektrik';
+                            final customerNumber = sale['customer_number'] ?? '-';
+                            final price = Formatters.parseDouble(sale['selling_price']);
+                            final profit = Formatters.parseDouble(sale['profit_margin']);
+                            final isSuccess = (sale['status'] ?? 'SUKSES') == 'SUKSES';
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isSuccess ? Colors.green.shade50 : Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      isSuccess ? Icons.check_circle_outline : Icons.error_outline,
+                                      color: isSuccess ? Colors.green.shade700 : Colors.red.shade700,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          productName,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          customerNumber,
+                                          style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontWeight: FontWeight.w600),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              Formatters.formatRupiah(price),
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '(Laba: ${Formatters.formatRupiah(profit)})',
+                                              style: TextStyle(fontSize: 10, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.print_outlined, size: 20, color: ThemeConfig.primary),
+                                    tooltip: 'Cetak / Preview Struk',
+                                    onPressed: () => _showDigitalReceiptModal(sale),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),

@@ -202,19 +202,22 @@ class AgentTransferController extends Controller
             // Record double-entry journal with AccountingService (automatically updates account balances & balance checks)
             $feeAcc = Account::where('code', '4-1200')->first(); // PENDAPATAN JASA
 
+            // Physical cash received into cash drawer = Pokok + Admin Fee (Total Amount) -> DEBIT Cash Transfer
+            // Outgoing bank transfer from Source Account (e.g. SALDO BCA) = Pokok (Amount) -> CREDIT Saldo BCA
+            // Store income from Admin Fee = Admin Fee -> CREDIT Pendapatan Jasa
             $journalLines = [
-                // 1. Debit: Cash Transfer (Nominal diterima/ditransfer)
+                // 1. Debit: Cash Transfer (Uang fisik diterima laci kasir: pokok + admin fee)
                 [
                     'account_id' => $cashTransferAccount->id,
-                    'debit' => (float) $transfer->amount,
+                    'debit' => (float) $transfer->total_amount,
                     'credit' => 0,
-                    'memo' => "Transfer Toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
+                    'memo' => "Penerimaan tunai transfer toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
                 ],
-                // 2. Credit: Source Bank/Cash (Saldo rekening terpotong sejumlah total amount)
+                // 2. Credit: Source Bank/Cash (Saldo rekening bank terpotong sejumlah nilai transfer pokok)
                 [
                     'account_id' => $sourceAccount->id,
                     'debit' => 0,
-                    'credit' => (float) $transfer->total_amount,
+                    'credit' => (float) $transfer->amount,
                     'memo' => "Pengurangan saldo transfer {$transfer->reference_no}",
                 ],
             ];
@@ -229,7 +232,7 @@ class AgentTransferController extends Controller
                 ];
             } else if ($transfer->admin_fee > 0) {
                 // If fee account not found, adjust cash transfer debit to keep balanced
-                $journalLines[0]['debit'] = (float) $transfer->total_amount;
+                $journalLines[0]['debit'] = (float) $transfer->amount;
             }
 
             $this->accountingService->createJournalEntry(

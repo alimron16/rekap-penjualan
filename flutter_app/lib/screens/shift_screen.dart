@@ -181,11 +181,33 @@ class _ShiftScreenState extends State<ShiftScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Text('Saldo Kas Laci Fisik Saat Ini', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text(
-                          currencyFormatter.format(drawerBalance),
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Saldo Kas Laci (Cash Retail)', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  currencyFormatter.format(drawerBalance),
+                                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                                ),
+                              ],
+                            ),
+                            if (_shiftData?['cash_transfer_balance'] != null)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('Kas Transfer (Laci):', style: TextStyle(color: Colors.white60, fontSize: 10)),
+                                  Text(
+                                    currencyFormatter.format((_shiftData!['cash_transfer_balance'] as num).toDouble()),
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
                         const Divider(color: Colors.white24, height: 20),
                         Row(
@@ -226,10 +248,26 @@ class _ShiftScreenState extends State<ShiftScreen> {
                     child: Column(
                       children: [
                         _buildSummaryRow(
-                          'Penjualan Tunai (Cash)',
+                          'Penjualan Tunai Retail',
                           summary['cash_sales'] ?? 0,
                           icon: Icons.payments_outlined,
                           color: Colors.green.shade700,
+                        ),
+                        const Divider(height: 16),
+                        _buildSummaryRow(
+                          'Penjualan Produk Multi (Pulsa / PLN)',
+                          summary['total_digital_sales'] ?? 0,
+                          icon: Icons.phone_android_outlined,
+                          color: Colors.teal.shade700,
+                          subtitle: 'Margin laba: ${currencyFormatter.format(summary['total_digital_profit'] ?? 0)} (${summary['digital_sales_count'] ?? 0} transaksi)',
+                        ),
+                        const Divider(height: 16),
+                        _buildSummaryRow(
+                          'Jasa Transfer Agen (Uang Masuk)',
+                          summary['total_transfer_cash'] ?? 0,
+                          icon: Icons.send_to_mobile_outlined,
+                          color: Colors.indigo.shade700,
+                          subtitle: 'Fee admin: ${currencyFormatter.format(summary['total_transfer_fee'] ?? 0)} (${summary['transfer_count'] ?? 0} transaksi)',
                         ),
                         const Divider(height: 16),
                         _buildSummaryRow(
@@ -274,6 +312,75 @@ class _ShiftScreenState extends State<ShiftScreen> {
                       ],
                     ),
                   ),
+
+                  // Histori Transaksi Produk Multi Shift Ini
+                  if (_shiftData?['digital_sales'] != null && (_shiftData!['digital_sales'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.bolt_outlined, color: Colors.teal, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Histori Produk Multi Shift Ini',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${(_shiftData!['digital_sales'] as List).length} Transaksi',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blueGrey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: (_shiftData!['digital_sales'] as List).length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, idx) {
+                          final item = (_shiftData!['digital_sales'] as List)[idx];
+                          final prodName = item['product_name'] ?? 'Pulsa / Elektrik';
+                          final custNum = item['customer_number'] ?? '-';
+                          final price = (item['selling_price'] as num?)?.toDouble() ?? 0.0;
+                          final profit = (item['profit_margin'] as num?)?.toDouble() ?? 0.0;
+                          final timeStr = item['date'] ?? '';
+
+                          return ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            leading: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.phone_android, color: Colors.teal.shade700, size: 18),
+                            ),
+                            title: Text(prodName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            subtitle: Text('$custNum • $timeStr', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(currencyFormatter.format(price), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: ThemeConfig.textDark)),
+                                Text('+${currencyFormatter.format(profit)}', style: TextStyle(fontSize: 10, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // Close Shift & Deposit Box

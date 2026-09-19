@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\CashTransaction;
 use App\Models\Customer;
 use App\Models\DigitalProduct;
@@ -336,6 +337,72 @@ class PosTransactionService
             $this->accountingService->recordInventoryAdjustment($adj);
 
             return $adj;
+        });
+    }
+
+    /**
+     * Process Sales Return (Retur Penjualan) within an ACID transaction.
+     */
+    public function processSaleReturn(array $data): SaleReturn
+    {
+        return DB::transaction(function () use ($data) {
+            $returnNumber = $this->generateTransactionNumber('RTP');
+
+            $product = Product::lockForUpdate()->findOrFail($data['product_id']);
+            $qty = (float) $data['qty'];
+            $refundAmount = (float) ($data['refund_amount'] ?? $data['amount'] ?? 0);
+            $accountId = $data['account_id'] ?? $data['refund_account_id'] ?? null;
+
+            // Restock returned product
+            $product->stock += $qty;
+            $product->save();
+
+            $saleReturn = SaleReturn::create([
+                'return_number' => $returnNumber,
+                'date' => $data['date'] ?? now()->format('Y-m-d'),
+                'original_sale_id' => $data['sale_id'] ?? $data['original_sale_id'] ?? null,
+                'customer_id' => $data['customer_id'] ?? null,
+                'product_id' => $product->id,
+                'qty' => $qty,
+                'amount' => $refundAmount,
+                'refund_account_id' => $accountId,
+                'reason' => $data['reason'] ?? 'RETUR PENJUALAN',
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            // If refund is paid from cash/bank account, record cash transaction and update balance
+            if ($refundAmount > 0 && $accountId) {
+                $cashAcc = Account::find($accountId);
+                if ($cashAcc) {
+                    $trxNumber = $this->generateTransactionNumber('KK');
+                    $returAcc = Account::where('code', '4-1300')->first() ?: Account::where('group', 'BEBAN')->first();
+
+                    $trx = CashTransaction::create([
+                        'transaction_number' => $trxNumber,
+                        'type' => 'OUT',
+                        'date' => $data['date'] ?? now(),
+                        'debit_account_id' => $returAcc?->id ?? $cashAcc->id,
+                        'credit_account_id' => $cashAcc->id,
+                        'amount' => $refundAmount,
+                        'admin_fee' => 0,
+                        'notes' => "Pengembalian dana retur {$returnNumber} ({$product->name})",
+                    ]);
+
+                    try {
+                        $this->accountingService->recordCashTransaction($trx);
+                    } catch (\Exception $e) {
+                        // Direct balance update fallback if accounting journal fails
+                        if ($cashAcc->type === 'D') {
+                            $cashAcc->current_balance -= $refundAmount;
+                        } else {
+                            $cashAcc->current_balance += $refundAmount;
+                        }
+                        $cashAcc->save();
+                    }
+                }
+            }
+
+            return $saleReturn;
         });
     }
 }

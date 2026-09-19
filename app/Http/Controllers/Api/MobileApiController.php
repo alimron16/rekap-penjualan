@@ -834,8 +834,19 @@ class MobileApiController extends Controller
 
         $products = DigitalProduct::where('status', 'OPEN')->orderBy('name')->get();
         $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])->get();
-        $cashAccounts = Account::whereIn('code', ['1-1110', '1-1112'])->get();
+        // Include Saldo BCA (1-1113), Cash Retail (1-1110), Cash Transfer (1-1111), Cash Multi (1-1112), Saldo BRI (1-1120)
+        $cashAccounts = Account::whereIn('code', ['1-1113', '1-1110', '1-1111', '1-1112', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130'])
+            ->orderByRaw("FIELD(code, '1-1113', '1-1110', '1-1111', '1-1112', '1-1120')")
+            ->get();
         $saldoMulti = Account::where('code', '1-1131')->value('current_balance') ?? 0;
+        $saldoBca = Account::where('code', '1-1113')->value('current_balance') ?? 0;
+
+        // Recent today's digital sales for cashier history and thermal reprint
+        $recentDigitalSales = DigitalSale::with(['digitalProduct', 'depositAccount', 'cashAccount'])
+            ->whereDate('date', now())
+            ->orderByDesc('date')
+            ->take(30)
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -843,6 +854,9 @@ class MobileApiController extends Controller
             'deposit_accounts' => $depositAccounts,
             'cash_accounts' => $cashAccounts,
             'saldo_multi' => (float) $saldoMulti,
+            'saldo_bca' => (float) $saldoBca,
+            'recent_sales' => $recentDigitalSales,
+            'setting' => StoreSetting::first(),
         ]);
     }
 
@@ -1314,21 +1328,24 @@ class MobileApiController extends Controller
         }
 
         // Record double-entry journal with AccountingService
+        // Physical cash received into cash drawer = Pokok + Admin Fee (Total Amount) -> DEBIT Cash Transfer/Retail
+        // Outgoing bank transfer from Source Account (e.g. SALDO BCA) = Pokok (Amount) -> CREDIT Saldo BCA
+        // Store income from Admin Fee = Admin Fee -> CREDIT Pendapatan Jasa
         $feeAcc = Account::where('code', '4-1200')->first(); // PENDAPATAN JASA
 
         $journalLines = [
-            // 1. Debit: Cash Transfer
+            // 1. Debit: Cash Transfer / Retail (Cash Drawer receives physical cash: amount + admin fee)
             [
                 'account_id' => $cashTransferAccount->id,
-                'debit' => (float) $transfer->amount,
+                'debit' => (float) $transfer->total_amount,
                 'credit' => 0,
-                'memo' => "Transfer Toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
+                'memo' => "Penerimaan tunai transfer toko {$transfer->store_name} ke {$transfer->bank_name} {$transfer->account_number}",
             ],
-            // 2. Credit: Source Bank/Cash
+            // 2. Credit: Source Bank/Cash (Saldo BCA / bank berkurang senilai transfer pokok yang dikirim)
             [
                 'account_id' => $sourceAccount->id,
                 'debit' => 0,
-                'credit' => (float) $transfer->total_amount,
+                'credit' => (float) $transfer->amount,
                 'memo' => "Pengurangan saldo transfer {$transfer->reference_no}",
             ],
         ];
@@ -1341,7 +1358,8 @@ class MobileApiController extends Controller
                 'memo' => "Pendapatan jasa transfer fee {$transfer->reference_no}",
             ];
         } else if ($transfer->admin_fee > 0) {
-            $journalLines[0]['debit'] = (float) $transfer->total_amount;
+            // If fee account doesn't exist, debit amount to stay balanced
+            $journalLines[0]['debit'] = (float) $transfer->amount;
         }
 
         $this->accountingService->createJournalEntry(
@@ -2148,7 +2166,7 @@ class MobileApiController extends Controller
         $date = $request->query('date', date('Y-m-d'));
         $outletId = $user->outlet_id;
 
-        // Sales today
+        // Sales today (Fisik)
         $salesQuery = Sale::whereDate('date', $date);
         if ($outletId) $salesQuery->where('outlet_id', $outletId);
 
@@ -2157,6 +2175,16 @@ class MobileApiController extends Controller
         $nonCashSales = $sales->where('payment_method', '!=', 'cash')->sum('paid_amount');
         $receivableSales = $sales->sum('remaining_receivable');
 
+        // Digital Sales today (Pulsa, PLN, Data)
+        $digitalSalesQuery = DigitalSale::whereDate('date', $date)
+            ->where('status', 'SUKSES')
+            ->with(['digitalProduct', 'cashAccount']);
+        $digitalSales = $digitalSalesQuery->get();
+        $totalDigitalSales = (float) $digitalSales->sum('selling_price');
+        $totalDigitalHpp = (float) $digitalSales->sum('hpp');
+        $totalDigitalProfit = (float) $digitalSales->sum('profit_margin');
+        $digitalSalesCount = $digitalSales->count();
+
         // Tarik Tunai today
         $withdrawQuery = CashTransaction::where('type', 'TRANSFER')
             ->where('notes', 'like', 'Tarik Tunai%')
@@ -2164,14 +2192,30 @@ class MobileApiController extends Controller
         $totalWithdraw = (float) $withdrawQuery->sum('amount');
         $totalWithdrawFee = (float) $withdrawQuery->sum('admin_fee');
 
+        // Transfer Agen today (approved)
+        $transferQuery = AgentTransfer::whereDate('created_at', $date)
+            ->where('status', 'approved');
+        if ($outletId) $transferQuery->where('outlet_id', $outletId);
+        $transfers = $transferQuery->get();
+        $totalTransferCash = (float) $transfers->sum('total_amount'); // uang tunai masuk laci
+        $totalTransferFee = (float) $transfers->sum('admin_fee');
+        $totalTransferCount = $transfers->count();
+
         // Kas Keluar (Beban Makan, Sampah, Operasional)
         $expenseQuery = CashTransaction::where('type', 'OUT')
             ->whereDate('date', $date);
         $totalExpense = (float) $expenseQuery->sum('amount');
 
-        // Laci Cash Retail current balance
+        // Account balances
         $cashRetailAcc = Account::where('code', '1-1110')->first();
+        $cashTransferAcc = Account::where('code', '1-1111')->first();
+        $saldoBcaAcc = Account::where('code', '1-1113')->first();
+        $saldoMultiAcc = Account::where('code', '1-1131')->first();
+
         $currentCashDrawer = (float) ($cashRetailAcc?->current_balance ?? 0);
+        $currentCashTransfer = (float) ($cashTransferAcc?->current_balance ?? 0);
+        $currentSaldoBca = (float) ($saldoBcaAcc?->current_balance ?? 0);
+        $currentSaldoMulti = (float) ($saldoMultiAcc?->current_balance ?? 0);
 
         // Required drawer reserve (modal awal)
         $requiredReserve = 400000.0;
@@ -2181,6 +2225,10 @@ class MobileApiController extends Controller
             'success' => true,
             'date' => $date,
             'cash_drawer_balance' => $currentCashDrawer,
+            'cash_retail_balance' => $currentCashDrawer,
+            'cash_transfer_balance' => $currentCashTransfer,
+            'saldo_bca_balance' => $currentSaldoBca,
+            'saldo_multi_balance' => $currentSaldoMulti,
             'required_reserve' => $requiredReserve,
             'recommended_deposit' => $recommendedDeposit,
             'summary' => [
@@ -2188,11 +2236,29 @@ class MobileApiController extends Controller
                 'cash_sales' => (float) $cashSales,
                 'non_cash_sales' => (float) $nonCashSales,
                 'receivable_sales' => (float) $receivableSales,
+                'total_digital_sales' => $totalDigitalSales,
+                'total_digital_profit' => $totalDigitalProfit,
+                'digital_sales_count' => $digitalSalesCount,
                 'total_withdraw_cash' => $totalWithdraw,
                 'total_withdraw_fee' => $totalWithdrawFee,
+                'total_transfer_cash' => $totalTransferCash,
+                'total_transfer_fee' => $totalTransferFee,
+                'transfer_count' => $totalTransferCount,
                 'total_expense' => $totalExpense,
-                'total_transactions' => $sales->count(),
+                'total_transactions' => $sales->count() + $digitalSalesCount,
             ],
+            'digital_sales' => $digitalSales->map(function ($ds) {
+                return [
+                    'id' => $ds->id,
+                    'transaction_number' => $ds->transaction_number,
+                    'product_name' => $ds->digitalProduct?->name ?? 'Produk Multi',
+                    'customer_number' => $ds->customer_number,
+                    'selling_price' => (float) $ds->selling_price,
+                    'profit_margin' => (float) $ds->profit_margin,
+                    'status' => $ds->status,
+                    'date' => $ds->date ? $ds->date->format('H:i') : null,
+                ];
+            }),
             'user' => [
                 'name' => $user->name,
                 'store_name' => $user->outlet?->name ?? 'Toko Kasir',
@@ -2337,22 +2403,22 @@ class MobileApiController extends Controller
             });
 
         // 4. Retur Penjualan
-        $returns = SaleReturn::with(['sale', 'customer', 'items.product'])
+        $returns = SaleReturn::with(['originalSale', 'customer', 'product'])
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
             ->get()
             ->map(function ($r) {
-                $itemNames = $r->items->map(fn($it) => ($it->product->name ?? 'Item') . ' (' . (float)$it->qty . ')')->join(', ');
+                $itemName = ($r->product->name ?? 'Item') . ' (' . (float)$r->qty . ')';
                 return [
                     'id' => $r->id,
                     'type' => 'return',
                     'badge' => 'RETUR',
                     'number' => $r->return_number,
-                    'date' => $r->date->format('d/m/Y H:i'),
-                    'title' => ($r->customer->name ?? 'Pelanggan') . ' - ' . $itemNames . ' [' . ($r->reason ?? 'Retur') . ']',
-                    'amount' => (float) $r->total_amount,
-                    'refund_method' => $r->refund_method,
+                    'date' => $r->date ? $r->date->format('d/m/Y H:i') : now()->format('d/m/Y H:i'),
+                    'title' => ($r->customer->name ?? 'Pelanggan') . ' - ' . $itemName . ' [' . ($r->reason ?? 'Retur') . ']',
+                    'amount' => (float) $r->amount,
+                    'refund_method' => $r->refundAccount?->name ?? 'Tunai',
                     'is_negative' => false,
                 ];
             });
