@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/printer_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
@@ -21,6 +22,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
   DateTime? _endDate;
 
   List<dynamic> _withdrawals = [];
+  List<dynamic> _digitalSales = [];
   List<dynamic> _stockIn = [];
   List<dynamic> _stockOut = [];
   List<dynamic> _returns = [];
@@ -32,7 +34,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this, initialIndex: widget.initialTabIndex);
+    _tabController = TabController(length: 5, vsync: this, initialIndex: widget.initialTabIndex);
     _loadLogs();
   }
 
@@ -53,6 +55,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
         setState(() {
           if (res['success'] == true) {
             _withdrawals = res['withdrawals'] ?? [];
+            _digitalSales = res['digital_sales'] ?? [];
             _stockIn = res['stock_in'] ?? [];
             _stockOut = res['stock_out'] ?? [];
             _returns = res['returns'] ?? [];
@@ -186,6 +189,16 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
                     ],
                   ),
                 ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.phone_android_outlined, size: 16),
+                      SizedBox(width: 6),
+                      Text('PRODUK MULTI'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -232,6 +245,7 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
                       _buildLogList(_stockIn, 'Barang Masuk (Kulakan)', Icons.input_outlined, Colors.green.shade800),
                       _buildLogList(_stockOut, 'Barang Keluar (Penjualan)', Icons.output_outlined, Colors.blue.shade800),
                       _buildLogList(_returns, 'Retur Penjualan', Icons.assignment_return_outlined, Colors.red.shade800),
+                      _buildDigitalLogList(_digitalSales),
                     ],
                   ),
           ),
@@ -329,6 +343,178 @@ class _StoreLogsScreenState extends State<StoreLogsScreen> with SingleTickerProv
                   fontSize: 14,
                   color: badgeColor,
                 ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDigitalLogList(List<dynamic> items) {
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.phone_android_outlined, size: 54, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'Belum ada riwayat transaksi produk multi.',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(14),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final sellingPrice = Formatters.parseDouble(item['selling_price'] ?? item['amount']);
+        final profitMargin = Formatters.parseDouble(item['profit_margin']);
+        final title = item['title'] ?? item['product_name'] ?? 'Pulsa / Paket Data';
+        final customerNumber = item['customer_number'] ?? '';
+        final number = item['number'] ?? item['transaction_number'] ?? '';
+        final date = item['date'] ?? '';
+        final status = (item['status'] ?? 'SUKSES').toString().toUpperCase();
+        final isSuccess = status == 'SUKSES' || status == 'SUCCESS';
+
+        const badgeColor = Color(0xFF0F766E);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.phone_android_outlined, color: badgeColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'PRODUK MULTI',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: badgeColor),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSuccess ? Colors.green.shade50 : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: isSuccess ? Colors.green.shade300 : Colors.red.shade300, width: 0.5),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isSuccess ? Colors.green.shade800 : Colors.red.shade800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            date,
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    if (customerNumber.isNotEmpty)
+                      Text(
+                        'Tujuan: $customerNumber',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: Colors.black87),
+                      ),
+                    if (number.isNotEmpty)
+                      Text(number, style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.blueGrey)),
+                    if (profitMargin > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Laba: ${currencyFormatter.format(profitMargin)}',
+                        style: TextStyle(fontSize: 10, color: Colors.green.shade800, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    currencyFormatter.format(sellingPrice),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: badgeColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      try {
+                        await PrinterService.printDigitalReceipt(digitalSale: item);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Gagal mencetak struk: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.print_outlined, size: 14, color: Colors.black87),
+                          SizedBox(width: 4),
+                          Text('Struk', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -375,7 +375,7 @@ class PosTransactionService
                 $cashAcc = Account::find($accountId);
                 if ($cashAcc) {
                     $trxNumber = $this->generateTransactionNumber('KK');
-                    $returAcc = Account::where('code', '4-1300')->first() ?: Account::where('group', 'BEBAN')->first();
+                    $returAcc = Account::where('code', '4-1600')->first() ?: Account::where('name', 'like', '%RETUR%')->first() ?: Account::where('group', 'BEBAN')->first();
 
                     $trx = CashTransaction::create([
                         'transaction_number' => $trxNumber,

@@ -73,37 +73,39 @@ class PrinterService {
 
   /// Build Circular Store Avatar / Logo matching Settings Screen Preview
   static pw.Widget _buildPdfLogo(Uint8List? logoBytes) {
-    if (logoBytes != null) {
+    if (logoBytes != null && logoBytes.isNotEmpty) {
       return pw.Container(
-        width: 32,
-        height: 32,
+        width: 36,
+        height: 36,
         child: pw.ClipRRect(
-          horizontalRadius: 16,
-          verticalRadius: 16,
+          horizontalRadius: 18,
+          verticalRadius: 18,
           child: pw.Image(
             pw.MemoryImage(logoBytes),
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             fit: pw.BoxFit.contain,
           ),
         ),
       );
     }
 
+    // Clean lightweight store badge (no solid dark green blob)
     return pw.Container(
-      width: 32,
-      height: 32,
-      decoration: const pw.BoxDecoration(
+      width: 34,
+      height: 34,
+      decoration: pw.BoxDecoration(
         shape: pw.BoxShape.circle,
-        color: PdfColor(0.067, 0.220, 0.098, 0.12), // ThemeConfig.primary with opacity
+        color: const PdfColor(0.93, 0.95, 0.96),
+        border: pw.Border.all(color: const PdfColor(0.75, 0.82, 0.86), width: 0.8),
       ),
       child: pw.Center(
         child: pw.Text(
-          'STORE',
+          'POS',
           style: pw.TextStyle(
-            fontSize: 7,
+            fontSize: 8,
             fontWeight: pw.FontWeight.bold,
-            color: const PdfColor(0.067, 0.220, 0.098),
+            color: const PdfColor(0.15, 0.25, 0.35),
           ),
         ),
       ),
@@ -379,13 +381,25 @@ class PrinterService {
     final storePhone = storeSetting?['phone']?.toString() ?? '';
     final receiptFooter = (storeSetting?['receipt_footer'] != null && storeSetting!['receipt_footer'].toString().isNotEmpty)
         ? storeSetting['receipt_footer'].toString()
-        : 'Terima kasih telah berbelanja!\nSimpan struk ini sebagai bukti transaksi yang sah.';
+        : 'Terima kasih telah berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar/dikembalikan.';
 
     final logoUrl = storeSetting?['logo_url']?.toString();
     final logoBytes = await _fetchLogoBytes(logoUrl);
 
     final trxNo = digitalSale['transaction_number'] ?? digitalSale['invoice_number'] ?? 'PE-NOTA';
-    final dateStr = digitalSale['date'] != null ? digitalSale['date'].toString() : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+
+    String dateFormatted;
+    if (digitalSale['date'] != null) {
+      try {
+        final parsed = DateTime.parse(digitalSale['date'].toString()).toLocal();
+        dateFormatted = DateFormat('dd/MM/yyyy  HH:mm').format(parsed);
+      } catch (_) {
+        dateFormatted = digitalSale['date'].toString();
+      }
+    } else {
+      dateFormatted = DateFormat('dd/MM/yyyy  HH:mm').format(DateTime.now());
+    }
+
     final customerNo = digitalSale['customer_number'] ?? digitalSale['phone'] ?? '-';
     final productName = digitalSale['digital_product']?['name'] ?? digitalSale['product_name'] ?? 'Pulsa / Elektrik';
     final sellingPrice = Formatters.parseDouble(digitalSale['selling_price'] ?? digitalSale['total']);
@@ -440,21 +454,20 @@ class PrinterService {
 
               // Info
               _receiptRow('No. Trx', trxNo),
-              _receiptRow('Tanggal', dateStr),
+              _receiptRow('Tanggal', dateFormatted),
               _receiptRow('Kategori', 'Pulsa / PPOB'),
               pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
               // Product Detail
-              _receiptRow('Produk', productName, bold: true),
+              _receiptRow('Produk', productName),
               _receiptRow('No. Tujuan', customerNo),
               if (notes.isNotEmpty) _receiptRow('SN / Ket', notes),
-              _receiptRow('Status', status),
-
               pw.Divider(thickness: 0.5, color: PdfColors.grey300),
 
-              // Total
+              // Total & Status matching preview
               _receiptRow('Total', Formatters.formatRupiah(sellingPrice), bold: true),
               _receiptRow('Bayar', 'Tunai'),
+              _receiptRow('Status', status, bold: true, statusColor: PdfColors.green800),
 
               pw.Divider(thickness: 0.5, color: PdfColors.grey300),
               pw.SizedBox(height: 2),
@@ -485,7 +498,7 @@ class PrinterService {
     return pdf.save();
   }
 
-  static pw.Widget _receiptRow(String label, String value, {bool bold = false}) {
+  static pw.Widget _receiptRow(String label, String value, {bool bold = false, PdfColor? statusColor}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 1.0),
       child: pw.Row(
@@ -502,7 +515,8 @@ class PrinterService {
             value,
             style: pw.TextStyle(
               fontSize: 7.5,
-              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              fontWeight: (bold || statusColor != null) ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: statusColor,
             ),
           ),
         ],

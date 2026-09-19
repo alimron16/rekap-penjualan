@@ -28,7 +28,14 @@ class SaleReturn extends Model
         'amount' => 'decimal:2',
     ];
 
+    protected $appends = ['refund_amount'];
+
     public function originalSale(): BelongsTo
+    {
+        return $this->belongsTo(Sale::class, 'original_sale_id');
+    }
+
+    public function sale(): BelongsTo
     {
         return $this->belongsTo(Sale::class, 'original_sale_id');
     }
@@ -46,5 +53,15 @@ class SaleReturn extends Model
     public function refundAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'refund_account_id');
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'refund_account_id');
+    }
+
+    public function getRefundAmountAttribute()
+    {
+        return $this->amount;
     }
 }

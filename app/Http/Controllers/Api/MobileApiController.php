@@ -2403,7 +2403,7 @@ class MobileApiController extends Controller
             });
 
         // 4. Retur Penjualan
-        $returns = SaleReturn::with(['originalSale', 'customer', 'product'])
+        $returns = SaleReturn::with(['originalSale', 'customer', 'product', 'refundAccount'])
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
@@ -2423,12 +2423,41 @@ class MobileApiController extends Controller
                 ];
             });
 
+        // 5. Produk Multi (Pulsa, PLN, Paket Data)
+        $digitalSales = DigitalSale::with(['digitalProduct', 'depositAccount', 'cashAccount'])
+            ->when($startDate || $endDate, $applyDateFilter)
+            ->latest('date')
+            ->take(100)
+            ->get()
+            ->map(function ($ds) {
+                $prodName = $ds->digitalProduct?->name ?? 'Pulsa / Elektrik';
+                return [
+                    'id' => $ds->id,
+                    'type' => 'digital',
+                    'badge' => 'PRODUK MULTI',
+                    'transaction_number' => $ds->transaction_number,
+                    'number' => $ds->transaction_number,
+                    'date' => $ds->date ? $ds->date->format('d/m/Y H:i') : now()->format('d/m/Y H:i'),
+                    'title' => "{$prodName} - {$ds->customer_number}",
+                    'customer_number' => $ds->customer_number,
+                    'product_name' => $prodName,
+                    'selling_price' => (float) $ds->selling_price,
+                    'amount' => (float) $ds->selling_price,
+                    'profit_margin' => (float) $ds->profit_margin,
+                    'status' => $ds->status,
+                    'notes' => $ds->notes,
+                    'digital_product' => $ds->digitalProduct,
+                    'is_negative' => false,
+                ];
+            });
+
         return response()->json([
             'success' => true,
             'withdrawals' => $withdrawals,
             'stock_in' => $purchases,
             'stock_out' => $sales,
             'returns' => $returns,
+            'digital_sales' => $digitalSales,
         ]);
     }
 
