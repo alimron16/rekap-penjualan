@@ -208,5 +208,18 @@ Route::prefix('receipt')->name('receipt.')->group(function () {
     Route::get('/thermal-digital/{digitalSale}', [ReceiptController::class, 'thermalDigital'])->name('thermal_digital');
 });
 
+// Download APK (Bypass Cloudflare & Browser Cache)
+Route::get('/download-apk', function () {
+    $path = public_path('download/elephant-pos.apk');
+    if (!file_exists($path)) {
+        abort(404, 'File installer APK belum tersedia di server.');
+    }
+    return response()->download($path, 'elephant-pos-v1.0.1.apk', [
+        'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+        'Expires' => '0',
+    ]);
+})->name('download.apk');
+
 
 

@@ -582,7 +582,7 @@
             </div>
 
             <div class="pt-2 flex flex-col gap-2">
-                <a href="/download/elephant-pos.apk" download class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2">
+                <a href="/download-apk?v={{ time() }}" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     <span>Unduh File Installer (.APK)</span>
                 </a>
