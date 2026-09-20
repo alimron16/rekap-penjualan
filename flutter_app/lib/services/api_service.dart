@@ -317,8 +317,12 @@ class ApiService {
   }
 
   // --- Master Data: Customers ---
-  static Future<Map<String, dynamic>> getCustomers() async {
-    return await _get('$baseUrl/customers');
+  static Future<Map<String, dynamic>> getCustomers({String? search, int? outletId}) async {
+    final params = <String>[];
+    if (search != null && search.isNotEmpty) params.add('q=${Uri.encodeComponent(search)}');
+    if (outletId != null) params.add('outlet_id=$outletId');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/customers$query');
   }
 
   static Future<Map<String, dynamic>> storeCustomer(Map<String, dynamic> data) async {
@@ -334,8 +338,12 @@ class ApiService {
   }
 
   // --- Master Data: Suppliers ---
-  static Future<Map<String, dynamic>> getSuppliers() async {
-    return await _get('$baseUrl/suppliers');
+  static Future<Map<String, dynamic>> getSuppliers({String? search, int? outletId}) async {
+    final params = <String>[];
+    if (search != null && search.isNotEmpty) params.add('q=${Uri.encodeComponent(search)}');
+    if (outletId != null) params.add('outlet_id=$outletId');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/suppliers$query');
   }
 
   static Future<Map<String, dynamic>> storeSupplier(Map<String, dynamic> data) async {

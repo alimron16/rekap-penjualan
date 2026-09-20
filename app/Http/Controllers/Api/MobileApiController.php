@@ -616,21 +616,38 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $outletId = $request->query('outlet_id', $user->outlet_id);
-        if ($user && !$user->isSuperAdmin()) {
+        $outletId = $request->query('outlet_id');
+        if ($user->isToko()) {
             $outletId = $user->outlet_id;
         }
 
-        $customers = Customer::when($outletId, function ($q) use ($outletId) {
-                $q->where(function ($sub) use ($outletId) {
-                    $sub->where('outlet_id', $outletId)
-                        ->orWhereNull('outlet_id');
-                });
-            })
-            ->orderBy('name')
-            ->get();
+        $query = Customer::with('outlet');
+        if ($outletId) {
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
+        }
+        if ($search = $request->query('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('phone', 'like', "%$search%")
+                  ->orWhere('address', 'like', "%$search%");
+            });
+        }
 
-        return response()->json(['success' => true, 'data' => $customers]);
+        $customers = $query->orderBy('name')->get();
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+        $selectedOutlet = $outletId ? $outlets->firstWhere('id', (int)$outletId) : null;
+
+        return response()->json([
+            'success' => true,
+            'data' => $customers,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId ? (int)$outletId : null,
+            'selected_outlet_name' => $selectedOutlet ? $selectedOutlet->name : 'Semua Toko',
+            'is_global' => empty($outletId),
+        ]);
     }
 
     public function storeCustomer(Request $request)
@@ -649,9 +666,10 @@ class MobileApiController extends Controller
             'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        $data['outlet_id'] = $user->outlet_id ?? $data['outlet_id'] ?? Outlet::first()?->id;
+        $data['outlet_id'] = $user->isToko() ? $user->outlet_id : ($data['outlet_id'] ?? $user->outlet_id);
 
         $customer = Customer::create($data);
+        $customer->load('outlet');
         return response()->json(['success' => true, 'message' => 'Pelanggan berhasil disimpan!', 'data' => $customer]);
     }
 
@@ -672,11 +690,12 @@ class MobileApiController extends Controller
             'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        if (!$customer->outlet_id && $user->outlet_id) {
+        if ($user->isToko()) {
             $data['outlet_id'] = $user->outlet_id;
         }
 
         $customer->update($data);
+        $customer->load('outlet');
         return response()->json(['success' => true, 'message' => "Pelanggan [{$customer->name}] berhasil diperbarui!", 'data' => $customer]);
     }
 
@@ -689,10 +708,7 @@ class MobileApiController extends Controller
         $name = $customer->name;
 
         if ($customer->sales()->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => "Pelanggan [{$name}] tidak dapat dihapus karena sudah memiliki riwayat transaksi! Ubah status menjadi 'Nonaktif'.",
-            ], 422);
+            return response()->json(['success' => false, 'message' => "Pelanggan [{$name}] tidak dapat dihapus karena sudah memiliki riwayat penjualan!"], 422);
         }
 
         $customer->delete();
@@ -704,8 +720,39 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $suppliers = Supplier::orderBy('name')->get();
-        return response()->json(['success' => true, 'data' => $suppliers]);
+        $outletId = $request->query('outlet_id');
+        if ($user->isToko()) {
+            $outletId = $user->outlet_id;
+        }
+
+        $query = Supplier::with('outlet');
+        if ($outletId) {
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
+        }
+        if ($search = $request->query('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('phone', 'like', "%$search%")
+                  ->orWhere('address', 'like', "%$search%")
+                  ->orWhere('bank_name', 'like', "%$search%");
+            });
+        }
+
+        $suppliers = $query->orderBy('name')->get();
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+        $selectedOutlet = $outletId ? $outlets->firstWhere('id', (int)$outletId) : null;
+
+        return response()->json([
+            'success' => true,
+            'data' => $suppliers,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId ? (int)$outletId : null,
+            'selected_outlet_name' => $selectedOutlet ? $selectedOutlet->name : 'Semua Toko',
+            'is_global' => empty($outletId),
+        ]);
     }
 
     public function storeSupplier(Request $request)
@@ -720,9 +767,15 @@ class MobileApiController extends Controller
             'bank_name' => 'nullable|string',
             'account_number' => 'nullable|string',
             'account_name' => 'nullable|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
+        if ($user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
+
         $supplier = Supplier::create($data);
+        $supplier->load('outlet');
         return response()->json(['success' => true, 'message' => 'Supplier berhasil disimpan!', 'data' => $supplier]);
     }
 
@@ -739,9 +792,15 @@ class MobileApiController extends Controller
             'bank_name' => 'nullable|string',
             'account_number' => 'nullable|string',
             'account_name' => 'nullable|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
+        if ($user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
+
         $supplier->update($data);
+        $supplier->load('outlet');
         return response()->json(['success' => true, 'message' => "Supplier [{$supplier->name}] berhasil diperbarui!", 'data' => $supplier]);
     }
 

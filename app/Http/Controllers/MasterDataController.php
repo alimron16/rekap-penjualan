@@ -399,13 +399,27 @@ class MasterDataController extends Controller
     }
 
     // ================================================================
-    // Suppliers (global list; purchases are per-outlet)
+    // Suppliers (per-outlet / global)
     // ================================================================
 
     public function suppliers(Request $request)
     {
+        $user     = auth()->user();
+        $outletId = $this->scopedOutletId();
+
+        if ($user?->isAdmin() && $request->has('outlet_id')) {
+            $outletId = $request->input('outlet_id') ?: null;
+        }
+
         $perPage = $request->input('per_page', 25);
-        $query   = Supplier::withCount('purchases');
+        $query   = Supplier::with('outlet')->withCount('purchases');
+
+        if ($outletId) {
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
+        }
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -419,7 +433,13 @@ class MasterDataController extends Controller
             ? $query->orderBy('name')->paginate(10000)->withQueryString()
             : $query->orderBy('name')->paginate((int) $perPage)->withQueryString();
 
-        return view('master.suppliers', compact('suppliers'));
+        $outlets = $user?->isAdmin()
+            ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get()
+            : collect();
+
+        $selectedOutlet = $outletId ? \App\Models\Outlet::find($outletId) : null;
+
+        return view('master.suppliers', compact('suppliers', 'outlets', 'outletId', 'selectedOutlet'));
     }
 
     public function storeSupplier(Request $request)
@@ -432,7 +452,13 @@ class MasterDataController extends Controller
             'account_number' => 'nullable|string',
             'account_name'   => 'nullable|string',
             'notes'          => 'nullable|string',
+            'outlet_id'      => 'nullable|exists:outlets,id',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         Supplier::create($data);
         return redirect()->route('master.suppliers')->with('success', 'Supplier berhasil ditambahkan!');
@@ -448,7 +474,13 @@ class MasterDataController extends Controller
             'account_number' => 'nullable|string',
             'account_name'   => 'nullable|string',
             'notes'          => 'nullable|string',
+            'outlet_id'      => 'nullable|exists:outlets,id',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         $supplier->update($data);
         return redirect()->route('master.suppliers')->with('success', "Data supplier [{$supplier->name}] berhasil diperbarui!");
@@ -480,10 +512,13 @@ class MasterDataController extends Controller
         }
 
         $perPage = $request->input('per_page', 25);
-        $query   = Customer::withCount('sales');
+        $query   = Customer::with('outlet')->withCount('sales');
 
         if ($outletId) {
-            $query->where('outlet_id', $outletId);
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
         }
 
         if ($search = $request->input('search')) {
@@ -502,21 +537,26 @@ class MasterDataController extends Controller
             ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get()
             : collect();
 
-        return view('master.customers', compact('customers', 'outlets', 'outletId'));
+        $selectedOutlet = $outletId ? \App\Models\Outlet::find($outletId) : null;
+
+        return view('master.customers', compact('customers', 'outlets', 'outletId', 'selectedOutlet'));
     }
 
     public function storeCustomer(Request $request)
     {
         $data = $request->validate([
-            'name'    => 'required|string',
-            'phone'   => 'nullable|string',
-            'address' => 'nullable|string',
-            'notes'   => 'nullable|string',
-            'status'  => 'required|string',
+            'name'      => 'required|string',
+            'phone'     => 'nullable|string',
+            'address'   => 'nullable|string',
+            'notes'     => 'nullable|string',
+            'status'    => 'required|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
         $user = auth()->user();
-        $data['outlet_id'] = $request->input('outlet_id') ?? $user?->outlet_id;
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         Customer::create($data);
         return redirect()->route('master.customers')->with('success', 'Pelanggan berhasil ditambahkan!');
@@ -525,12 +565,18 @@ class MasterDataController extends Controller
     public function updateCustomer(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'name'    => 'required|string',
-            'phone'   => 'nullable|string',
-            'address' => 'nullable|string',
-            'notes'   => 'nullable|string',
-            'status'  => 'required|string',
+            'name'      => 'required|string',
+            'phone'     => 'nullable|string',
+            'address'   => 'nullable|string',
+            'notes'     => 'nullable|string',
+            'status'    => 'required|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         $customer->update($data);
         return redirect()->route('master.customers')->with('success', "Data pelanggan [{$customer->name}] berhasil diperbarui!");

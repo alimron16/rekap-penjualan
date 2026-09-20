@@ -19,6 +19,54 @@
         </button>
     </div>
 
+    <!-- Keterangan Toko & Pilihan Toko untuk Admin -->
+    <div class="rounded-lg p-3.5 border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs {{ $selectedOutlet ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-blue-50 border-blue-200 text-blue-950' }}">
+        <div class="flex items-center gap-2.5">
+            <span class="p-2 rounded-full {{ $selectedOutlet ? 'bg-emerald-200 text-emerald-800' : 'bg-blue-200 text-blue-800' }}">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+            </span>
+            <div>
+                @if($selectedOutlet)
+                    <div class="font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                        <span>DATA PELANGGAN: TOKO {{ $selectedOutlet->name }} ({{ $selectedOutlet->code }})</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-semibold">Toko Aktif</span>
+                    </div>
+                    <div class="text-[11px] text-emerald-700 mt-0.5">
+                        Menampilkan pelanggan yang terdaftar di toko <strong>{{ $selectedOutlet->name }}</strong> & pelanggan umum nasional.
+                    </div>
+                @else
+                    <div class="font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                        <span>DATA PELANGGAN: SEMUA TOKO / KONSOLIDASI</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-600 text-white font-semibold">Seluruh Cabang</span>
+                    </div>
+                    <div class="text-[11px] text-blue-700 mt-0.5">
+                        Menampilkan <strong>seluruh data pelanggan</strong> dari semua cabang & toko Elephant Cell.
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        @if(auth()->user() && auth()->user()->isAdmin() && $outlets->isNotEmpty())
+            <div class="flex items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-200">
+                <span class="text-[11px] font-bold text-slate-700">Pilih Toko:</span>
+                <div class="flex flex-wrap gap-1.5">
+                    <a href="{{ route('master.customers', array_merge(request()->except('outlet_id'), ['outlet_id' => ''])) }}" 
+                       class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ empty($outletId) ? 'bg-blue-700 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                        Semua Toko
+                    </a>
+                    @foreach($outlets as $ot)
+                        <a href="{{ route('master.customers', array_merge(request()->except('outlet_id'), ['outlet_id' => $ot->id])) }}" 
+                           class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ (string)$outletId === (string)$ot->id ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                            {{ $ot->name }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+
     <!-- Toolbar Filter & Export -->
     <x-table-toolbar tableId="customersTable" excelName="Rekap_Daftar_Pelanggan" placeholder="Cari nama pelanggan, kontak, alamat..." />
 
@@ -29,6 +77,7 @@
                     <tr>
                         <th class="w-12 text-center">NO</th>
                         <th>NAMA PELANGGAN</th>
+                        <th>CABANG / TOKO</th>
                         <th>KONTAK / NO HP</th>
                         <th>ALAMAT</th>
                         <th>KETERANGAN</th>
@@ -42,6 +91,19 @@
                         <tr>
                             <td class="text-center text-slate-500 font-semibold">{{ $customers->firstItem() + $idx }}</td>
                             <td class="font-bold text-slate-900">{{ $c->name }}</td>
+                            <td>
+                                @if($c->outlet)
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                        <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                        {{ $c->outlet->name }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                                        <svg class="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        Semua Toko (Global)
+                                    </span>
+                                @endif
+                            </td>
                             <td class="font-mono">{{ $c->phone ?? '-' }}</td>
                             <td>{{ $c->address ?? '-' }}</td>
                             <td>{{ $c->notes ?? '-' }}</td>
@@ -70,7 +132,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-6 text-slate-400">Belum ada data pelanggan.</td>
+                            <td colspan="9" class="text-center py-6 text-slate-400">Belum ada data pelanggan.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -99,6 +161,17 @@
                 <label class="font-bold text-slate-700 block mb-1">Nama Pelanggan *</label>
                 <input type="text" name="name" required placeholder="Contoh: Toko Berkah / UMUM" class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
             </div>
+            @if(auth()->user() && auth()->user()->isAdmin())
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Toko / Cabang</label>
+                <select name="outlet_id" class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
+                    <option value="">Semua Toko / Global (Pelanggan Umum)</option>
+                    @foreach($outlets as $ot)
+                        <option value="{{ $ot->id }}">{{ $ot->name }} ({{ $ot->code }})</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
             <div>
                 <label class="font-bold text-slate-700 block mb-1">Nomor HP</label>
                 <input type="text" name="phone" placeholder="Contoh: 0812XXXXXXXX" class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
@@ -143,6 +216,17 @@
                 <label class="font-bold text-slate-700 block mb-1">Nama Pelanggan *</label>
                 <input type="text" name="name" id="edit_cust_name" required class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
             </div>
+            @if(auth()->user() && auth()->user()->isAdmin())
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Toko / Cabang</label>
+                <select name="outlet_id" id="edit_cust_outlet_id" class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
+                    <option value="">Semua Toko / Global (Pelanggan Umum)</option>
+                    @foreach($outlets as $ot)
+                        <option value="{{ $ot->id }}">{{ $ot->name }} ({{ $ot->code }})</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
             <div>
                 <label class="font-bold text-slate-700 block mb-1">Nomor HP</label>
                 <input type="text" name="phone" id="edit_cust_phone" class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
@@ -175,6 +259,10 @@ function editCustomer(data) {
     const form = document.getElementById('formEditCustomer');
     form.action = "{{ url('/master/customers') }}/" + data.id;
     document.getElementById('edit_cust_name').value = data.name || '';
+    const outletSelect = document.getElementById('edit_cust_outlet_id');
+    if (outletSelect) {
+        outletSelect.value = data.outlet_id || '';
+    }
     document.getElementById('edit_cust_phone').value = data.phone || '';
     document.getElementById('edit_cust_address').value = data.address || '';
     document.getElementById('edit_cust_notes').value = data.notes || '';

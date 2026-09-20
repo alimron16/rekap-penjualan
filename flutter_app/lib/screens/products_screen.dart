@@ -890,7 +890,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                           child: ChoiceChip(
                             selected: isSelected,
                             label: Text(ot['name'] ?? 'Cabang', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                            selectedColor: Colors.emerald.withOpacity(0.2),
+                            selectedColor: const Color(0xFF059669).withOpacity(0.2),
                             onSelected: (val) {
                               if (_selectedOutletId != ot['id']) {
                                 setState(() => _selectedOutletId = ot['id']);

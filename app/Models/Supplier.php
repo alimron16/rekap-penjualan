@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Supplier extends Model
 {
     protected $fillable = [
+        'outlet_id',
         'name',
         'phone',
         'address',
@@ -15,6 +16,11 @@ class Supplier extends Model
         'account_number',
         'account_name',
     ];
+
+    public function outlet(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
 
     protected function accountNumber(): \Illuminate\Database\Eloquent\Casts\Attribute
     {

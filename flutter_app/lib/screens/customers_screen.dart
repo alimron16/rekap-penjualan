@@ -17,9 +17,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
   List<dynamic> _filteredCustomers = [];
   final _searchController = TextEditingController();
 
+  // Outlet Scoping
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
+  String _selectedOutletName = 'Semua Toko (Global)';
+  bool _isGlobal = true;
+  bool _canFilterOutlet = false;
+
   @override
   void initState() {
     super.initState();
+    _loadUser();
     _loadData();
   }
 
@@ -29,6 +37,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
     super.dispose();
   }
 
+  void _loadUser() async {
+    final user = await ApiService.getUser();
+    if (user != null && mounted) {
+      setState(() {
+        final role = (user['role'] ?? '').toString().toLowerCase();
+        _canFilterOutlet = role == 'admin' || role == 'super_admin' || role == 'superadmin';
+      });
+    }
+  }
+
   void _loadData() async {
     setState(() {
       _isLoading = true;
@@ -36,11 +54,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
     });
 
     try {
-      final res = await ApiService.getCustomers();
+      final res = await ApiService.getCustomers(outletId: _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
             _customers = res['data'] ?? [];
+            if (res['outlets'] != null && res['outlets'] is List) {
+              _outlets = res['outlets'];
+            }
+            _selectedOutletName = res['selected_outlet_name'] ?? (_selectedOutletId == null ? 'Semua Toko (Global)' : 'Toko Cabang');
+            _isGlobal = res['is_global'] ?? (_selectedOutletId == null);
             _applyFilter();
           } else {
             _errorMessage = res['message'] ?? 'Gagal memuat pelanggan';
@@ -68,7 +91,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
           final name = (c['name'] ?? '').toString().toLowerCase();
           final phone = (c['phone'] ?? '').toString().toLowerCase();
           final address = (c['address'] ?? '').toString().toLowerCase();
-          return name.contains(query) || phone.contains(query) || address.contains(query);
+          final outletName = (c['outlet']?['name'] ?? '').toString().toLowerCase();
+          return name.contains(query) || phone.contains(query) || address.contains(query) || outletName.contains(query);
         }).toList();
       }
     });
@@ -82,6 +106,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final bankNameController = TextEditingController(text: customer?['bank_name'] ?? '');
     final accountNumController = TextEditingController(text: customer?['account_number'] ?? '');
     String status = customer?['status'] ?? 'Aktif';
+    int? selectedModalOutletId = customer?['outlet_id'];
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -116,10 +141,33 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   ],
                 ),
                 const Divider(height: 16),
-                const Text('Nama Lengkap', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const Text('Nama Lengkap *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                 const SizedBox(height: 4),
-                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nama pelanggan')),
+                TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nama pelanggan / Toko Mitra')),
                 const SizedBox(height: 10),
+
+                // Outlet selection in modal
+                if (_canFilterOutlet && _outlets.isNotEmpty) ...[
+                  const Text('Toko / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<int?>(
+                    value: selectedModalOutletId,
+                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Semua Toko / Global (Pelanggan Umum)', style: TextStyle(fontSize: 12)),
+                      ),
+                      ..._outlets.map((ot) => DropdownMenuItem<int?>(
+                        value: ot['id'] as int,
+                        child: Text('${ot['name']} (${ot['code'] ?? 'CABANG'})', style: const TextStyle(fontSize: 12)),
+                      )),
+                    ],
+                    onChanged: (val) => setModalState(() => selectedModalOutletId = val),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 Row(
                   children: [
                     Expanded(
@@ -204,6 +252,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               'bank_name': bankNameController.text.trim(),
                               'account_number': accountNumController.text.trim(),
                               'status': status,
+                              'outlet_id': selectedModalOutletId,
                             };
 
                             final res = isEditing
@@ -298,17 +347,128 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
       body: Column(
         children: [
+          // Admin Outlet Selector ChoiceChips
+          if (_canFilterOutlet && _outlets.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.storefront_outlined, size: 14, color: ThemeConfig.primary),
+                      SizedBox(width: 4),
+                      Text('PILIH TOKO / CABANG:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            selected: _selectedOutletId == null,
+                            label: const Text('Semua Toko (Global)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            selectedColor: ThemeConfig.primary.withOpacity(0.2),
+                            onSelected: (val) {
+                              if (_selectedOutletId != null) {
+                                setState(() => _selectedOutletId = null);
+                                _loadData();
+                              }
+                            },
+                          ),
+                        ),
+                        ..._outlets.map((ot) {
+                          final isSelected = _selectedOutletId == ot['id'];
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              selected: isSelected,
+                              label: Text(ot['name'] ?? 'Cabang', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                              selectedColor: const Color(0xFF059669).withOpacity(0.2),
+                              onSelected: (val) {
+                                if (_selectedOutletId != ot['id']) {
+                                  setState(() => _selectedOutletId = ot['id']);
+                                  _loadData();
+                                }
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Informative Status Banner
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _isGlobal ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _isGlobal ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isGlobal ? Icons.public : Icons.store,
+                  size: 20,
+                  color: _isGlobal ? const Color(0xFF1D4ED8) : const Color(0xFF047857),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isGlobal
+                            ? 'MODE: DATA PELANGGAN GLOBAL (SEMUA TOKO)'
+                            : 'MODE: DATA PELANGGAN - ${_selectedOutletName.toUpperCase()}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _isGlobal ? const Color(0xFF1D4ED8) : const Color(0xFF047857),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _isGlobal
+                            ? 'Menampilkan konsolidasi seluruh pelanggan dari semua cabang Elephant Cell.'
+                            : 'Menampilkan pelanggan toko cabang & pelanggan umum.',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _isGlobal ? const Color(0xFF1E40AF) : const Color(0xFF065F46),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Search Header
           Container(
             padding: const EdgeInsets.all(12),
-            color: Colors.white,
+            color: Colors.transparent,
             child: TextField(
               controller: _searchController,
               onChanged: (_) => _applyFilter(),
               decoration: InputDecoration(
-                hintText: 'Cari nama, no. HP, alamat pelanggan...',
+                hintText: 'Cari nama, no. HP, toko, alamat...',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                filled: true,
+                fillColor: Colors.white,
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 18),
@@ -321,6 +481,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
             ),
           ),
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
@@ -340,12 +501,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         : RefreshIndicator(
                             onRefresh: () async => _loadData(),
                             child: ListView.separated(
-                              padding: const EdgeInsets.only(left: 12, right: 12, top: 12, bottom: 80),
+                              padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 80),
                               itemCount: _filteredCustomers.length,
                               separatorBuilder: (_, __) => const SizedBox(height: 8),
                               itemBuilder: (ctx, i) {
                                 final c = _filteredCustomers[i];
                                 final isAktif = (c['status'] ?? 'Aktif') == 'Aktif';
+                                final outlet = c['outlet'];
+                                final outletName = outlet != null ? outlet['name'] : null;
 
                                 return Container(
                                   padding: const EdgeInsets.all(12),
@@ -395,7 +558,38 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 3),
+                                            const SizedBox(height: 4),
+
+                                            // Store Badge
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: outlet != null ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: outlet != null ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE)),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    outlet != null ? Icons.storefront : Icons.public,
+                                                    size: 11,
+                                                    color: outlet != null ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    outlet != null ? 'Toko: $outletName' : 'Semua Toko (Global)',
+                                                    style: TextStyle(
+                                                      color: outlet != null ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 10,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            const SizedBox(height: 4),
                                             Text(
                                               c['phone'] != null && c['phone'].toString().isNotEmpty ? 'Telp: ${c['phone']}' : 'Tidak ada telepon',
                                               style: TextStyle(color: ThemeConfig.textMuted, fontSize: 11),
