@@ -37,6 +37,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
 
   Map<String, dynamic>? _currentUser;
   bool _canEditStock = true;
+  bool _canEditPrice = true;
 
   @override
   void initState() {
@@ -59,15 +60,18 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
       setState(() {
         _currentUser = user;
         final role = (user['role'] ?? '').toString().toLowerCase();
-        if (role == 'super_admin') {
+        final isAdminOrSuper = role == 'admin' || role == 'super_admin' || role == 'superadmin';
+        if (isAdminOrSuper) {
           _canEditStock = true;
+          _canEditPrice = true;
         } else {
           final perms = user['permissions'];
           if (perms is Map && perms.containsKey('edit_stock')) {
             _canEditStock = perms['edit_stock'] == true;
           } else {
-            _canEditStock = role == 'admin';
+            _canEditStock = false;
           }
+          _canEditPrice = false; // Toko/FL tidak bisa ubah harga
         }
       });
     }
@@ -281,15 +285,55 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                   ],
                 ),
                 const SizedBox(height: 10),
+                // Pesan kunci harga untuk non-admin
+                if (!_canEditPrice)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      border: Border.all(color: Colors.amber.shade200),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock_outline, size: 14, color: Colors.amber.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Harga hanya dapat diubah oleh Admin. Hubungi Admin untuk perubahan harga.',
+                            style: TextStyle(fontSize: 11, color: Colors.amber.shade800, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('HPP (Modal)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Row(
+                            children: [
+                              const Text('HPP (Modal)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              if (!_canEditPrice) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.lock_outline, size: 12, color: Colors.grey),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 4),
-                          TextField(controller: hppController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(
+                            controller: hppController,
+                            keyboardType: TextInputType.number,
+                            enabled: _canEditPrice,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              filled: !_canEditPrice,
+                              fillColor: !_canEditPrice ? Colors.grey.shade100 : null,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -298,9 +342,26 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Harga Retail', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Row(
+                            children: [
+                              const Text('Harga Retail', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              if (!_canEditPrice) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.lock_outline, size: 12, color: Colors.grey),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 4),
-                          TextField(controller: retailPriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(
+                            controller: retailPriceController,
+                            keyboardType: TextInputType.number,
+                            enabled: _canEditPrice,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              filled: !_canEditPrice,
+                              fillColor: !_canEditPrice ? Colors.grey.shade100 : null,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -309,9 +370,26 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Harga Grosir', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                          Row(
+                            children: [
+                              const Text('Harga Grosir', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              if (!_canEditPrice) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.lock_outline, size: 12, color: Colors.grey),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 4),
-                          TextField(controller: wholesalePriceController, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: '0')),
+                          TextField(
+                            controller: wholesalePriceController,
+                            keyboardType: TextInputType.number,
+                            enabled: _canEditPrice,
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              filled: !_canEditPrice,
+                              fillColor: !_canEditPrice ? Colors.grey.shade100 : null,
+                            ),
+                          ),
                         ],
                       ),
                     ),

@@ -243,17 +243,41 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @if(auth()->check() && auth()->user()->isToko())
+                <div class="sm:col-span-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-amber-800">
+                    <svg class="w-4 h-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span><strong>Harga dikunci.</strong> Hanya Admin yang dapat mengubah HPP dan harga jual. Hubungi Admin untuk perubahan harga.</span>
+                </div>
+                @endif
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">HPP Awal (Rp)</label>
-                    <input type="number" step="1" name="hpp" value="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        HPP Awal (Rp)
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="1" name="hpp" value="0" required
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono" @endif>
                 </div>
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">Harga Retail (Rp)</label>
-                    <input type="number" step="1" name="retail_price" value="0" required class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        Harga Retail (Rp)
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="1" name="retail_price" value="0" required
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono" @endif>
                 </div>
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">Harga Grosir (Rp)</label>
-                    <input type="number" step="1" name="wholesale_price" value="0" class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        Harga Grosir (Rp)
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="1" name="wholesale_price" value="0"
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-3 py-1.5 border border-slate-300 rounded font-mono" @endif>
                 </div>
             </div>
 
@@ -447,17 +471,41 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @if(auth()->check() && auth()->user()->isToko())
+                <div class="sm:col-span-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-amber-800">
+                    <svg class="w-4 h-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <span><strong>Harga dikunci.</strong> Hanya Admin yang dapat mengubah HPP dan harga jual. Hubungi Admin untuk perubahan harga.</span>
+                </div>
+                @endif
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">HPP (Harga Modal) *</label>
-                    <input type="number" step="any" name="hpp" id="edit_item_hpp" required min="0" class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        HPP (Harga Modal) *
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="any" name="hpp" id="edit_item_hpp" required min="0"
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600" @endif>
                 </div>
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">Harga Retail *</label>
-                    <input type="number" step="any" name="retail_price" id="edit_item_retail" required min="0" class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono font-bold focus:ring-2 focus:ring-emerald-600">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        Harga Retail *
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="any" name="retail_price" id="edit_item_retail" required min="0"
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono font-bold bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono font-bold focus:ring-2 focus:ring-emerald-600" @endif>
                 </div>
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">Harga Grosir</label>
-                    <input type="number" step="any" name="wholesale_price" id="edit_item_wholesale" min="0" class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600">
+                    <label class="font-bold text-slate-700 block mb-1">
+                        Harga Grosir
+                        @if(auth()->check() && auth()->user()->isToko())
+                            <span class="text-[10px] text-amber-600 font-normal">(Terkunci)</span>
+                        @endif
+                    </label>
+                    <input type="number" step="any" name="wholesale_price" id="edit_item_wholesale" min="0"
+                           @if(auth()->check() && auth()->user()->isToko()) readonly class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono bg-slate-100 cursor-not-allowed text-slate-500" @else class="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono focus:ring-2 focus:ring-emerald-600" @endif>
                 </div>
             </div>
 

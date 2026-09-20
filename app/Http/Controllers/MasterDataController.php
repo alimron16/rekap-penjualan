@@ -81,6 +81,15 @@ class MasterDataController extends Controller
             $data['wholesale_price'] = $data['retail_price'];
         }
 
+        // Server-side: Toko/FL tidak bisa mengubah harga — abaikan nilai harga dari form
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            // Toko tidak bisa buat item baru — set harga ke 0, perlu diisi oleh Admin
+            $data['hpp'] = 0;
+            $data['retail_price'] = 0;
+            $data['wholesale_price'] = 0;
+        }
+
         Product::create($data);
 
         return redirect()->route('master.items')->with('success', 'Item berhasil ditambahkan!');
@@ -123,6 +132,13 @@ class MasterDataController extends Controller
         $user = auth()->user();
         if ($user && (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko()))) {
             $data['stock'] = $product->stock;
+        }
+
+        // Hak akses edit harga: Toko/FL tidak bisa mengubah HPP dan harga jual
+        if ($user && $user->isToko()) {
+            $data['hpp'] = $product->hpp;
+            $data['retail_price'] = $product->retail_price;
+            $data['wholesale_price'] = $product->wholesale_price;
         }
 
         $product->update($data);

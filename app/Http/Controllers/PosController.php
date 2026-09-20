@@ -13,7 +13,8 @@ use Illuminate\Http\Request;
 class PosController extends Controller
 {
     public function __construct(
-        protected PosTransactionService $posService
+        protected PosTransactionService $posService,
+        protected \App\Services\ShiftService $shiftService
     ) {}
 
     /**
@@ -23,6 +24,7 @@ class PosController extends Controller
     {
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->orderBy('code')->get();
         $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
             ->where('type', 'D')
             ->orderBy('code')
@@ -142,6 +144,78 @@ class PosController extends Controller
                 'success' => false,
                 'message' => 'Gagal memproses tarik tunai: ' . $e->getMessage(),
             ], 422);
+        }
+    }
+
+    /**
+     * Halaman Rekap Shift & Setor Penjualan (Web)
+     */
+    public function shift(Request $request)
+    {
+        $user = auth()->user();
+        $isAdmin = in_array($user->role, ['admin', 'superadmin']);
+
+        $outlets = $isAdmin ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get() : collect([$user->outlet])->filter();
+
+        $selectedOutletId = $isAdmin && $request->has('outlet_id')
+            ? ($request->outlet_id ? (int) $request->outlet_id : null)
+            : ($user->outlet_id ?? ($outlets->first()?->id));
+
+        $summary = $this->shiftService->getShiftSummary($selectedOutletId, $user->id);
+        $history = $this->shiftService->getShiftHistory($selectedOutletId, 20);
+
+        return view('pos.shift', compact('summary', 'history', 'outlets', 'selectedOutletId', 'isAdmin'));
+    }
+
+    /**
+     * Proses Setor & Ganti Shift via Web
+     */
+    public function closeShiftWeb(Request $request)
+    {
+        $user = auth()->user();
+        $isAdmin = in_array($user->role, ['admin', 'superadmin']);
+
+        $outletId = $isAdmin && $request->has('outlet_id')
+            ? ($request->outlet_id ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
+
+        $retailDeposit = (float) ($request->cash_retail_deposit ?? 0);
+        $multiDeposit = (float) ($request->cash_multi_deposit ?? 0);
+        $transferDeposit = (float) ($request->cash_transfer_deposit ?? 0);
+
+        $retailRetained = (float) ($request->cash_retail_retained ?? 400000);
+        $multiRetained = (float) ($request->cash_multi_retained ?? 0);
+        $transferRetained = (float) ($request->cash_transfer_retained ?? 0);
+
+        $totalDeposit = $retailDeposit + $multiDeposit + $transferDeposit;
+
+        try {
+            $shiftLog = $this->shiftService->closeShift([
+                'cash_retail_deposit' => $retailDeposit,
+                'cash_retail_retained' => $retailRetained,
+                'cash_multi_deposit' => $multiDeposit,
+                'cash_multi_retained' => $multiRetained,
+                'cash_transfer_deposit' => $transferDeposit,
+                'cash_transfer_retained' => $transferRetained,
+                'notes' => $request->notes ?? 'Tutup Shift Web',
+            ], $outletId, $user->id);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Ganti Shift & Setor berhasil! Total disetor: Rp ' . number_format($totalDeposit, 0, ',', '.'),
+                    'shift_log' => $shiftLog,
+                    'print_url' => route('receipt.thermal_shift', $shiftLog->id),
+                ]);
+            }
+
+            return redirect()->route('pos.shift', ['outlet_id' => $outletId])
+                ->with('success', 'Ganti Shift & Setor Rp ' . number_format($totalDeposit, 0, ',', '.') . ' berhasil!');
+        } catch (Exception $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return back()->with('error', 'Gagal memproses tutup shift: ' . $e->getMessage());
         }
     }
 }

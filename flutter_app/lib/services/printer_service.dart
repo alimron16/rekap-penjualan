@@ -819,4 +819,163 @@ class PrinterService {
       }
     }
   }
+
+  /// Print Shift Closing / Rekap Shift Receipt
+  static Future<void> printShiftReceipt({
+    required Map<String, dynamic> shiftData,
+    Map<String, dynamic>? storeSetting,
+  }) async {
+    final pdf = pw.Document();
+    final paperSizeStr = await getPreferredPaperSize();
+    final is80mm = paperSizeStr == '80mm';
+    final pageFormat = is80mm ? PdfPageFormat.roll80 : PdfPageFormat.roll57;
+
+    final resolvedSetting = await _resolveStoreSetting(storeSetting);
+    final logoBytes = await _fetchLogoBytes(resolvedSetting['logo_url']?.toString());
+    final logoImage = _buildPdfLogo(logoBytes);
+    final fontRegular = await PdfGoogleFonts.robotoRegular();
+    final fontBold = await PdfGoogleFonts.robotoBold();
+
+    final storeName = resolvedSetting['store_name']?.toString() ?? 'ELEPHANT POS';
+    final storeAddress = resolvedSetting['address']?.toString() ?? '';
+    final storePhone = resolvedSetting['phone']?.toString() ?? '';
+
+    final outletName = shiftData['outlet_name'] ?? shiftData['outlet']?['name'] ?? 'Pusat';
+    final cashierName = shiftData['user_name'] ?? shiftData['user']?['name'] ?? 'Kasir';
+    final startTime = shiftData['start_time_formatted'] ?? shiftData['start_time'] ?? '-';
+    final endTime = shiftData['end_time_formatted'] ?? shiftData['end_time'] ?? '-';
+
+    final totalDeposited = Formatters.parseDouble(shiftData['total_deposited'] ?? 0);
+    final retailDeposited = Formatters.parseDouble(shiftData['cash_retail_deposited'] ?? 0);
+    final retailRetained = Formatters.parseDouble(shiftData['cash_retail_retained'] ?? 400000);
+    final multiDeposited = Formatters.parseDouble(shiftData['cash_multi_deposited'] ?? 0);
+    final multiRetained = Formatters.parseDouble(shiftData['cash_multi_retained'] ?? 0);
+    final transferDeposited = Formatters.parseDouble(shiftData['cash_transfer_deposited'] ?? 0);
+    final transferRetained = Formatters.parseDouble(shiftData['cash_transfer_retained'] ?? 0);
+
+    final cashSales = Formatters.parseDouble(shiftData['cash_sales'] ?? shiftData['summary']?['cash_sales'] ?? 0);
+    final nonCashSales = Formatters.parseDouble(shiftData['non_cash_sales'] ?? shiftData['summary']?['non_cash_sales'] ?? 0);
+    final receivableSales = Formatters.parseDouble(shiftData['receivable_sales'] ?? shiftData['summary']?['receivable_sales'] ?? 0);
+    final digitalSales = Formatters.parseDouble(shiftData['digital_sales'] ?? shiftData['summary']?['total_digital_sales'] ?? 0);
+    final transferCash = Formatters.parseDouble(shiftData['transfer_cash'] ?? shiftData['summary']?['total_transfer_cash'] ?? 0);
+    final expenses = Formatters.parseDouble(shiftData['expenses'] ?? shiftData['summary']?['total_expense'] ?? 0);
+    final trxCount = shiftData['transaction_count'] ?? shiftData['summary']?['total_transactions'] ?? 0;
+    final notes = shiftData['notes']?.toString() ?? '';
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            if (logoImage != null) pw.Container(height: 38, child: pw.Center(child: logoImage)),
+            pw.Text(storeName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11), textAlign: pw.TextAlign.center),
+            if (storeAddress.isNotEmpty) pw.Text(storeAddress, style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
+            if (storePhone.isNotEmpty) pw.Text('Telp: $storePhone', style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
+            pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
+            pw.Text('STRUK REKAP & TUTUP SHIFT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+            pw.SizedBox(height: 4),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Outlet:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(outletName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Kasir:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(cashierName, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Mulai:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(startTime, style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Selesai:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(endTime, style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
+            pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('OPERASIONAL SHIFT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Penjualan Tunai:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(cashSales), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Non-Tunai (TF/QRIS):', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(nonCashSales), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Tempo (Piutang):', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(receivableSales), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Produk Multi:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(digitalSales), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Transfer Masuk:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(transferCash), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Kas Keluar (Beban):', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('-${Formatters.currency.format(expenses)}', style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Total Transaksi:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('$trxCount Trx', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+            ]),
+            pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
+            pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('SETORAN 3 KAS & MODAL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8))),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Setor Retail:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(retailDeposited), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Sisa Modal Retail:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(retailRetained), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Setor Multi:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(multiDeposited), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Setor Transfer:', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(Formatters.currency.format(transferDeposited), style: const pw.TextStyle(fontSize: 8)),
+            ]),
+            pw.Divider(thickness: 0.8),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('TOTAL DISETOR:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+              pw.Text(Formatters.currency.format(totalDeposited), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+            ]),
+            if (notes.isNotEmpty) ...[
+              pw.SizedBox(height: 3),
+              pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Catatan: $notes', style: const pw.TextStyle(fontSize: 7))),
+            ],
+            pw.SizedBox(height: 10),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: [
+                pw.Column(children: [
+                  pw.Text('Diserahkan,', style: const pw.TextStyle(fontSize: 7)),
+                  pw.SizedBox(height: 18),
+                  pw.Text('($cashierName)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                ]),
+                pw.Column(children: [
+                  pw.Text('Diterima,', style: const pw.TextStyle(fontSize: 7)),
+                  pw.SizedBox(height: 18),
+                  pw.Text('(Supervisor)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7)),
+                ]),
+              ],
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()), style: const pw.TextStyle(fontSize: 6)),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Rekap_Shift_${DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
 }

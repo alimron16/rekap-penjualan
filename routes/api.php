@@ -78,6 +78,7 @@ Route::get('/cash-transactions', [MobileApiController::class, 'cashTransactions'
 Route::post('/cash-transactions', [MobileApiController::class, 'storeCashTransaction']);
 Route::get('/pos/shift-summary', [MobileApiController::class, 'shiftSummary']);
 Route::post('/pos/close-shift', [MobileApiController::class, 'closeShift']);
+Route::get('/pos/shift-history', [MobileApiController::class, 'shiftHistory']);
 Route::get('/pos/unified-logs', [MobileApiController::class, 'unifiedLogs']);
 
 // 9. Laporan Keuangan

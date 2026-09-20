@@ -32,4 +32,12 @@ class ReceiptController extends Controller
 
         return view('receipts.thermal_digital', compact('digitalSale', 'setting'));
     }
+
+    public function thermalShift(\App\Models\ShiftLog $shiftLog)
+    {
+        $setting = StoreSetting::first();
+        $shiftLog->load(['outlet', 'user']);
+
+        return view('receipts.thermal_shift', compact('shiftLog', 'setting'));
+    }
 }

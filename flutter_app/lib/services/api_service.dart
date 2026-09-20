@@ -425,21 +425,42 @@ class ApiService {
   }
 
   // --- Shift Kasir & Setor Penjualan ---
-  static Future<Map<String, dynamic>> getShiftSummary({String? date}) async {
-    final d = date ?? '';
-    return await _get('$baseUrl/pos/shift-summary?date=$d');
+  static Future<Map<String, dynamic>> getShiftSummary({String? date, int? outletId}) async {
+    final params = <String>[];
+    if (date != null && date.isNotEmpty) params.add('date=$date');
+    if (outletId != null) params.add('outlet_id=$outletId');
+    final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/pos/shift-summary$q');
   }
 
   static Future<Map<String, dynamic>> closeShift({
-    required double depositAmount,
+    double? depositAmount,
+    double? cashRetailDeposit,
+    double? cashRetailRetained,
+    double? cashMultiDeposit,
+    double? cashMultiRetained,
+    double? cashTransferDeposit,
+    double? cashTransferRetained,
+    int? outletId,
     String? notes,
-    int? destinationAccountId,
   }) async {
     return await _post('$baseUrl/pos/close-shift', {
-      'deposit_amount': depositAmount,
+      if (depositAmount != null) 'deposit_amount': depositAmount,
+      if (cashRetailDeposit != null) 'cash_retail_deposit': cashRetailDeposit,
+      if (cashRetailRetained != null) 'cash_retail_retained': cashRetailRetained,
+      if (cashMultiDeposit != null) 'cash_multi_deposit': cashMultiDeposit,
+      if (cashMultiRetained != null) 'cash_multi_retained': cashMultiRetained,
+      if (cashTransferDeposit != null) 'cash_transfer_deposit': cashTransferDeposit,
+      if (cashTransferRetained != null) 'cash_transfer_retained': cashTransferRetained,
+      if (outletId != null) 'outlet_id': outletId,
       'notes': notes,
-      'destination_account_id': destinationAccountId,
     });
+  }
+
+  static Future<Map<String, dynamic>> getShiftHistory({int? outletId, int page = 1}) async {
+    final params = <String>['page=$page'];
+    if (outletId != null) params.add('outlet_id=$outletId');
+    return await _get('$baseUrl/pos/shift-history?${params.join('&')}');
   }
 
   // --- Histori Terpadu Toko (Tarik Tunai, Masuk, Keluar, Retur) ---

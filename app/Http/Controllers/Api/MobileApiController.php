@@ -42,7 +42,8 @@ class MobileApiController extends Controller
         protected AccountingService $accountingService,
         protected FinancialReportService $reportService,
         protected YearlyClosingService $closingService,
-        protected \App\Services\GeminiAiService $geminiService
+        protected \App\Services\GeminiAiService $geminiService,
+        protected \App\Services\ShiftService $shiftService
     ) {}
 
     /**
@@ -349,6 +350,13 @@ class MobileApiController extends Controller
             $data['wholesale_price'] = $data['retail_price'];
         }
 
+        // Server-side: Toko/FL tidak bisa mengubah harga
+        if ($user->isToko()) {
+            $data['hpp'] = 0;
+            $data['retail_price'] = 0;
+            $data['wholesale_price'] = 0;
+        }
+
         // Auto create category if not exists
         if (!empty($data['type'])) {
             Category::firstOrCreate(['type' => 'physical_type', 'name' => strtoupper(trim($data['type']))]);
@@ -395,6 +403,13 @@ class MobileApiController extends Controller
         // FL Toko cannot edit stock physical quantity unless granted permission
         if (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko())) {
             $data['stock'] = $product->stock;
+        }
+
+        // Server-side: Toko/FL tidak bisa mengubah harga
+        if ($user->isToko()) {
+            $data['hpp'] = $product->hpp;
+            $data['retail_price'] = $product->retail_price;
+            $data['wholesale_price'] = $product->wholesale_price;
         }
 
         $product->update($data);
@@ -2167,14 +2182,14 @@ class MobileApiController extends Controller
     {
         $apkPath = public_path('download/elephant-pos.apk');
         $fileSize = file_exists($apkPath) ? filesize($apkPath) : 0;
-        $fileSizeMb = $fileSize > 0 ? round($fileSize / (1024 * 1024), 1) : 65.3;
+        $fileSizeMb = $fileSize > 0 ? round($fileSize / (1024 * 1024), 1) : 65.4;
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.2',
-            'version_code' => 3,
+            'version' => '1.0.3',
+            'version_code' => 4,
             'title' => 'Pembaruan Tersedia',
-            'release_notes' => "• Sinkronisasi logo cetak struk sesuai pengaturan toko.\n• Fitur update aplikasi otomatis dan manual di menu pengaturan.\n• Peningkatan kestabilan dan kecepatan sistem.",
+            'release_notes' => "• Penguncian harga jual dan HPP untuk akun Toko (hanya Admin yang berwenang mengubah harga).\n• Desain baru Rekap Shift & Setor Penjualan: bersih, teratur, dan mudah dipahami.\n• Pemisahan 3 kantong kas: Cash Retail, Cash Multi (Pulsa/PPOB), dan Cash Transfer Agen.\n• Ganti Shift otomatis mereset seluruh indikator transaksi ke 0 untuk shift berikutnya.\n• Histori dan rincian lengkap tutup shift per cabang/toko.\n• Mode Multi-Outlet untuk Admin dan Superadmin.",
             'download_url' => url('/download-apk') . '?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => false,
@@ -2186,164 +2201,121 @@ class MobileApiController extends Controller
     // ==========================================
 
     /**
-     * Get real-time shift summary for cashier
+     * Get real-time shift summary for cashier / admin per outlet
      */
     public function shiftSummary(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $date = $request->query('date', date('Y-m-d'));
-        $outletId = $user->outlet_id;
+        // Allow admin/superadmin to view any outlet, regular cashier views their own outlet
+        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
+            ? ($request->outlet_id ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
-        // Sales today (Fisik)
-        $salesQuery = Sale::whereDate('date', $date);
-        if ($outletId) $salesQuery->where('outlet_id', $outletId);
+        $summary = $this->shiftService->getShiftSummary($outletId, $user->id);
 
-        $sales = $salesQuery->with('customer')->get();
-        $cashSales = $sales->where('payment_method', 'cash')->sum('paid_amount');
-        $nonCashSales = $sales->where('payment_method', '!=', 'cash')->sum('paid_amount');
-        $receivableSales = $sales->sum('remaining_receivable');
-
-        // Digital Sales today (Pulsa, PLN, Data)
-        $digitalSalesQuery = DigitalSale::whereDate('date', $date)
-            ->where('status', 'SUKSES')
-            ->with(['digitalProduct', 'cashAccount']);
-        $digitalSales = $digitalSalesQuery->get();
-        $totalDigitalSales = (float) $digitalSales->sum('selling_price');
-        $totalDigitalHpp = (float) $digitalSales->sum('hpp');
-        $totalDigitalProfit = (float) $digitalSales->sum('profit_margin');
-        $digitalSalesCount = $digitalSales->count();
-
-        // Tarik Tunai today
-        $withdrawQuery = CashTransaction::where('type', 'TRANSFER')
-            ->where('notes', 'like', 'Tarik Tunai%')
-            ->whereDate('date', $date);
-        $totalWithdraw = (float) $withdrawQuery->sum('amount');
-        $totalWithdrawFee = (float) $withdrawQuery->sum('admin_fee');
-
-        // Transfer Agen today (approved)
-        $transferQuery = AgentTransfer::whereDate('created_at', $date)
-            ->where('status', 'approved');
-        if ($outletId) $transferQuery->where('outlet_id', $outletId);
-        $transfers = $transferQuery->get();
-        $totalTransferCash = (float) $transfers->sum('total_amount'); // uang tunai masuk laci
-        $totalTransferFee = (float) $transfers->sum('admin_fee');
-        $totalTransferCount = $transfers->count();
-
-        // Kas Keluar (Beban Makan, Sampah, Operasional)
-        $expenseQuery = CashTransaction::where('type', 'OUT')
-            ->whereDate('date', $date);
-        $totalExpense = (float) $expenseQuery->sum('amount');
-
-        // Account balances
-        $cashRetailAcc = Account::where('code', '1-1110')->first();
-        $cashTransferAcc = Account::where('code', '1-1111')->first();
-        $saldoBcaAcc = Account::where('code', '1-1113')->first();
-        $saldoMultiAcc = Account::where('code', '1-1131')->first();
-
-        $currentCashDrawer = (float) ($cashRetailAcc?->current_balance ?? 0);
-        $currentCashTransfer = (float) ($cashTransferAcc?->current_balance ?? 0);
-        $currentSaldoBca = (float) ($saldoBcaAcc?->current_balance ?? 0);
-        $currentSaldoMulti = (float) ($saldoMultiAcc?->current_balance ?? 0);
-
-        // Required drawer reserve (modal awal)
-        $requiredReserve = 400000.0;
-        $recommendedDeposit = max(0.0, $currentCashDrawer - $requiredReserve);
-
+        // Provide backwards-compatible keys and rich new structured data
         return response()->json([
             'success' => true,
-            'date' => $date,
-            'cash_drawer_balance' => $currentCashDrawer,
-            'cash_retail_balance' => $currentCashDrawer,
-            'cash_transfer_balance' => $currentCashTransfer,
-            'saldo_bca_balance' => $currentSaldoBca,
-            'saldo_multi_balance' => $currentSaldoMulti,
-            'required_reserve' => $requiredReserve,
-            'recommended_deposit' => $recommendedDeposit,
-            'summary' => [
-                'total_sales' => (float) $sales->sum('total'),
-                'cash_sales' => (float) $cashSales,
-                'non_cash_sales' => (float) $nonCashSales,
-                'receivable_sales' => (float) $receivableSales,
-                'total_digital_sales' => $totalDigitalSales,
-                'total_digital_profit' => $totalDigitalProfit,
-                'digital_sales_count' => $digitalSalesCount,
-                'total_withdraw_cash' => $totalWithdraw,
-                'total_withdraw_fee' => $totalWithdrawFee,
-                'total_transfer_cash' => $totalTransferCash,
-                'total_transfer_fee' => $totalTransferFee,
-                'transfer_count' => $totalTransferCount,
-                'total_expense' => $totalExpense,
-                'total_transactions' => $sales->count() + $digitalSalesCount,
-            ],
-            'digital_sales' => $digitalSales->map(function ($ds) {
-                return [
-                    'id' => $ds->id,
-                    'transaction_number' => $ds->transaction_number,
-                    'product_name' => $ds->digitalProduct?->name ?? 'Produk Multi',
-                    'customer_number' => $ds->customer_number,
-                    'selling_price' => (float) $ds->selling_price,
-                    'profit_margin' => (float) $ds->profit_margin,
-                    'status' => $ds->status,
-                    'date' => $ds->date ? $ds->date->format('H:i') : null,
-                ];
-            }),
+            'shift_number' => $summary['shift_number'],
+            'date' => date('Y-m-d'),
+            'start_time' => $summary['start_time'],
+            'start_time_formatted' => $summary['start_time_formatted'],
+            'end_time' => $summary['end_time'],
+            'end_time_formatted' => $summary['end_time_formatted'],
+            'duration' => $summary['duration'],
+            'outlet_id' => $summary['outlet_id'],
+            'outlet_name' => $summary['outlet_name'],
+            'cash_drawer_balance' => $summary['cash_retail']['balance'],
+            'cash_retail_balance' => $summary['cash_retail']['balance'],
+            'cash_transfer_balance' => $summary['cash_transfer']['balance'],
+            'saldo_multi_balance' => $summary['cash_multi']['balance'],
+            'required_reserve' => $summary['cash_retail']['required_reserve'],
+            'recommended_deposit' => $summary['cash_retail']['recommended_deposit'],
+            'cash_retail' => $summary['cash_retail'],
+            'cash_multi' => $summary['cash_multi'],
+            'cash_transfer' => $summary['cash_transfer'],
+            'summary' => $summary['summary'],
+            'digital_sales' => $summary['digital_sales'],
+            'last_shift' => $summary['last_shift'],
             'user' => [
                 'name' => $user->name,
-                'store_name' => $user->outlet?->name ?? 'Toko Kasir',
+                'role' => $user->role,
+                'store_name' => $summary['outlet_name'],
             ],
         ]);
     }
 
     /**
-     * Close shift / Setor Uang Penjualan dan Sisakan Modal Awal
+     * Close shift / Ganti Shift & Setor Penjualan (Mendukung 3 Jenis Kas: Retail, Multi, Transfer)
      */
     public function closeShift(Request $request)
     {
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $request->validate([
-            'deposit_amount' => 'required|numeric|min:1',
-            'notes' => 'nullable|string',
-            'destination_account_id' => 'nullable|exists:accounts,id',
-        ]);
+        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
+            ? ($request->outlet_id ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
-        $cashRetailAcc = Account::where('code', '1-1110')->firstOrFail();
-        $brangkasAcc = $request->destination_account_id 
-            ? Account::find($request->destination_account_id)
-            : (Account::where('name', 'like', '%BRANGKAS%')->first() ?: Account::where('code', '1-1113')->first() ?: $cashRetailAcc);
+        // Support both 3-cash structure and legacy deposit_amount
+        $retailDeposit = $request->filled('cash_retail_deposit')
+            ? (float) $request->cash_retail_deposit
+            : (float) ($request->deposit_amount ?? 0);
 
-        $amount = (float) $request->deposit_amount;
-        $trxNumber = $this->posService->generateTransactionNumber('ST'); // Setor Toko
+        $multiDeposit = (float) ($request->cash_multi_deposit ?? 0);
+        $transferDeposit = (float) ($request->cash_transfer_deposit ?? 0);
+
+        $retailRetained = (float) ($request->cash_retail_retained ?? 400000);
+        $multiRetained = (float) ($request->cash_multi_retained ?? 0);
+        $transferRetained = (float) ($request->cash_transfer_retained ?? 0);
+
+        $totalDeposit = $retailDeposit + $multiDeposit + $transferDeposit;
 
         try {
-            // Transfer from CASH RETAIL to BRANGKAS / PUSAT
-            $trx = CashTransaction::create([
-                'transaction_number' => $trxNumber,
-                'type' => 'TRANSFER',
-                'date' => now(),
-                'debit_account_id' => $brangkasAcc->id,
-                'credit_account_id' => $cashRetailAcc->id,
-                'amount' => $amount,
-                'admin_fee' => 0,
-                'notes' => "Setor Kas Penjualan Shift [{$user->name}] - " . ($request->notes ?? 'Tutup Shift'),
-            ]);
-
-            $this->accountingService->recordCashTransaction($trx);
-
-            $remainingDrawer = (float) $cashRetailAcc->fresh()->current_balance;
+            $shiftLog = $this->shiftService->closeShift([
+                'cash_retail_deposit' => $retailDeposit,
+                'cash_retail_retained' => $retailRetained,
+                'cash_multi_deposit' => $multiDeposit,
+                'cash_multi_retained' => $multiRetained,
+                'cash_transfer_deposit' => $transferDeposit,
+                'cash_transfer_retained' => $transferRetained,
+                'notes' => $request->notes ?? 'Ganti Shift Kasir',
+            ], $outletId, $user->id);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Setor uang penjualan Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!',
-                'remaining_drawer' => $remainingDrawer,
-                'transaction' => $trx,
+                'message' => 'Ganti Shift & Setor berhasil! Total disetor: Rp ' . number_format($totalDeposit, 0, ',', '.'),
+                'total_deposited' => $totalDeposit,
+                'shift_log' => $shiftLog,
             ]);
         } catch (Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    /**
+     * Get shift history list
+     */
+    public function shiftHistory(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
+            ? ($request->outlet_id ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
+
+        $history = $this->shiftService->getShiftHistory($outletId, 25);
+
+        return response()->json([
+            'success' => true,
+            'data' => $history->items(),
+            'current_page' => $history->currentPage(),
+            'last_page' => $history->lastPage(),
+            'total' => $history->total(),
+        ]);
     }
 
     /**

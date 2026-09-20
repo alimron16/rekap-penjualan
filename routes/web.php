@@ -102,6 +102,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('pos')->name('pos.')->group(function () {
         Route::get('/retail', [PosController::class, 'retail'])->name('retail');
         Route::get('/wholesale', [PosController::class, 'wholesale'])->name('wholesale');
+        Route::get('/shift', [PosController::class, 'shift'])->name('shift');
+        Route::post('/shift/close', [PosController::class, 'closeShiftWeb'])->name('shift.close');
         Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
         Route::post('/withdraw', [PosController::class, 'withdraw'])->name('withdraw');
     });
@@ -206,6 +208,7 @@ Route::prefix('receipt')->name('receipt.')->group(function () {
     Route::get('/thermal/{sale}', [ReceiptController::class, 'thermal'])->name('thermal');
     Route::get('/invoice/{sale}', [ReceiptController::class, 'invoice'])->name('invoice');
     Route::get('/thermal-digital/{digitalSale}', [ReceiptController::class, 'thermalDigital'])->name('thermal_digital');
+    Route::get('/thermal-shift/{shiftLog}', [ReceiptController::class, 'thermalShift'])->name('thermal_shift');
 });
 
 // Download APK (Bypass Cloudflare & Browser Cache)
@@ -214,7 +217,7 @@ Route::get('/download-apk', function () {
     if (!file_exists($path)) {
         abort(404, 'File installer APK belum tersedia di server.');
     }
-    return response()->download($path, 'elephant-pos-v1.0.1.apk', [
+    return response()->download($path, 'elephant-pos-v1.0.3.apk', [
         'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
         'Expires' => '0',
