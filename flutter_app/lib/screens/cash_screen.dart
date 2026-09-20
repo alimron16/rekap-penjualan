@@ -37,30 +37,58 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   DateTime? _endDate;
   final dateFormatter = DateFormat('yyyy-MM-dd');
   final displayDateFormatter = DateFormat('d MMM yyyy');
+  bool _isKasir = false;
 
   @override
   void initState() {
     super.initState();
+    _initTabController();
+    _checkUserRole();
+  }
+
+  void _initTabController() {
     _tabController = TabController(
-      length: 2,
+      length: _isKasir ? 1 : 2,
       vsync: this,
-      initialIndex: widget.initialType == 'in' ? 0 : 1,
+      initialIndex: _isKasir ? 0 : (widget.initialType == 'in' ? 0 : 1),
     );
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        _loadData();
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      _loadData();
+    }
+  }
+
+  void _checkUserRole() async {
+    final user = await ApiService.getUser();
+    if (mounted && user != null) {
+      final role = user['role']?.toString().toLowerCase();
+      final isKasir = role == 'toko';
+      if (isKasir != _isKasir) {
+        setState(() {
+          _isKasir = isKasir;
+          _tabController.removeListener(_onTabChanged);
+          _tabController.dispose();
+          _initTabController();
+        });
       }
-    });
+    }
     _loadData();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
-  String get _currentType => _tabController.index == 0 ? 'in' : 'out';
+  String get _currentType {
+    if (_isKasir) return 'out';
+    return _tabController.index == 0 ? 'in' : 'out';
+  }
 
   void _loadData() async {
     setState(() => _isLoading = true);
@@ -130,6 +158,13 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   }
 
   void _openAddModal({String? defaultExpenseTitle, String? defaultExpenseDesc}) {
+    if (_isKasir && _currentType == 'in') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kasir hanya diizinkan untuk input Kas Keluar.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     final amountController = TextEditingController();
     final descController = TextEditingController(text: defaultExpenseDesc ?? defaultExpenseTitle ?? '');
     
@@ -137,7 +172,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
     int? sourceId;
     if (_cashAccounts.isNotEmpty) {
       final defaultCash = _cashAccounts.firstWhere(
-        (a) => (a['code'] == '1-1110' || a['code'] == '1-1111'),
+        (a) => (a['code'] == '1-1110' || a['code'] == '1-1111' || (a['code'] != null && a['code'].toString().startsWith('1-1110-'))),
         orElse: () => _cashAccounts[0],
       );
       sourceId = defaultCash['id'];
@@ -414,18 +449,19 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
               unselectedLabelColor: Colors.white70,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              tabs: const [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.arrow_circle_down_outlined, size: 18),
-                      SizedBox(width: 8),
-                      Text('KAS MASUK'),
-                    ],
+              tabs: [
+                if (!_isKasir)
+                  const Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.arrow_circle_down_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('KAS MASUK'),
+                      ],
+                    ),
                   ),
-                ),
-                Tab(
+                const Tab(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

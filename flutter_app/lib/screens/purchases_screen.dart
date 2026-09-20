@@ -22,6 +22,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   List<dynamic> _suppliers = [];
   List<dynamic> _products = [];
   List<dynamic> _accounts = [];
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
 
   @override
   void initState() {
@@ -36,14 +38,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
     super.dispose();
   }
 
-  void _loadData() async {
+  void _loadData({int? outletId}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final res = await ApiService.getPurchases();
+      final res = await ApiService.getPurchases(outletId: outletId ?? _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -52,6 +54,10 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
             _suppliers = res['suppliers'] ?? [];
             _products = res['products'] ?? [];
             _accounts = res['accounts'] ?? [];
+            _outlets = res['outlets'] ?? [];
+            if (_selectedOutletId == null && res['selected_outlet_id'] != null) {
+              _selectedOutletId = res['selected_outlet_id'];
+            }
           } else {
             _errorMessage = res['message'] ?? 'Gagal memuat data pembelian';
           }
@@ -71,6 +77,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   void _showNewPurchaseModal() {
     int? selectedSupplierId = _suppliers.isNotEmpty ? _suppliers.first['id'] : null;
     int? selectedAccountId = _accounts.isNotEmpty ? _accounts.first['id'] : null;
+    int? modalOutletId = _selectedOutletId ?? (_outlets.isNotEmpty ? _outlets.first['id'] : null);
     String paymentMethod = 'cash';
     final paidAmountController = TextEditingController();
     final notesController = TextEditingController();
@@ -123,6 +130,23 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                     ],
                   ),
                   const SizedBox(height: 12),
+                  if (_outlets.isNotEmpty) ...[
+                    const Text('Toko Tujuan Pembelian', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<int>(
+                      value: (_outlets.any((o) => o['id'] == modalOutletId)) ? modalOutletId : (_outlets.first['id'] as int?),
+                      isExpanded: true,
+                      decoration: const InputDecoration(),
+                      items: _outlets.map<DropdownMenuItem<int>>((o) {
+                        return DropdownMenuItem<int>(
+                          value: o['id'],
+                          child: Text(o['name'] ?? '', style: const TextStyle(fontSize: 13)),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setModalState(() => modalOutletId = val),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   const Text('Supplier / Pemasok', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int>(
@@ -370,6 +394,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                           accountId: selectedAccountId,
                           paidAmount: paidAmt,
                           notes: notesController.text,
+                          outletId: modalOutletId,
                           items: cartItems,
                         );
 
@@ -573,11 +598,72 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                     ],
                   ),
                 )
-              : TabBarView(
-                  controller: _tabController,
+              : Column(
                   children: [
-                    _buildPurchasesList(),
-                    _buildDebtsList(),
+                    if (_outlets.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        color: Colors.white,
+                        child: Row(
+                          children: [
+                            const Text('Toko:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    ChoiceChip(
+                                      label: const Text('Semua Toko', style: TextStyle(fontSize: 11)),
+                                      selected: _selectedOutletId == null,
+                                      selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                                      labelStyle: TextStyle(
+                                        color: _selectedOutletId == null ? ThemeConfig.primary : Colors.black87,
+                                        fontWeight: _selectedOutletId == null ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                      onSelected: (selected) {
+                                        if (selected) {
+                                          setState(() => _selectedOutletId = null);
+                                          _loadData();
+                                        }
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    ..._outlets.map((ot) {
+                                      final isSel = _selectedOutletId == ot['id'];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(right: 6),
+                                        child: ChoiceChip(
+                                          label: Text('${ot['name']}', style: const TextStyle(fontSize: 11)),
+                                          selected: isSel,
+                                          selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                                          labelStyle: TextStyle(
+                                            color: isSel ? ThemeConfig.primary : Colors.black87,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                          onSelected: (selected) {
+                                            setState(() => _selectedOutletId = selected ? ot['id'] : null);
+                                            _loadData();
+                                          },
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildPurchasesList(),
+                          _buildDebtsList(),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
     );
@@ -634,7 +720,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'No: ${p['invoice_no'] ?? '-'} • Tgl: ${p['date'] ?? '-'}',
+                    'No: ${p['invoice_no'] ?? '-'} • Tgl: ${p['date'] ?? '-'}${p['outlet']?['name'] != null ? ' • ${p['outlet']['name']}' : ''}',
                     style: const TextStyle(color: ThemeConfig.textMuted, fontSize: 12),
                   ),
                   const Divider(height: 20),

@@ -151,6 +151,10 @@ class AccountingController extends Controller
 
     public function storeCashIn(Request $request)
     {
+        if (auth()->check() && auth()->user()->isToko()) {
+            abort(403, 'Kasir hanya diizinkan untuk mencatat Kas Keluar.');
+        }
+
         $data = $request->validate([
             'debit_account_id' => 'required|exists:accounts,id', // Penerima dana (Kas/Bank)
             'credit_account_id' => 'required|exists:accounts,id', // Sumber dana / Kategori

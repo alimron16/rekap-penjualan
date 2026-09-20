@@ -97,6 +97,19 @@
 
         <form action="{{ route('receivable.returns.store') }}" method="POST" class="p-5 space-y-3 text-xs">
             @csrf
+            @if(isset($outlets) && $outlets->count() > 0)
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Outlet / Toko Retur *</label>
+                <select name="outlet_id" required class="w-full px-3 py-1.5 border border-slate-300 rounded font-semibold bg-emerald-50 text-emerald-950">
+                    @foreach($outlets as $o)
+                        <option value="{{ $o->id }}" {{ (auth()->user()?->outlet_id == $o->id) ? 'selected' : '' }}>
+                            {{ $o->name }} ({{ $o->code }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="font-bold text-slate-700 block mb-1">Tanggal *</label>

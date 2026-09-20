@@ -17,6 +17,8 @@ class _DigitalScreenState extends State<DigitalScreen> {
   List<dynamic> _depositAccounts = [];
   List<dynamic> _cashAccounts = [];
   List<dynamic> _recentSales = [];
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
   Map<String, dynamic>? _storeSetting;
   double _saldoMulti = 0;
   double _saldoBca = 0;
@@ -38,14 +40,14 @@ class _DigitalScreenState extends State<DigitalScreen> {
     _loadDigitalData();
   }
 
-  void _loadDigitalData() async {
+  void _loadDigitalData({int? outletId}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final res = await ApiService.getDigitalData();
+      final res = await ApiService.getDigitalData(outletId: outletId ?? _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -56,15 +58,19 @@ class _DigitalScreenState extends State<DigitalScreen> {
             _saldoMulti = Formatters.parseDouble(res['saldo_multi']);
             _saldoBca = Formatters.parseDouble(res['saldo_bca']);
             _storeSetting = res['setting'];
+            _outlets = res['outlets'] ?? [];
+            if (_selectedOutletId == null && res['selected_outlet_id'] != null) {
+              _selectedOutletId = res['selected_outlet_id'];
+            }
 
-            if (_products.isNotEmpty && _selectedProductId == null) {
+            if (_products.isNotEmpty && (_selectedProductId == null || !_products.any((p) => p['id'] == _selectedProductId))) {
               _selectedProductId = _products[0]['id'];
               _sellingPriceController.text = Formatters.parseDouble(_products[0]['selling_price']).toStringAsFixed(0);
             }
-            if (_depositAccounts.isNotEmpty && _selectedDepositAccountId == null) {
+            if (_depositAccounts.isNotEmpty && (_selectedDepositAccountId == null || !_depositAccounts.any((a) => a['id'] == _selectedDepositAccountId))) {
               _selectedDepositAccountId = _depositAccounts[0]['id'];
             }
-            if (_cashAccounts.isNotEmpty && _selectedCashAccountId == null) {
+            if (_cashAccounts.isNotEmpty && (_selectedCashAccountId == null || !_cashAccounts.any((a) => a['id'] == _selectedCashAccountId))) {
               _selectedCashAccountId = _cashAccounts[0]['id'];
             }
           } else {
@@ -113,6 +119,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
         sellingPrice: price,
         hpp: hpp > 0 ? hpp : null,
         notes: _notesController.text.trim(),
+        outletId: _selectedOutletId,
       );
 
       setState(() => _isSubmitting = false);
@@ -189,10 +196,15 @@ class _DigitalScreenState extends State<DigitalScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
-                        Icon(Icons.add_card, color: Color(0xFF0F766E), size: 22),
-                        SizedBox(width: 8),
-                        Text('Top Up Saldo Multi Server', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      children: [
+                        const Icon(Icons.add_card, color: Color(0xFF0F766E), size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          _selectedOutletId != null && _outlets.any((o) => o['id'] == _selectedOutletId)
+                              ? 'Top Up Saldo Multi (${_outlets.firstWhere((o) => o['id'] == _selectedOutletId)['name']})'
+                              : 'Top Up Saldo Multi Server',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
                       ],
                     ),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
@@ -260,6 +272,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
                             final res = await ApiService.topupMulti(
                               sourceAccountId: sourceAccountId!,
                               amount: amount,
+                              outletId: _selectedOutletId,
                               notes: notesController.text.trim(),
                             );
                             if (res['success'] == true) {
@@ -498,6 +511,54 @@ class _DigitalScreenState extends State<DigitalScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Outlet Selector for Admin
+                      if (_outlets.isNotEmpty) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.storefront, size: 18, color: ThemeConfig.primary),
+                              const SizedBox(width: 8),
+                              const Text('Toko:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: _outlets.map((ot) {
+                                      final isSel = _selectedOutletId == ot['id'];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(right: 6),
+                                        child: ChoiceChip(
+                                          label: Text('${ot['name']}', style: const TextStyle(fontSize: 11)),
+                                          selected: isSel,
+                                          selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                                          labelStyle: TextStyle(
+                                            color: isSel ? ThemeConfig.primary : Colors.black87,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                          onSelected: (selected) {
+                                            if (selected) {
+                                              setState(() => _selectedOutletId = ot['id']);
+                                              _loadDigitalData(outletId: ot['id']);
+                                            }
+                                          },
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       // Saldo Multi & Saldo BCA Cards
                       Row(
                         children: [

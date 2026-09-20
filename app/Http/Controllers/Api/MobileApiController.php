@@ -1073,31 +1073,84 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $products = DigitalProduct::where('status', 'OPEN')->orderBy('name')->get();
-        $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])->get();
-        // Include Saldo BCA (1-1113), Cash Retail (1-1110), Cash Transfer (1-1111), Cash Multi (1-1112), Saldo BRI (1-1120)
-        $cashAccounts = Account::whereIn('code', ['1-1113', '1-1110', '1-1111', '1-1112', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130'])
+        $isAdmin  = $user->isSuperAdmin() || $user->isAdmin();
+        // Kasir: outlet tetap dari user. Admin: bisa pilih outlet via ?outlet_id=
+        $outletId = $user->outlet_id;
+        if ($isAdmin && $request->filled('outlet_id')) {
+            $outletId = (int) $request->outlet_id;
+        }
+
+        // Produk digital: lihat milik toko + produk global (outlet_id NULL)
+        $products = DigitalProduct::where('status', 'OPEN')
+            ->when(
+                $outletId,
+                fn($q) => $q->where(fn($s) => $s->where('outlet_id', $outletId)->orWhereNull('outlet_id')),
+            )
+            ->orderBy('name')
+            ->get();
+
+        // Deposit accounts: akun per-outlet (1-1131-X, 1-1113-X, 1-1120-X)
+        $depositAccounts = Account::where('group', 'AKTIVA')
+            ->where('type', 'D')
+            ->when(
+                $outletId,
+                fn($q) => $q->where('outlet_id', $outletId)->where(fn($s) =>
+                    $s->where('code', 'like', '1-1131%')
+                      ->orWhere('code', 'like', '1-1113%')
+                      ->orWhere('code', 'like', '1-1120%')
+                ),
+                fn($q) => $q->whereNull('outlet_id')->whereIn('code', ['1-1131', '1-1113', '1-1120'])
+            )
+            ->get();
+
+        // Fallback ke akun global kalau outlet belum punya akun per-outlet
+        if ($outletId && $depositAccounts->isEmpty()) {
+            $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])
+                ->whereNull('outlet_id')
+                ->get();
+        }
+
+        // Cash accounts: akun penerimaan uang tunai (tetap global/shared)
+        $cashAccounts = Account::whereNull('outlet_id')
+            ->whereIn('code', ['1-1113', '1-1110', '1-1111', '1-1112', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130'])
             ->orderByRaw("FIELD(code, '1-1113', '1-1110', '1-1111', '1-1112', '1-1120')")
             ->get();
-        $saldoMulti = Account::where('code', '1-1131')->value('current_balance') ?? 0;
-        $saldoBca = Account::where('code', '1-1113')->value('current_balance') ?? 0;
 
-        // Recent today's digital sales for cashier history and thermal reprint
+        // Saldo dari akun per-outlet, fallback ke global
+        $saldoMulti = Account::when(
+            $outletId,
+            fn($q) => $q->where('outlet_id', $outletId)->where('code', 'like', '1-1131%'),
+            fn($q) => $q->whereNull('outlet_id')->where('code', '1-1131')
+        )->value('current_balance') ?? 0;
+
+        $saldoBca = Account::when(
+            $outletId,
+            fn($q) => $q->where('outlet_id', $outletId)->where('code', 'like', '1-1113%'),
+            fn($q) => $q->whereNull('outlet_id')->where('code', '1-1113')
+        )->value('current_balance') ?? 0;
+
+        // Recent digital sales — filter per outlet kalau kasir
         $recentDigitalSales = DigitalSale::with(['digitalProduct', 'depositAccount', 'cashAccount'])
             ->whereDate('date', now())
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->orderByDesc('date')
             ->take(30)
             ->get();
 
+        // List outlet untuk selector Admin
+        $outlets = $isAdmin ? Outlet::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']) : collect();
+
         return response()->json([
-            'success' => true,
-            'products' => $products,
-            'deposit_accounts' => $depositAccounts,
-            'cash_accounts' => $cashAccounts,
-            'saldo_multi' => (float) $saldoMulti,
-            'saldo_bca' => (float) $saldoBca,
-            'recent_sales' => $recentDigitalSales,
-            'setting' => StoreSetting::first(),
+            'success'            => true,
+            'products'           => $products,
+            'deposit_accounts'   => $depositAccounts,
+            'cash_accounts'      => $cashAccounts,
+            'saldo_multi'        => (float) $saldoMulti,
+            'saldo_bca'          => (float) $saldoBca,
+            'recent_sales'       => $recentDigitalSales,
+            'setting'            => StoreSetting::first(),
+            'outlets'            => $outlets,
+            'selected_outlet_id' => $outletId,
         ]);
     }
 
@@ -1114,10 +1167,11 @@ class MobileApiController extends Controller
             'selling_price' => 'nullable|numeric|min:0',
             'hpp' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id ?? Outlet::where('status', 'active')->value('id');
+            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::where('status', 'active')->value('id');
             $data['user_id'] = $user->id;
             $digitalSale = $this->posService->processDigitalSale($data);
             $digitalSale->load(['digitalProduct', 'depositAccount', 'cashAccount']);
@@ -1191,9 +1245,15 @@ class MobileApiController extends Controller
             'source_account_id' => 'required|exists:accounts,id',
             'amount' => 'required|numeric|min:1000',
             'notes' => 'nullable|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        $multiAccount = Account::where('code', '1-1131')->firstOrFail();
+        // Top up ke akun SALDO MULTI milik outlet user; fallback ke akun global
+        $outletId    = $user->outlet_id ?? $request->input('outlet_id');
+        $multiAccount = $outletId
+            ? Account::where('outlet_id', $outletId)->where('code', 'like', '1-1131%')->first()
+                ?? Account::where('code', '1-1131')->whereNull('outlet_id')->firstOrFail()
+            : Account::where('code', '1-1131')->whereNull('outlet_id')->firstOrFail();
 
         try {
             $trxNumber = $this->posService->generateTransactionNumber('TP');
@@ -1202,7 +1262,7 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'OUT',
                 'date' => now(),
-                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'outlet_id' => $outletId ?? Outlet::where('status', 'active')->value('id'),
                 'user_id' => $user->id,
                 'debit_account_id' => $multiAccount->id,
                 'credit_account_id' => $data['source_account_id'],
@@ -1276,12 +1336,23 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $isAdmin = $user->isSuperAdmin() || $user->isAdmin();
         $outletId = $user->outlet_id;
+        if ($isAdmin && $request->filled('outlet_id')) {
+            $outletId = (int) $request->outlet_id;
+        }
+
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+        if (!$outletId && $outlets->isNotEmpty() && !$user->isSuperAdmin()) {
+            $outletId = $outlets->first()->id;
+        }
+
         $returns = SaleReturn::with(['sale', 'customer', 'product', 'account'])
             ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->whereHas('sale', fn($sq) => $sq->where('outlet_id', $outletId)))
             ->latest()
-            ->take(30)
+            ->take(50)
             ->get();
+
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         if ($outletId) {
             $outletStocks = ProductStock::where('outlet_id', $outletId)->whereIn('product_id', $products->pluck('id'))->pluck('stock', 'product_id');
@@ -1291,7 +1362,30 @@ class MobileApiController extends Controller
                 $p->stock = $p->outlet_stock;
             });
         }
-        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+
+        // Prepare accounts: put the outlet's Cash Retail at the top
+        $outletCashAcc = null;
+        if ($outletId) {
+            $outletCashAcc = Account::where('outlet_id', $outletId)
+                ->where('code', 'like', '1-1110%')
+                ->first();
+        }
+        if (!$outletCashAcc) {
+            $outletCashAcc = Account::where('code', '1-1110')->first();
+        }
+
+        $otherAccounts = Account::where('group', 'AKTIVA')
+            ->whereIn('type', ['D'])
+            ->when($outletCashAcc, fn($q) => $q->where('id', '!=', $outletCashAcc->id))
+            ->when($outletId, fn($q) => $q->where(fn($sub) => $sub->whereNull('outlet_id')->orWhere('outlet_id', $outletId)))
+            ->get();
+
+        $accounts = collect();
+        if ($outletCashAcc) {
+            $accounts->push($outletCashAcc);
+        }
+        $accounts = $accounts->merge($otherAccounts);
+
         $customers = Customer::where('status', 'Aktif')
             ->when($outletId && !$user->isSuperAdmin(), function ($q) use ($outletId) {
                 $q->where(function ($sub) use ($outletId) {
@@ -1308,6 +1402,8 @@ class MobileApiController extends Controller
             'products' => $products,
             'accounts' => $accounts,
             'customers' => $customers,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId,
         ]);
     }
 
@@ -1325,10 +1421,13 @@ class MobileApiController extends Controller
             'refund_amount' => 'required|numeric|min:0',
             'account_id' => 'required|exists:accounts,id',
             'notes' => 'nullable|string',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            $data['outlet_id'] = $request->input('outlet_id') 
+                ?? $user->outlet_id 
+                ?? Outlet::where('status', 'active')->value('id');
             $data['user_id'] = $user->id;
             $this->posService->processSaleReturn($data);
             return response()->json(['success' => true, 'message' => 'Retur penjualan berhasil dicatat!']);
@@ -1346,35 +1445,57 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $isAdmin  = $user->isSuperAdmin() || $user->isAdmin();
+        // Kasir: outlet dari user. Admin: bisa pilih via ?outlet_id=, atau lihat semua kalau kosong
         $outletId = $user->outlet_id;
+        if ($isAdmin && $request->filled('outlet_id')) {
+            $outletId = (int) $request->outlet_id;
+        }
+
         $purchases = Purchase::with(['supplier', 'items.product', 'outlet'])
-            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->latest()
-            ->take(30)
+            ->take(50)
             ->get();
+
         $suppliers = Supplier::orderBy('name')->get();
-        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
-        if ($outletId) {
-            $outletStocks = ProductStock::where('outlet_id', $outletId)->whereIn('product_id', $products->pluck('id'))->pluck('stock', 'product_id');
+        $products  = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+
+        $resolvedOutletId = $outletId;
+        if ($resolvedOutletId) {
+            $outletStocks = ProductStock::where('outlet_id', $resolvedOutletId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->pluck('stock', 'product_id');
             $products->each(function ($p) use ($outletStocks) {
                 $p->global_stock = (float) $p->stock;
                 $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
-                $p->stock = $p->outlet_stock;
+                $p->stock        = $p->outlet_stock;
             });
         }
-        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+
+        // Akun pembayaran: hanya global (tanpa outlet_id) agar tidak bingung
+        $accounts = Account::whereNull('outlet_id')
+            ->where('group', 'AKTIVA')
+            ->whereIn('type', ['D'])
+            ->get();
+
         $debts = Purchase::where('status', 'BELUM LUNAS')
-            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with('supplier')
             ->get();
 
+        // List outlet untuk selector Admin
+        $outlets = $isAdmin ? Outlet::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']) : collect();
+
         return response()->json([
-            'success' => true,
-            'purchases' => $purchases,
-            'suppliers' => $suppliers,
-            'products' => $products,
-            'accounts' => $accounts,
-            'debts' => $debts,
+            'success'            => true,
+            'purchases'          => $purchases,
+            'suppliers'          => $suppliers,
+            'products'           => $products,
+            'accounts'           => $accounts,
+            'debts'              => $debts,
+            'outlets'            => $outlets,
+            'selected_outlet_id' => $outletId,
         ]);
     }
 
@@ -1384,21 +1505,26 @@ class MobileApiController extends Controller
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
         $data = $request->validate([
-            'date' => 'required|date',
-            'supplier_id' => 'required|exists:suppliers,id',
-            'payment_method' => 'required|string',
-            'account_id' => 'nullable|exists:accounts,id',
-            'paid_amount' => 'nullable|numeric|min:0',
-            'discount' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
+            'date'               => 'required|date',
+            'supplier_id'        => 'required|exists:suppliers,id',
+            'payment_method'     => 'required|string',
+            'account_id'         => 'nullable|exists:accounts,id',
+            'paid_amount'        => 'nullable|numeric|min:0',
+            'discount'           => 'nullable|numeric|min:0',
+            'notes'              => 'nullable|string',
+            'outlet_id'          => 'nullable|exists:outlets,id',
+            'items'              => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.qty' => 'required|numeric|min:0.01',
-            'items.*.buy_price' => 'required|numeric|min:0',
+            'items.*.qty'        => 'required|numeric|min:0.01',
+            'items.*.buy_price'  => 'required|numeric|min:0',
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            // Kasir: pakai outlet sendiri. Admin/SuperAdmin: wajib kirim outlet_id
+            $data['outlet_id'] = $user->outlet_id ?? (int) $request->input('outlet_id');
+            if (!$data['outlet_id']) {
+                return response()->json(['success' => false, 'message' => 'Pilih toko tujuan pembelian terlebih dahulu.'], 422);
+            }
             $data['user_id'] = $user->id;
             $purchase = $this->posService->processPurchase($data);
             return response()->json(['success' => true, 'message' => 'Faktur pembelian berhasil disimpan!', 'data' => $purchase]);
@@ -1844,6 +1970,13 @@ class MobileApiController extends Controller
         ]);
 
         $type = strtoupper($data['type']);
+        if ($user->isToko() && $type === 'IN') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kasir hanya diizinkan untuk mencatat Kas Keluar.',
+            ], 403);
+        }
+
         $prefix = $type === 'IN' ? 'KM' : ($type === 'OUT' ? 'KK' : 'KT');
         $trxNumber = $this->posService->generateTransactionNumber($prefix);
 

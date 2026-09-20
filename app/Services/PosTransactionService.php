@@ -499,10 +499,10 @@ class PosTransactionService
             $refundAmount = (float) ($data['refund_amount'] ?? $data['amount'] ?? 0);
             $accountId    = $data['account_id'] ?? $data['refund_account_id'] ?? null;
 
-            // Determine the outlet of the original sale (fallback: user's outlet)
+            // Determine the outlet of the return (explicit outlet_id > original sale's outlet > fallback)
             $originalSale = isset($data['sale_id']) ? Sale::find($data['sale_id']) : null;
-            $outletId     = $originalSale?->outlet_id
-                ?? $data['outlet_id']
+            $outletId     = $data['outlet_id']
+                ?? $originalSale?->outlet_id
                 ?? $this->resolveOutletId();
 
             // Restock — per outlet
@@ -531,6 +531,16 @@ class PosTransactionService
             if ($refundAmount > 0 && $accountId) {
                 $cashAcc = Account::find($accountId);
                 if ($cashAcc) {
+                    // If selected account is generic CASH RETAIL (1-1110) or global, resolve to outlet's CASH RETAIL if available
+                    if ($outletId && ($cashAcc->code === '1-1110' || str_starts_with($cashAcc->code, '1-1110-'))) {
+                        $outletCashAcc = Account::where('outlet_id', $outletId)
+                            ->where('code', 'like', '1-1110%')
+                            ->first();
+                        if ($outletCashAcc) {
+                            $cashAcc = $outletCashAcc;
+                        }
+                    }
+
                     $trxNumber = $this->generateTransactionNumber('KK');
                     $returAcc  = Account::where('code', '4-1600')->first()
                         ?: Account::where('name', 'like', '%RETUR%')->first()
@@ -541,6 +551,7 @@ class PosTransactionService
                         'type'               => 'OUT',
                         'date'               => $data['date'] ?? now(),
                         'outlet_id'          => $outletId,
+                        'user_id'            => $data['user_id'] ?? (auth()->check() ? auth()->id() : null),
                         'debit_account_id'   => $returAcc?->id ?? $cashAcc->id,
                         'credit_account_id'  => $cashAcc->id,
                         'amount'             => $refundAmount,

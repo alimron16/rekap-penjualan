@@ -488,8 +488,9 @@ class ApiService {
   }
 
   // --- Digital / Pulsa & Top Up Saldo Multi ---
-  static Future<Map<String, dynamic>> getDigitalData() async {
-    return await _get('$baseUrl/digital/data');
+  static Future<Map<String, dynamic>> getDigitalData({int? outletId}) async {
+    final query = outletId != null ? '?outlet_id=$outletId' : '';
+    return await _get('$baseUrl/digital/data$query');
   }
 
   static Future<Map<String, dynamic>> checkoutDigital({
@@ -500,6 +501,7 @@ class ApiService {
     double? sellingPrice,
     double? hpp,
     String? notes,
+    int? outletId,
   }) async {
     return await _post(
       '$baseUrl/digital/checkout',
@@ -511,6 +513,7 @@ class ApiService {
         'selling_price': sellingPrice,
         'hpp': hpp,
         'notes': notes,
+        if (outletId != null) 'outlet_id': outletId,
       },
       timeout: const Duration(seconds: 20),
     );
@@ -519,6 +522,7 @@ class ApiService {
   static Future<Map<String, dynamic>> topupMulti({
     required int sourceAccountId,
     required double amount,
+    int? outletId,
     String? notes,
   }) async {
     return await _post(
@@ -526,6 +530,7 @@ class ApiService {
       {
         'source_account_id': sourceAccountId,
         'amount': amount,
+        if (outletId != null) 'outlet_id': outletId,
         'notes': notes,
       },
       timeout: const Duration(seconds: 20),
@@ -697,8 +702,9 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getReturns() async {
-    return await _get('$baseUrl/returns');
+  static Future<Map<String, dynamic>> getReturns({int? outletId}) async {
+    final query = outletId != null ? '?outlet_id=$outletId' : '';
+    return await _get('$baseUrl/returns$query');
   }
 
   static Future<Map<String, dynamic>> storeReturn({
@@ -710,8 +716,9 @@ class ApiService {
     required double refundAmount,
     required int accountId,
     String? notes,
+    int? outletId,
   }) async {
-    return await _post('$baseUrl/returns', {
+    final Map<String, dynamic> data = {
       'date': date,
       'sale_id': saleId,
       'customer_id': customerId,
@@ -720,12 +727,17 @@ class ApiService {
       'refund_amount': refundAmount,
       'account_id': accountId,
       'notes': notes,
-    });
+    };
+    if (outletId != null) {
+      data['outlet_id'] = outletId;
+    }
+    return await _post('$baseUrl/returns', data);
   }
 
   // --- Pembelian & Hutang ---
-  static Future<Map<String, dynamic>> getPurchases() async {
-    return await _get('$baseUrl/purchases');
+  static Future<Map<String, dynamic>> getPurchases({int? outletId}) async {
+    final query = outletId != null ? '?outlet_id=$outletId' : '';
+    return await _get('$baseUrl/purchases$query');
   }
 
   static Future<Map<String, dynamic>> storePurchase({
@@ -733,6 +745,7 @@ class ApiService {
     required int supplierId,
     required String paymentMethod,
     int? accountId,
+    int? outletId,
     double paidAmount = 0,
     double discount = 0,
     String? notes,
@@ -745,6 +758,7 @@ class ApiService {
         'supplier_id': supplierId,
         'payment_method': paymentMethod,
         'account_id': accountId,
+        'outlet_id': outletId,
         'paid_amount': paidAmount,
         'discount': discount,
         'notes': notes,

@@ -122,8 +122,9 @@ class ReceivableController extends Controller
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $outlets = \App\Models\Outlet::where('status', 'active')->orderBy('name')->get();
 
-        return view('receivable.returns', compact('returns', 'products', 'customers', 'accounts'));
+        return view('receivable.returns', compact('returns', 'products', 'customers', 'accounts', 'outlets'));
     }
 
     public function storeReturn(Request $request)
@@ -136,32 +137,18 @@ class ReceivableController extends Controller
             'qty' => 'required|numeric|min:1',
             'amount' => 'required|numeric|min:0',
             'refund_account_id' => 'nullable|exists:accounts,id',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'reason' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($data) {
-            $returnNumber = $this->posService->generateTransactionNumber('RTP');
+        $data['account_id'] = $data['refund_account_id'] ?? null;
+        $data['refund_amount'] = $data['amount'];
+        $data['outlet_id'] = $data['outlet_id'] ?? auth()->user()?->outlet_id;
 
-            $product = Product::lockForUpdate()->findOrFail($data['product_id']);
-            $product->stock += (float) $data['qty'];
-            $product->save();
+        $this->posService->processSaleReturn($data);
 
-            SaleReturn::create([
-                'return_number' => $returnNumber,
-                'date' => $data['date'],
-                'original_sale_id' => $data['original_sale_id'] ?? null,
-                'customer_id' => $data['customer_id'] ?? null,
-                'product_id' => $data['product_id'],
-                'qty' => $data['qty'],
-                'amount' => $data['amount'],
-                'refund_account_id' => $data['refund_account_id'] ?? null,
-                'reason' => $data['reason'] ?? 'SALAH INPUT',
-                'notes' => $data['notes'] ?? null,
-            ]);
-        });
-
-        return redirect()->route('receivable.returns')->with('success', 'Retur penjualan berhasil disimpan dan stok barang bertambah!');
+        return redirect()->route('receivable.returns')->with('success', 'Retur penjualan berhasil disimpan, stok barang toko bertambah dan kas telah disesuaikan!');
     }
 
     public function updatePayment(Request $request, ReceivablePayment $payment)

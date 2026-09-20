@@ -20,21 +20,38 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
   List<dynamic> _products = [];
   List<dynamic> _accounts = [];
   List<dynamic> _customers = [];
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
+    _checkUserRole();
+  }
+
+  void _checkUserRole() async {
+    final user = await ApiService.getUser();
+    if (mounted && user != null) {
+      setState(() {
+        final role = user['role']?.toString().toLowerCase();
+        _isAdmin = role == 'admin' || role == 'super_admin';
+        if (!_isAdmin && user['outlet_id'] != null) {
+          _selectedOutletId = int.tryParse(user['outlet_id'].toString());
+        }
+      });
+    }
     _loadData();
   }
 
-  void _loadData() async {
+  void _loadData({int? outletId}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final res = await ApiService.getReturns();
+      final res = await ApiService.getReturns(outletId: outletId ?? _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -42,6 +59,10 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
             _products = res['products'] ?? [];
             _accounts = res['accounts'] ?? [];
             _customers = res['customers'] ?? [];
+            _outlets = res['outlets'] ?? [];
+            if (_selectedOutletId == null && res['selected_outlet_id'] != null) {
+              _selectedOutletId = res['selected_outlet_id'];
+            }
           } else {
             _errorMessage = res['message'] ?? 'Gagal memuat data retur';
           }
@@ -62,6 +83,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
     int? selectedProductId = _products.isNotEmpty ? _products.first['id'] : null;
     int? selectedCustomerId;
     int? selectedAccountId = _accounts.isNotEmpty ? _accounts.first['id'] : null;
+    int? modalOutletId = _selectedOutletId ?? (_outlets.isNotEmpty ? _outlets.first['id'] : null);
     final qtyController = TextEditingController(text: '1');
     final refundController = TextEditingController();
     final notesController = TextEditingController();
@@ -110,6 +132,27 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (_isAdmin && _outlets.isNotEmpty) ...[
+                  const Text('Outlet / Toko Retur *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<int>(
+                    value: modalOutletId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(),
+                    items: _outlets.map<DropdownMenuItem<int>>((o) {
+                      return DropdownMenuItem<int>(
+                        value: o['id'],
+                        child: Text('${o['name']} (${o['code'] ?? ''})', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setModalState(() {
+                        modalOutletId = val;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 const Text('Pilih Produk yang Diretur', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<int>(
@@ -257,6 +300,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                 refundAmount: refund,
                                 accountId: selectedAccountId!,
                                 notes: notesController.text,
+                                outletId: modalOutletId ?? _selectedOutletId,
                               );
 
                               if (res['success'] == true) {
@@ -314,36 +358,78 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         icon: const Icon(Icons.assignment_return, color: Colors.white),
         label: const Text('Retur Baru', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _loadData, child: const Text('Coba Lagi')),
-                    ],
+      body: Column(
+        children: [
+          if (_isAdmin && _outlets.isNotEmpty)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter Outlet Toko:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.blueGrey)),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _outlets.map((outlet) {
+                        final isSelected = _selectedOutletId == outlet['id'];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(outlet['name'] ?? ''),
+                            selected: isSelected,
+                            selectedColor: ThemeConfig.primary,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() => _selectedOutletId = outlet['id']);
+                                _loadData(outletId: outlet['id']);
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                )
-              : _returns.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
-                          SizedBox(height: 12),
-                          Text('Belum ada riwayat retur barang', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async => _loadData(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                        itemCount: _returns.length,
-                        itemBuilder: (ctx, i) {
+                ],
+              ),
+            ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: ThemeConfig.primary))
+                : _errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(onPressed: _loadData, child: const Text('Coba Lagi')),
+                          ],
+                        ),
+                      )
+                    : _returns.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+                                SizedBox(height: 12),
+                                Text('Belum ada riwayat retur barang', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () async => _loadData(),
+                            child: ListView.builder(
+                              padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
+                              itemCount: _returns.length,
+                              itemBuilder: (ctx, i) {
                           final r = _returns[i];
                           final refund = Formatters.parseDouble(r['refund_amount']);
 
