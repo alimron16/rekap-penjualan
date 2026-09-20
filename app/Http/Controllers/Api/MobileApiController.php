@@ -2421,13 +2421,13 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.4',
-            'version_code' => 5,
-            'title' => 'Pembaruan Tersedia',
-            'release_notes' => "• Perbaikan filter Rekap Shift & Setoran Penjualan per Cabang/Outlet (setiap toko kini hanya melihat rekap kas & setorannya sendiri).\n• Dukungan pemilihan cabang untuk Super Admin dan Admin pada Rekap & Histori Shift.\n• Pencatatan outlet_id otomatis pada transaksi digital, tarik tunai, dan kas operasional.\n• Penguncian harga jual dan HPP untuk akun Toko (hanya Admin yang berwenang mengubah harga).\n• Pemisahan 3 kantong kas: Cash Retail, Cash Multi, dan Cash Transfer Agen.",
+            'version' => '1.0.5',
+            'version_code' => 6,
+            'title' => 'Pembaruan Tersedia (v1.0.5)',
+            'release_notes' => "• Pemilihan Toko / Cabang (Semua Toko, Tambun, Cibitung) di Master Data Barang, Pelanggan, dan Supplier.\n• Status banner keterangan mode toko aktif (Global vs Cabang).\n• Label stok dinamis & badge kepemilikan toko pada setiap kartu data.\n• Pilihan penetapan toko cabang pada form tambah & edit pelanggan dan supplier.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
-            'force_update' => false,
+            'force_update' => true,
         ]);
     }
 

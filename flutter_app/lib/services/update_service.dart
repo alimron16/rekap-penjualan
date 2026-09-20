@@ -5,8 +5,8 @@ import 'api_service.dart';
 import '../utils/theme_config.dart';
 
 class UpdateService {
-  static const String currentVersion = '1.0.4';
-  static const int currentVersionCode = 5;
+  static const String currentVersion = '1.0.5';
+  static const int currentVersionCode = 6;
   static const String _keyLastDismissed = 'app_update_dismissed_time';
 
   /// Check server for app updates
@@ -22,7 +22,8 @@ class UpdateService {
       if (!context.mounted) return;
 
       if (isNewer) {
-        if (autoPrompt) {
+        final isForce = res['force_update'] == true;
+        if (autoPrompt && !isForce) {
           final prefs = await SharedPreferences.getInstance();
           final lastDismissed = prefs.getInt(_keyLastDismissed) ?? 0;
           final now = DateTime.now().millisecondsSinceEpoch;
