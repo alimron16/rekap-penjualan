@@ -327,7 +327,7 @@ class MobileApiController extends Controller
         }
 
         $outletId = $request->query('outlet_id', $user->outlet_id);
-        if ($user && !$user->isSuperAdmin()) {
+        if ($user && $user->isToko()) {
             $outletId = $user->outlet_id;
         }
 
