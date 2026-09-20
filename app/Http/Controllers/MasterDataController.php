@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\DigitalProduct;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\ProductStock;
 use App\Models\Supplier;

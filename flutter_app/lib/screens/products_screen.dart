@@ -205,6 +205,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final minStockController = TextEditingController(text: item != null ? (item['min_stock'] ?? 5).toString() : '5');
     String status = item?['status'] ?? 'Masih Dijual';
     bool isSubmitting = false;
+    int? selectedModalOutletId = _selectedOutletId;
 
     showModalBottomSheet(
       context: context,
@@ -457,6 +458,26 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                     ),
                   ],
                 ),
+                if (!isEditing && _canFilterOutlet && _outlets.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text('Alokasi Stok Awal ke Toko / Cabang', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<int?>(
+                    value: selectedModalOutletId,
+                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    items: [
+                      ..._outlets.map((ot) => DropdownMenuItem<int?>(
+                        value: ot['id'] as int,
+                        child: Text('${ot['name']} (${ot['code'] ?? 'CABANG'})', style: const TextStyle(fontSize: 12)),
+                      )),
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Bagi Rata ke Semua Cabang', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                    onChanged: (val) => setModalState(() => selectedModalOutletId = val),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -482,6 +503,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                               'stock': Formatters.parseDouble(stockController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
                               'min_stock': Formatters.parseInt(minStockController.text),
                               'status': status,
+                              if (selectedModalOutletId != null) 'outlet_id': selectedModalOutletId,
                             };
 
                             final res = isEditing
@@ -1074,7 +1096,19 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Menampilkan: ${_filteredItems.length} Item', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+              Builder(builder: (context) {
+                final readyCount = _filteredItems.where((i) => Formatters.parseDouble(i['stock']) > 0).length;
+                final emptyCount = _filteredItems.length - readyCount;
+                return Row(
+                  children: [
+                    Text('Menampilkan: ${_filteredItems.length} Item', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                    if (!_isGlobal) ...[
+                      const SizedBox(width: 6),
+                      Text('($readyCount Ada Stok, $emptyCount Habis)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: readyCount > 0 ? const Color(0xFF065F46) : Colors.red)),
+                    ],
+                  ],
+                );
+              }),
               const Text('Geser tabel ke kanan untuk melihat semua kolom', style: TextStyle(fontSize: 10, color: Colors.grey)),
             ],
           ),

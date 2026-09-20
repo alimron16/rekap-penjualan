@@ -377,8 +377,9 @@ class ApiService {
   }
 
   // --- POS Kasir ---
-  static Future<Map<String, dynamic>> getPosData() async {
-    final res = await _get('$baseUrl/pos/data', timeout: const Duration(seconds: 15));
+  static Future<Map<String, dynamic>> getPosData({int? outletId}) async {
+    final query = outletId != null ? '?outlet_id=$outletId' : '';
+    final res = await _get('$baseUrl/pos/data$query', timeout: const Duration(seconds: 15));
     if (res['success'] == true) {
       await saveCachedPosData(res);
     }
@@ -392,6 +393,7 @@ class ApiService {
     required double paidAmount,
     required String paymentMethod,
     int? accountId,
+    int? outletId,
     String? notes,
     required List<Map<String, dynamic>> items,
   }) async {
@@ -404,6 +406,7 @@ class ApiService {
         'paid_amount': paidAmount,
         'payment_method': paymentMethod,
         'account_id': accountId,
+        if (outletId != null) 'outlet_id': outletId,
         'notes': notes,
         'items': items,
       },

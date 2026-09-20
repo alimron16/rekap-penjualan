@@ -411,12 +411,32 @@ class MobileApiController extends Controller
 
         $product = Product::create($data);
 
-        $outletId = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::first()?->id;
+        $outletId = $user->isToko() ? $user->outlet_id : $request->input('outlet_id');
+        $activeOutlets = Outlet::where('status', 'active')->get();
+
         if ($outletId) {
             ProductStock::updateOrCreate(
                 ['product_id' => $product->id, 'outlet_id' => $outletId],
                 ['stock' => $initialStock, 'min_stock' => $data['min_stock'] ?? 5]
             );
+            foreach ($activeOutlets as $ot) {
+                if ($ot->id != $outletId) {
+                    ProductStock::firstOrCreate(
+                        ['product_id' => $product->id, 'outlet_id' => $ot->id],
+                        ['stock' => 0, 'min_stock' => $data['min_stock'] ?? 5]
+                    );
+                }
+            }
+        } else {
+            // Null means distribute equally across all active outlets
+            $count = max(1, $activeOutlets->count());
+            $splitStock = round($initialStock / $count, 2);
+            foreach ($activeOutlets as $ot) {
+                ProductStock::updateOrCreate(
+                    ['product_id' => $product->id, 'outlet_id' => $ot->id],
+                    ['stock' => $splitStock, 'min_stock' => $data['min_stock'] ?? 5]
+                );
+            }
         }
         $product->syncTotalStock();
 
@@ -947,7 +967,13 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $outletId = $user->outlet_id ?? $request->query('outlet_id');
+        $outlets = Outlet::where('status', 'active')->orderBy('id')->get();
+        $outletId = $request->query('outlet_id');
+        if ($user->isToko() || empty($outletId)) {
+            $outletId = $user->outlet_id ?? $outletId ?? $outlets->first()?->id;
+        }
+
+        $activeOutlet = $outlets->firstWhere('id', (int) $outletId) ?? $user->outlet;
 
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
         if ($outletId) {
@@ -992,7 +1018,10 @@ class MobileApiController extends Controller
             'accounts' => $cashAndBankAccounts,
             'all_accounts' => Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->orderBy('code')->get(),
             'setting' => $setting,
-            'outlet' => $user->outlet,
+            'outlet' => $activeOutlet,
+            'outlets' => $outlets,
+            'selected_outlet_id' => (int) $outletId,
+            'selected_outlet_name' => $activeOutlet?->name ?? 'Cabang',
         ]);
     }
 
@@ -1008,6 +1037,7 @@ class MobileApiController extends Controller
             'paid_amount' => 'required|numeric|min:0',
             'payment_method' => 'required|string',
             'account_id' => 'nullable|exists:accounts,id',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -1016,7 +1046,7 @@ class MobileApiController extends Controller
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id;
+            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::first()?->id;
             $data['user_id'] = $user->id;
             $sale = $this->posService->checkoutPos($data);
             $sale->load(['items.product', 'customer', 'outlet', 'user']);
@@ -2451,10 +2481,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.6',
-            'version_code' => 7,
-            'title' => 'Pembaruan Tersedia (v1.0.6)',
-            'release_notes' => "• Pemilihan Toko / Cabang di Produk Multi (Digital) & Master Data Barang Fisik, Pelanggan, dan Supplier.\n• Perbaikan kontras warna tombol filter cabang & quick cash kasir (Uang Pas, 5rb, 10rb, dst).\n• Banner status toko aktif dan badge cabang kepemilikan data.\n• Variasi stok produk per toko & penetapan toko pada produk digital.",
+            'version' => '1.0.7',
+            'version_code' => 8,
+            'title' => 'Pembaruan Tersedia (v1.0.7)',
+            'release_notes' => "• Pemilihan Toko / Cabang di Halaman Kasir POS (Eceran & Grosir) khusus Admin.\n• Pemilihan Alokasi Stok Toko saat Tambah Barang Baru.\n• Pemecahan dan distribusi Master Data Pelanggan, Supplier, dan Produk Digital per cabang.\n• Tampilan jumlah item ada stok vs habis per toko di Master Data.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,

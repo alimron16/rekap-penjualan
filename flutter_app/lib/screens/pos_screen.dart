@@ -41,20 +41,38 @@ class _PosScreenState extends State<PosScreen> {
   String _paymentMethod = 'cash'; // 'cash', 'piutang', 'transfer'
   bool _isCheckingOut = false;
 
+  // Outlet Scoping
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
+  String _selectedOutletName = 'Cabang';
+  bool _canFilterOutlet = false;
+
   @override
   void initState() {
     super.initState();
+    _loadUser();
     _loadPosData();
   }
 
-  void _loadPosData() async {
+  void _loadUser() async {
+    final user = await ApiService.getUser();
+    if (user != null && mounted) {
+      setState(() {
+        final role = (user['role'] ?? '').toString().toLowerCase();
+        _canFilterOutlet = role == 'admin' || role == 'super_admin' || role == 'superadmin';
+      });
+    }
+  }
+
+  void _loadPosData({int? outletId}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final res = await ApiService.getPosData();
+      final targetOutletId = outletId ?? _selectedOutletId;
+      final res = await ApiService.getPosData(outletId: targetOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -63,6 +81,11 @@ class _PosScreenState extends State<PosScreen> {
             _accounts = res['accounts'] ?? [];
             _storeSetting = res['setting'];
             _outlet = res['outlet'];
+            if (res['outlets'] != null && res['outlets'] is List) {
+              _outlets = res['outlets'];
+            }
+            _selectedOutletId = res['selected_outlet_id'] ?? targetOutletId;
+            _selectedOutletName = res['selected_outlet_name'] ?? (_outlet?['name'] ?? 'Cabang');
 
             // Extract unique types for category pills
             final Set<String> typesSet = {'ALL'};
@@ -651,6 +674,7 @@ class _PosScreenState extends State<PosScreen> {
         paidAmount: paid > 0 ? paid : _grandTotal,
         paymentMethod: _paymentMethod,
         accountId: _selectedAccountId,
+        outletId: _selectedOutletId,
         notes: _notesController.text.trim(),
         items: items,
       );
@@ -1247,6 +1271,97 @@ class _PosScreenState extends State<PosScreen> {
                 )
               : Column(
                   children: [
+                    // Outlet Selector Bar for Admin / Super Admin
+                    if (_canFilterOutlet && _outlets.isNotEmpty)
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.storefront, size: 14, color: ThemeConfig.primary),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'KASIR TOKO / CABANG AKTIF:',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F3D24).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF0F3D24).withOpacity(0.2)),
+                                  ),
+                                  child: Text(
+                                    _selectedOutletName,
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F3D24)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: _outlets.map((ot) {
+                                  final isSelected = _selectedOutletId == ot['id'];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      selected: isSelected,
+                                      label: Text(ot['name'] ?? 'Cabang'),
+                                      labelStyle: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                        color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                                      ),
+                                      selectedColor: const Color(0xFF0F3D24),
+                                      backgroundColor: Colors.white,
+                                      showCheckmark: true,
+                                      checkmarkColor: Colors.white,
+                                      side: BorderSide(
+                                        color: isSelected ? const Color(0xFF0F3D24) : const Color(0xFFCBD5E1),
+                                        width: 1.2,
+                                      ),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      onSelected: (val) {
+                                        if (_selectedOutletId != ot['id']) {
+                                          setState(() {
+                                            _selectedOutletId = ot['id'];
+                                            _selectedOutletName = ot['name'] ?? 'Cabang';
+                                            _cart.clear(); // Clear cart when switching store to avoid stock mismatch
+                                          });
+                                          _loadPosData(outletId: ot['id']);
+                                        }
+                                      },
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_selectedOutletName.isNotEmpty)
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.store, size: 14, color: ThemeConfig.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Kasir: $_selectedOutletName',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+
                     // Search & Category Filter Section
                     Container(
                       padding: const EdgeInsets.all(12),
