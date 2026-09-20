@@ -225,7 +225,7 @@ Route::get('/download-apk', function () {
             fpassthru($stream);
             fclose($stream);
         }
-    }, 'elephant-pos-v1.0.3.apk', [
+    }, 'elephant-pos-v1.0.4.apk', [
         'Content-Type' => 'application/vnd.android.package-archive',
         'Content-Length' => (string) $fileSize,
         'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',

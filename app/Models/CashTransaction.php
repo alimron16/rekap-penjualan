@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CashTransaction extends Model
 {
     protected $fillable = [
+        'outlet_id',
+        'user_id',
         'transaction_number',
         'type',
         'date',
@@ -17,6 +19,16 @@ class CashTransaction extends Model
         'admin_fee',
         'notes',
     ];
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     protected $casts = [
         'date' => 'datetime',

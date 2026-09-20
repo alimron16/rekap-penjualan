@@ -122,14 +122,34 @@ class ShiftService
         $saldoMultiAcc = Account::where('code', '1-1131')->first();
         $saldoBcaAcc = Account::where('code', '1-1113')->first();
 
-        $cashRetailBalance = (float) ($cashRetailAcc?->current_balance ?? 0);
-        $cashTransferBalance = (float) ($cashTransferAcc?->current_balance ?? 0);
         $saldoMultiBalance = (float) ($saldoMultiAcc?->current_balance ?? 0);
         $saldoBcaBalance = (float) ($saldoBcaAcc?->current_balance ?? 0);
 
         // Required drawer reserve (modal awal retail)
         $requiredReserve = 400000.0;
-        $recommendedDeposit = max(0.0, $cashRetailBalance - $requiredReserve);
+
+        if ($outletId) {
+            // Per-outlet cash drawer calculation:
+            // Drawer physical cash = starting retained modal + cash sales - operational expenses
+            $modalAwalRetail = ($lastShift && $lastShift->cash_retail_retained !== null)
+                ? (float) $lastShift->cash_retail_retained
+                : $requiredReserve;
+
+            $cashRetailBalance = max(0.0, $modalAwalRetail + $cashSales - $totalExpense);
+            $recommendedDeposit = max(0.0, $cashRetailBalance - $requiredReserve);
+
+            // Transfer cash on hand = starting transfer modal + incoming cash - withdrawals paid out
+            $modalAwalTransfer = ($lastShift && $lastShift->cash_transfer_retained !== null)
+                ? (float) $lastShift->cash_transfer_retained
+                : 0.0;
+
+            $cashTransferBalance = max(0.0, $modalAwalTransfer + $totalTransferCash - $totalWithdrawCash);
+        } else {
+            // Global view across all stores from general ledger
+            $cashRetailBalance = (float) ($cashRetailAcc?->current_balance ?? 0);
+            $cashTransferBalance = (float) ($cashTransferAcc?->current_balance ?? 0);
+            $recommendedDeposit = max(0.0, $cashRetailBalance - $requiredReserve);
+        }
 
         // Duration string
         $diffMinutes = $startTime->diffInMinutes($now);

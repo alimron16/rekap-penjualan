@@ -57,6 +57,8 @@ class DigitalSaleController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = auth()->user()->outlet_id ?? \App\Models\Outlet::where('status', 'active')->value('id');
+            $data['user_id'] = auth()->id();
             $this->posService->processDigitalSale($data);
             return redirect()->route('digital.index')->with('success', 'Transaksi elektrik berhasil diproses!');
         } catch (Exception $e) {
@@ -91,6 +93,8 @@ class DigitalSaleController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'OUT',
                 'date' => now(),
+                'outlet_id' => auth()->user()->outlet_id ?? \App\Models\Outlet::where('status', 'active')->value('id'),
+                'user_id' => auth()->id(),
                 'debit_account_id' => $multiAccount->id, // Saldo Multi bertambah
                 'credit_account_id' => $data['source_account_id'], // Kas / Bank berkurang
                 'amount' => $data['amount'],

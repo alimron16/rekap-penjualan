@@ -125,6 +125,8 @@ class PosController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'TRANSFER',
                 'date' => now(),
+                'outlet_id' => auth()->user()->outlet_id ?? \App\Models\Outlet::where('status', 'active')->value('id'),
+                'user_id' => auth()->id(),
                 'debit_account_id' => $bankAcc->id, // Bank/Transit bertambah (Uang transfer nasabah masuk)
                 'credit_account_id' => $data['source_account_id'], // Kas Laci berkurang (Uang fisik diberikan ke nasabah)
                 'amount' => $amount,
@@ -153,7 +155,7 @@ class PosController extends Controller
     public function shift(Request $request)
     {
         $user = auth()->user();
-        $isAdmin = in_array($user->role, ['admin', 'superadmin']);
+        $isAdmin = $user->isAdmin();
 
         $outlets = $isAdmin ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get() : collect([$user->outlet])->filter();
 
@@ -173,7 +175,7 @@ class PosController extends Controller
     public function closeShiftWeb(Request $request)
     {
         $user = auth()->user();
-        $isAdmin = in_array($user->role, ['admin', 'superadmin']);
+        $isAdmin = $user->isAdmin();
 
         $outletId = $isAdmin && $request->has('outlet_id')
             ? ($request->outlet_id ? (int) $request->outlet_id : null)

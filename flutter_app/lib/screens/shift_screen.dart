@@ -104,7 +104,12 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
           if (res['success'] == true) {
             _shiftData = res;
             final role = res['user']?['role']?.toString().toLowerCase() ?? '';
-            _isAdmin = role == 'admin' || role == 'superadmin';
+            _isAdmin = role == 'admin' || role == 'superadmin' || role == 'super_admin';
+
+            // Auto-select outlet if not selected yet
+            if (_selectedOutletId == null && res['outlet_id'] != null) {
+              _selectedOutletId = res['outlet_id'];
+            }
 
             // Auto-fill recommended deposits
             final recRetail = (res['recommended_deposit'] as num?)?.toDouble() ?? 0.0;
@@ -412,7 +417,9 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
                     Expanded(
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<int?>(
-                          value: _selectedOutletId,
+                          value: (_selectedOutletId == null || _outlets.any((o) => o['id'] == _selectedOutletId))
+                              ? _selectedOutletId
+                              : null,
                           isExpanded: true,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary),
                           items: [
@@ -423,7 +430,10 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
                                 )),
                           ],
                           onChanged: (val) {
-                            setState(() => _selectedOutletId = val);
+                            setState(() {
+                              _selectedOutletId = val;
+                              _historyList = [];
+                            });
                             _loadShiftData();
                           },
                         ),
@@ -838,24 +848,69 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
       return const Center(child: CircularProgressIndicator(color: ThemeConfig.primary));
     }
 
-    if (_historyList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_toggle_off_rounded, size: 54, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            const Text('Belum ada histori tutup shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text('Riwayat pergantian shift akan tersimpan di sini.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadHistory,
-      child: ListView.separated(
+    return Column(
+      children: [
+        if (_isAdmin && _outlets.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront_outlined, color: ThemeConfig.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Filter Cabang:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int?>(
+                        value: (_selectedOutletId == null || _outlets.any((o) => o['id'] == _selectedOutletId))
+                            ? _selectedOutletId
+                            : null,
+                        isExpanded: true,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.primary),
+                        items: [
+                          const DropdownMenuItem<int?>(value: null, child: Text('Semua Cabang / Pusat')),
+                          ..._outlets.map((o) => DropdownMenuItem<int?>(
+                                value: o['id'],
+                                child: Text(o['name'] ?? 'Cabang ${o['id']}'),
+                              )),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedOutletId = val;
+                          });
+                          _loadHistory();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Expanded(
+          child: _historyList.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history_toggle_off_rounded, size: 54, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      const Text('Belum ada histori tutup shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text('Riwayat pergantian shift akan tersimpan di sini.', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadHistory,
+                  child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _historyList.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -941,8 +996,11 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
           );
         },
       ),
-    );
-  }
+    ),
+  ),
+],
+);
+}
 
   Widget _miniStat(String label, String value) {
     return Column(

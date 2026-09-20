@@ -151,6 +151,8 @@ class PosTransactionService
                 'date' => now(),
                 'digital_product_id' => $digitalProduct->id,
                 'customer_number' => $data['customer_number'],
+                'outlet_id' => $data['outlet_id'] ?? (auth()->check() ? auth()->user()->outlet_id : null),
+                'user_id' => $data['user_id'] ?? (auth()->check() ? auth()->id() : null),
                 'selling_price' => $sellingPrice,
                 'hpp' => $hpp,
                 'profit_margin' => $margin,
@@ -269,6 +271,8 @@ class PosTransactionService
                 'transaction_number' => $trxNumber,
                 'type' => 'TRANSFER',
                 'date' => now(),
+                'outlet_id' => $data['outlet_id'] ?? (auth()->check() ? auth()->user()->outlet_id : null),
+                'user_id' => $data['user_id'] ?? (auth()->check() ? auth()->id() : null),
                 'debit_account_id' => $data['debit_account_id'], // CASH TRANSFER / Destination
                 'credit_account_id' => $data['credit_account_id'], // Source bank / cash
                 'amount' => $amount,

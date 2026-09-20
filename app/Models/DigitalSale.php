@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DigitalSale extends Model
 {
     protected $fillable = [
+        'outlet_id',
+        'user_id',
         'transaction_number',
         'date',
         'digital_product_id',
@@ -20,6 +22,16 @@ class DigitalSale extends Model
         'status',
         'notes',
     ];
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     protected $casts = [
         'date' => 'datetime',

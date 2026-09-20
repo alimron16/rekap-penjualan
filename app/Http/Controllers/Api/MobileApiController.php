@@ -891,6 +891,8 @@ class MobileApiController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = $user->outlet_id ?? Outlet::where('status', 'active')->value('id');
+            $data['user_id'] = $user->id;
             $digitalSale = $this->posService->processDigitalSale($data);
             $digitalSale->load(['digitalProduct', 'depositAccount', 'cashAccount']);
             return response()->json([
@@ -932,6 +934,8 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'TRANSFER',
                 'date' => now(),
+                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'user_id' => $user->id,
                 'debit_account_id' => $bankAcc->id,
                 'credit_account_id' => $data['source_account_id'],
                 'amount' => $amount,
@@ -972,6 +976,8 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'OUT',
                 'date' => now(),
+                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'user_id' => $user->id,
                 'debit_account_id' => $multiAccount->id,
                 'credit_account_id' => $data['source_account_id'],
                 'amount' => $data['amount'],
@@ -1565,6 +1571,8 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => $type,
                 'date' => $data['transaction_date'] ?? now(),
+                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'user_id' => $user->id,
                 'debit_account_id' => $debitAccountId,
                 'credit_account_id' => $creditAccountId,
                 'amount' => $data['amount'],
@@ -2186,10 +2194,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.3',
-            'version_code' => 4,
+            'version' => '1.0.4',
+            'version_code' => 5,
             'title' => 'Pembaruan Tersedia',
-            'release_notes' => "• Penguncian harga jual dan HPP untuk akun Toko (hanya Admin yang berwenang mengubah harga).\n• Desain baru Rekap Shift & Setor Penjualan: bersih, teratur, dan mudah dipahami.\n• Pemisahan 3 kantong kas: Cash Retail, Cash Multi (Pulsa/PPOB), dan Cash Transfer Agen.\n• Ganti Shift otomatis mereset seluruh indikator transaksi ke 0 untuk shift berikutnya.\n• Histori dan rincian lengkap tutup shift per cabang/toko.\n• Mode Multi-Outlet untuk Admin dan Superadmin.",
+            'release_notes' => "• Perbaikan filter Rekap Shift & Setoran Penjualan per Cabang/Outlet (setiap toko kini hanya melihat rekap kas & setorannya sendiri).\n• Dukungan pemilihan cabang untuk Super Admin dan Admin pada Rekap & Histori Shift.\n• Pencatatan outlet_id otomatis pada transaksi digital, tarik tunai, dan kas operasional.\n• Penguncian harga jual dan HPP untuk akun Toko (hanya Admin yang berwenang mengubah harga).\n• Pemisahan 3 kantong kas: Cash Retail, Cash Multi, dan Cash Transfer Agen.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => false,
@@ -2208,10 +2216,15 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        // Allow admin/superadmin to view any outlet, regular cashier views their own outlet
-        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
-            ? ($request->outlet_id ? (int) $request->outlet_id : null)
-            : $user->outlet_id;
+        // Allow admin/super_admin to select outlet, regular cashier views their own outlet
+        $isAdmin = $user->isAdmin();
+        if ($isAdmin) {
+            $outletId = $request->has('outlet_id')
+                ? ($request->filled('outlet_id') ? (int) $request->outlet_id : null)
+                : ($user->outlet_id ?? Outlet::where('status', 'active')->value('id'));
+        } else {
+            $outletId = $user->outlet_id ?? Outlet::where('status', 'active')->value('id');
+        }
 
         $summary = $this->shiftService->getShiftSummary($outletId, $user->id);
 
@@ -2255,9 +2268,12 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
-            ? ($request->outlet_id ? (int) $request->outlet_id : null)
-            : $user->outlet_id;
+        $isAdmin = $user->isAdmin();
+        if ($isAdmin && $request->has('outlet_id')) {
+            $outletId = $request->filled('outlet_id') ? (int) $request->outlet_id : ($user->outlet_id ?? Outlet::where('status', 'active')->value('id'));
+        } else {
+            $outletId = $user->outlet_id ?? Outlet::where('status', 'active')->value('id');
+        }
 
         // Support both 3-cash structure and legacy deposit_amount
         $retailDeposit = $request->filled('cash_retail_deposit')
@@ -2303,9 +2319,14 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $outletId = $request->has('outlet_id') && ($user->role === 'admin' || $user->role === 'superadmin')
-            ? ($request->outlet_id ? (int) $request->outlet_id : null)
-            : $user->outlet_id;
+        $isAdmin = $user->isAdmin();
+        if ($isAdmin) {
+            $outletId = $request->has('outlet_id')
+                ? ($request->filled('outlet_id') ? (int) $request->outlet_id : null)
+                : ($user->outlet_id ?? Outlet::where('status', 'active')->value('id'));
+        } else {
+            $outletId = $user->outlet_id ?? Outlet::where('status', 'active')->value('id');
+        }
 
         $history = $this->shiftService->getShiftHistory($outletId, 25);
 
