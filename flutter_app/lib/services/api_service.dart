@@ -274,11 +274,12 @@ class ApiService {
   }
 
   // --- Master Data: Products ---
-  static Future<Map<String, dynamic>> getProducts({String? search}) async {
-    final url = search != null && search.isNotEmpty
-        ? '$baseUrl/products?q=${Uri.encodeComponent(search)}'
-        : '$baseUrl/products';
-    return await _get(url);
+  static Future<Map<String, dynamic>> getProducts({String? search, int? outletId}) async {
+    final params = <String>[];
+    if (search != null && search.isNotEmpty) params.add('q=${Uri.encodeComponent(search)}');
+    if (outletId != null) params.add('outlet_id=$outletId');
+    final query = params.isNotEmpty ? '?${params.join('&')}' : '';
+    return await _get('$baseUrl/products$query');
   }
 
   static Future<Map<String, dynamic>> storeProduct(Map<String, dynamic> data) async {

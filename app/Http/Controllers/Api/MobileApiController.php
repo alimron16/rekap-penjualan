@@ -353,6 +353,8 @@ class MobileApiController extends Controller
         $categories = Category::whereIn('type', ['physical_type', 'physical_brand'])->orderBy('type')->orderBy('name')->get();
         $types = Category::where('type', 'physical_type')->pluck('name');
         $brands = Category::where('type', 'physical_brand')->pluck('name');
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+        $selectedOutlet = $outletId ? $outlets->firstWhere('id', (int)$outletId) : null;
 
         return response()->json([
             'success' => true,
@@ -360,6 +362,10 @@ class MobileApiController extends Controller
             'categories' => $categories,
             'types' => $types,
             'brands' => $brands,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId ? (int)$outletId : null,
+            'selected_outlet_name' => $selectedOutlet ? $selectedOutlet->name : 'Semua Toko (Global)',
+            'is_global' => empty($outletId),
         ]);
     }
 

@@ -35,6 +35,12 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   final _searchItemController = TextEditingController();
   final _searchMultiController = TextEditingController();
 
+  // Outlet Scoping
+  List<dynamic> _outlets = [];
+  int? _selectedOutletId;
+  String _selectedOutletName = 'Semua Toko (Global)';
+  bool _isGlobal = true;
+
   Map<String, dynamic>? _currentUser;
   bool _canEditStock = true;
   bool _canEditPrice = true;
@@ -91,13 +97,18 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   void _loadItems({String? search}) async {
     setState(() => _isLoadingItems = true);
     try {
-      final res = await ApiService.getProducts(search: search);
+      final res = await ApiService.getProducts(search: search, outletId: _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
             _items = res['data'] ?? [];
             _itemTypes = res['types'] ?? [];
             _itemBrands = res['brands'] ?? [];
+            if (res['outlets'] != null && res['outlets'] is List) {
+              _outlets = res['outlets'];
+            }
+            _selectedOutletName = res['selected_outlet_name'] ?? (_selectedOutletId == null ? 'Semua Toko (Global)' : 'Toko Cabang');
+            _isGlobal = res['is_global'] ?? (_selectedOutletId == null);
             _applyItemFilter();
           }
           _isLoadingItems = false;
@@ -837,6 +848,110 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   Widget _buildPhysicalItemsTab() {
     return Column(
       children: [
+        // Admin Outlet Selector Bar
+        if (_canEditPrice && _outlets.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: const Color(0xFFF1F5F9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.storefront_outlined, size: 14, color: ThemeConfig.primary),
+                    SizedBox(width: 4),
+                    Text('PILIH TOKO / CABANG:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          selected: _selectedOutletId == null,
+                          label: const Text('Semua Toko (Global)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          selectedColor: ThemeConfig.primary.withOpacity(0.2),
+                          onSelected: (val) {
+                            if (_selectedOutletId != null) {
+                              setState(() => _selectedOutletId = null);
+                              _loadItems();
+                            }
+                          },
+                        ),
+                      ),
+                      ..._outlets.map((ot) {
+                        final isSelected = _selectedOutletId == ot['id'];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            selected: isSelected,
+                            label: Text(ot['name'] ?? 'Cabang', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                            selectedColor: Colors.emerald.withOpacity(0.2),
+                            onSelected: (val) {
+                              if (_selectedOutletId != ot['id']) {
+                                setState(() => _selectedOutletId = ot['id']);
+                                _loadItems();
+                              }
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // Informational Banner (Keterangan Sumber Stok Aktif)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _isGlobal ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _isGlobal ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0)),
+          ),
+          child: Row(
+            children: [
+              Icon(_isGlobal ? Icons.public : Icons.store, size: 20, color: _isGlobal ? const Color(0xFF1D4ED8) : const Color(0xFF047857)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isGlobal
+                          ? 'MODE: STOK GLOBAL (KONSOLIDASI SELURUH TOKO)'
+                          : 'MODE: STOK CABANG - ${_selectedOutletName.toUpperCase()}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _isGlobal ? const Color(0xFF1E3A8A) : const Color(0xFF064E3B),
+                      ),
+                    ),
+                    Text(
+                      _isGlobal
+                          ? 'Angka pada kolom STOK adalah total akumulasi fisik barang dari seluruh toko.'
+                          : 'Angka pada kolom STOK adalah stok fisik aktual yang tersedia di toko $_selectedOutletName.',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _isGlobal ? const Color(0xFF1E40AF) : const Color(0xFF065F46),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Search & Filter Header
         Container(
           padding: const EdgeInsets.all(12),
@@ -921,20 +1036,20 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                             headingRowColor: MaterialStateProperty.all(const Color(0xFF0F3D24)),
                             headingTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                             dataRowHeight: 48,
-                            columns: const [
-                              DataColumn(label: Text('NO')),
-                              DataColumn(label: Text('KODE BARANG')),
-                              DataColumn(label: Text('NAMA BARANG')),
-                              DataColumn(label: Text('JENIS')),
-                              DataColumn(label: Text('MEREK')),
-                              DataColumn(label: Text('STOK')),
-                              DataColumn(label: Text('MIN')),
-                              DataColumn(label: Text('HPP (MODAL)')),
-                              DataColumn(label: Text('HARGA RETAIL')),
-                              DataColumn(label: Text('HARGA GROSIR')),
-                              DataColumn(label: Text('SUBTOTAL NILAI')),
-                              DataColumn(label: Text('STATUS')),
-                              DataColumn(label: Text('AKSI')),
+                            columns: [
+                              const DataColumn(label: Text('NO')),
+                              const DataColumn(label: Text('KODE BARANG')),
+                              const DataColumn(label: Text('NAMA BARANG')),
+                              const DataColumn(label: Text('JENIS')),
+                              const DataColumn(label: Text('MEREK')),
+                              DataColumn(label: Text(_isGlobal ? 'TOTAL STOK' : 'STOK TOKO')),
+                              const DataColumn(label: Text('MIN')),
+                              const DataColumn(label: Text('HPP (MODAL)')),
+                              const DataColumn(label: Text('HARGA RETAIL')),
+                              const DataColumn(label: Text('HARGA GROSIR')),
+                              const DataColumn(label: Text('SUBTOTAL NILAI')),
+                              const DataColumn(label: Text('STATUS')),
+                              const DataColumn(label: Text('AKSI')),
                             ],
                             rows: List<DataRow>.generate(_filteredItems.length, (idx) {
                               final item = _filteredItems[idx];

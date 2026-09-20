@@ -90,8 +90,10 @@ class MasterDataController extends Controller
         $brands                = Category::where('type', 'physical_brand')->pluck('name');
         $allPhysicalCategories = Category::whereIn('type', ['physical_type', 'physical_brand'])
             ->orderBy('type')->orderBy('name')->get();
+        $outlets               = Outlet::where('status', 'active')->orderBy('name')->get();
+        $selectedOutlet        = $outletId ? $outlets->firstWhere('id', (int) $outletId) : null;
 
-        return view('master.items', compact('items', 'totalStockValue', 'types', 'brands', 'allPhysicalCategories', 'outletId'));
+        return view('master.items', compact('items', 'totalStockValue', 'types', 'brands', 'allPhysicalCategories', 'outletId', 'outlets', 'selectedOutlet'));
     }
 
     public function storeItem(Request $request)

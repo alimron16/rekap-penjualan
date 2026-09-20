@@ -15,7 +15,7 @@
                 <span>DAFTAR ITEM (KATALOG PRODUK FISIK)</span>
             </h2>
             <p class="text-xs text-slate-500 mt-0.5">
-                Total Nilai Persediaan Stok Fisik Saat Ini: <span class="font-bold text-emerald-800 font-mono">Rp {{ number_format($totalStockValue, 0, ',', '.') }}</span>
+                Total Nilai Persediaan Stok Fisik ({{ $selectedOutlet ? $selectedOutlet->name : 'Semua Toko' }}): <span class="font-bold text-emerald-800 font-mono">Rp {{ number_format($totalStockValue, 0, ',', '.') }}</span>
             </p>
         </div>
 
@@ -36,6 +36,54 @@
         </div>
     </div>
 
+    <!-- Keterangan Sumber Stok & Pilihan Toko untuk Admin -->
+    <div class="rounded-lg p-3.5 border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs {{ $selectedOutlet ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-blue-50 border-blue-200 text-blue-950' }}">
+        <div class="flex items-center gap-2.5">
+            <span class="p-2 rounded-full {{ $selectedOutlet ? 'bg-emerald-200 text-emerald-800' : 'bg-blue-200 text-blue-800' }}">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+            </span>
+            <div>
+                @if($selectedOutlet)
+                    <div class="font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                        <span>STOK CABANG: {{ $selectedOutlet->name }} ({{ $selectedOutlet->code }})</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-semibold">Toko Aktif</span>
+                    </div>
+                    <div class="text-[11px] text-emerald-700 mt-0.5">
+                        Menampilkan sisa stok fisik aktual di toko <strong>{{ $selectedOutlet->name }}</strong>.
+                    </div>
+                @else
+                    <div class="font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                        <span>STOK GLOBAL: SEMUA TOKO / KONSOLIDASI</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-600 text-white font-semibold">Seluruh Cabang</span>
+                    </div>
+                    <div class="text-[11px] text-blue-700 mt-0.5">
+                        Menampilkan <strong>total akumulasi stok</strong> dari seluruh toko & cabang Elephant Cell.
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        @if(auth()->user() && auth()->user()->isAdmin())
+            <div class="flex items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-200">
+                <span class="text-[11px] font-bold text-slate-700">Filter Stok:</span>
+                <div class="flex flex-wrap gap-1.5">
+                    <a href="{{ route('master.items', array_merge(request()->except('outlet_id'), ['outlet_id' => ''])) }}" 
+                       class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ empty($outletId) ? 'bg-blue-700 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                        Semua Toko
+                    </a>
+                    @foreach($outlets as $ot)
+                        <a href="{{ route('master.items', array_merge(request()->except('outlet_id'), ['outlet_id' => $ot->id])) }}" 
+                           class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ (string)$outletId === (string)$ot->id ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                            {{ $ot->name }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+
     <!-- Excel Instruction Box -->
     <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs text-slate-800 flex items-start gap-2.5">
         <svg class="w-4 h-4 text-slate-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -48,6 +96,9 @@
 
     <!-- Filters & Search -->
     <form action="{{ route('master.items') }}" method="GET" class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-wrap items-center gap-3 text-xs">
+        @if(request('outlet_id'))
+            <input type="hidden" name="outlet_id" value="{{ request('outlet_id') }}">
+        @endif
         <div class="flex-1 min-w-[200px]">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kode atau Nama Produk..." class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
         </div>
@@ -75,7 +126,7 @@
         </button>
 
         @if(request()->hasAny(['search', 'type', 'brand']))
-            <a href="{{ route('master.items') }}" class="text-xs text-rose-600 hover:underline">Reset</a>
+            <a href="{{ route('master.items', request('outlet_id') ? ['outlet_id' => request('outlet_id')] : []) }}" class="text-xs text-rose-600 hover:underline">Reset</a>
         @endif
     </form>
 
@@ -93,7 +144,7 @@
                         <th>NAMA BARANG</th>
                         <th>JENIS</th>
                         <th>MEREK</th>
-                        <th class="text-center">STOK</th>
+                        <th class="text-center">{{ $selectedOutlet ? 'STOK (' . $selectedOutlet->code . ')' : 'TOTAL STOK' }}</th>
                         <th class="text-center">MIN</th>
                         <th class="text-right">HPP (MODAL)</th>
                         <th class="text-right">HARGA RETAIL</th>
@@ -105,21 +156,24 @@
                 </thead>
                 <tbody>
                     @forelse($items as $idx => $item)
+                        @php
+                            $activeStock = (float) ($outletId ? $item->outlet_stock : $item->stock);
+                        @endphp
                         <tr>
                             <td class="text-center text-slate-500 font-semibold">{{ $items->firstItem() + $idx }}</td>
                             <td class="font-mono font-bold text-emerald-800">{{ $item->item_code }}</td>
                             <td class="font-semibold text-slate-800">{{ $item->name }}</td>
                             <td><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-700">{{ $item->type }}</span></td>
                             <td>{{ $item->brand ?? '-' }}</td>
-                            <td class="text-center font-mono font-bold {{ $item->stock <= $item->min_stock ? 'text-rose-600 bg-rose-50' : 'text-slate-800' }}">
-                                {{ (float)$item->stock }}
+                            <td class="text-center font-mono font-bold {{ $activeStock <= $item->min_stock ? 'text-rose-600 bg-rose-50' : 'text-slate-800' }}">
+                                {{ $activeStock }}
                             </td>
                             <td class="text-center font-mono text-slate-500">{{ (float)$item->min_stock }}</td>
                             <td class="text-right font-mono font-semibold text-slate-700">Rp {{ number_format($item->hpp, 0, ',', '.') }}</td>
                             <td class="text-right font-mono font-bold text-slate-900">Rp {{ number_format($item->retail_price, 0, ',', '.') }}</td>
                             <td class="text-right font-mono font-semibold text-emerald-800">Rp {{ number_format($item->wholesale_price, 0, ',', '.') }}</td>
                             <td class="text-right font-mono font-bold text-slate-800 bg-slate-50/50">
-                                Rp {{ number_format($item->stock * $item->hpp, 0, ',', '.') }}
+                                Rp {{ number_format($activeStock * $item->hpp, 0, ',', '.') }}
                             </td>
                             <td class="text-center">
                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $item->status === 'Masih Dijual' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
