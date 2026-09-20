@@ -54,6 +54,9 @@
 
     <!-- Header Toko -->
     <div class="text-center">
+        @if($setting && $setting->logo_url)
+            <img src="{{ $setting->logo_url }}" alt="Logo" style="max-height: 48px; max-width: 120px; object-fit: contain; margin-bottom: 4px; display: inline-block;">
+        @endif
         <div style="font-weight: 900; font-size: 13px;">{{ $setting->name ?? 'ELEPHANT CELL GROUP' }}</div>
         @if(!empty($setting->address))
             <div style="font-size: 10px; color: #6b7280; margin-top: 2px;">{{ $setting->address }}</div>

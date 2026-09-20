@@ -2078,7 +2078,10 @@ class MobileApiController extends Controller
         );
         $closingHistory = YearlyClosing::latest()->take(5)->get();
 
-        return response()->json(['success' => true, 'setting' => $setting, 'closing_history' => $closingHistory]);
+        $settingData = $setting->toArray();
+        $settingData['logo_url'] = $setting->logo_url;
+
+        return response()->json(['success' => true, 'setting' => $settingData, 'closing_history' => $closingHistory]);
     }
 
     public function updateSettings(Request $request)
@@ -2106,10 +2109,13 @@ class MobileApiController extends Controller
             'active_year' => $validated['active_year'] ?? $setting->active_year,
         ]);
 
+        $settingData = $setting->toArray();
+        $settingData['logo_url'] = $setting->logo_url;
+
         return response()->json([
             'success' => true,
             'message' => 'Pengaturan toko & struk berhasil disimpan!',
-            'setting' => $setting,
+            'setting' => $settingData,
         ]);
     }
 
@@ -2143,11 +2149,35 @@ class MobileApiController extends Controller
         $setting->logo_path = 'settings/logos/' . $filename;
         $setting->save();
 
+        $settingData = $setting->toArray();
+        $settingData['logo_url'] = $setting->logo_url;
+
         return response()->json([
             'success' => true,
             'message' => 'Logo toko berhasil diperbarui!',
-            'logo_url' => asset('storage/' . $setting->logo_path),
-            'setting' => $setting,
+            'logo_url' => $setting->logo_url,
+            'setting' => $settingData,
+        ]);
+    }
+
+    /**
+     * Check Mobile App Version & In-App Update
+     */
+    public function appVersion(Request $request)
+    {
+        $apkPath = public_path('download/elephant-pos.apk');
+        $fileSize = file_exists($apkPath) ? filesize($apkPath) : 0;
+        $fileSizeMb = $fileSize > 0 ? round($fileSize / (1024 * 1024), 1) : 65.3;
+
+        return response()->json([
+            'success' => true,
+            'version' => '1.0.2',
+            'version_code' => 3,
+            'title' => 'Pembaruan Tersedia',
+            'release_notes' => "• Sinkronisasi logo cetak struk sesuai pengaturan toko.\n• Fitur update aplikasi otomatis dan manual di menu pengaturan.\n• Peningkatan kestabilan dan kecepatan sistem.",
+            'download_url' => url('/download-apk') . '?v=' . time(),
+            'file_size' => "{$fileSizeMb} MB",
+            'force_update' => false,
         ]);
     }
 

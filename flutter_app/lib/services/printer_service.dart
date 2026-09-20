@@ -35,6 +35,13 @@ class PrinterService {
     await prefs.setBool(keyAutoPrint, enabled);
   }
 
+  static Uint8List? _cachedLogoBytes;
+
+  /// Clear in-memory cached logo bytes (e.g. after uploading a new logo)
+  static void clearCachedLogo() {
+    _cachedLogoBytes = null;
+  }
+
   /// Resolve store settings with fallback to ApiService.getSettings()
   static Future<Map<String, dynamic>> _resolveStoreSetting(Map<String, dynamic>? storeSetting) async {
     final map = <String, dynamic>{};
@@ -42,50 +49,70 @@ class PrinterService {
       map.addAll(storeSetting);
     }
 
-    final hasValidName = (map['store_name'] != null && map['store_name'].toString().isNotEmpty) ||
-        (map['name'] != null && map['name'].toString().isNotEmpty);
+    final hasLogo = map['logo_url'] != null && map['logo_url'].toString().trim().isNotEmpty;
+    final hasValidName = (map['store_name'] != null && map['store_name'].toString().trim().isNotEmpty) ||
+        (map['name'] != null && map['name'].toString().trim().isNotEmpty);
 
-    if (!hasValidName) {
+    // If logo_url or store name is missing, always query settings from server
+    if (!hasValidName || !hasLogo) {
       try {
         final res = await ApiService.getSettings();
         if (res['success'] == true && res['setting'] is Map) {
           final fetched = Map<String, dynamic>.from(res['setting']);
-          map.addAll(fetched);
+          for (final entry in fetched.entries) {
+            if (map[entry.key] == null || map[entry.key].toString().trim().isEmpty) {
+              map[entry.key] = entry.value;
+            }
+          }
+          if (fetched['logo_url'] != null && fetched['logo_url'].toString().trim().isNotEmpty) {
+            map['logo_url'] = fetched['logo_url'];
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error resolving store settings: $e');
+      }
     }
 
     return map;
   }
 
-  /// Download logo bytes or return null
+  /// Download logo bytes or return null with caching and relative-path resolution
   static Future<Uint8List?> _fetchLogoBytes(String? logoUrl) async {
-    if (logoUrl == null || logoUrl.isEmpty) return null;
+    if (_cachedLogoBytes != null) return _cachedLogoBytes;
+    if (logoUrl == null || logoUrl.trim().isEmpty) return null;
+
     try {
-      final uri = Uri.parse(logoUrl);
-      final res = await http.get(uri).timeout(const Duration(seconds: 4));
+      String resolvedUrl = logoUrl.trim();
+      // Handle relative paths from backend
+      if (!resolvedUrl.startsWith('http://') && !resolvedUrl.startsWith('https://')) {
+        final base = ApiService.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+        final cleanPath = resolvedUrl.startsWith('/') ? resolvedUrl.substring(1) : resolvedUrl;
+        resolvedUrl = '$base/$cleanPath';
+      }
+
+      final uri = Uri.parse(resolvedUrl);
+      final res = await http.get(uri).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        _cachedLogoBytes = res.bodyBytes;
         return res.bodyBytes;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error fetching store logo bytes: $e');
+    }
     return null;
   }
 
-  /// Build Circular Store Avatar / Logo matching Settings Screen Preview
+  /// Build Store Logo matching Pengaturan Struk
   static pw.Widget _buildPdfLogo(Uint8List? logoBytes) {
     if (logoBytes != null && logoBytes.isNotEmpty) {
       return pw.Container(
-        width: 36,
-        height: 36,
-        child: pw.ClipRRect(
-          horizontalRadius: 18,
-          verticalRadius: 18,
-          child: pw.Image(
-            pw.MemoryImage(logoBytes),
-            width: 36,
-            height: 36,
-            fit: pw.BoxFit.contain,
-          ),
+        height: 48,
+        margin: const pw.EdgeInsets.only(bottom: 3),
+        alignment: pw.Alignment.center,
+        child: pw.Image(
+          pw.MemoryImage(logoBytes),
+          height: 48,
+          fit: pw.BoxFit.contain,
         ),
       );
     }

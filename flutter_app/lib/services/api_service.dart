@@ -829,6 +829,11 @@ class ApiService {
     return await _put('$baseUrl/settings', data);
   }
 
+  /// Get current mobile app release version and update info
+  static Future<Map<String, dynamic>> getAppVersion() async {
+    return await _get('$baseUrl/app/version', timeout: const Duration(seconds: 10));
+  }
+
   /// Upload store logo as multipart/form-data
   static Future<Map<String, dynamic>> uploadSettingsLogo(String filePath) async {
     try {

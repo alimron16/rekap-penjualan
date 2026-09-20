@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 import '../services/printer_service.dart';
+import '../services/update_service.dart';
 import '../utils/theme_config.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isCheckingUpdate = false;
   String? _errorMessage;
   Map<String, dynamic>? _setting;
   List<dynamic> _closingHistory = [];
@@ -149,6 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final res = await ApiService.uploadSettingsLogo(picked.path);
       if (mounted) {
         if (res['success'] == true) {
+          PrinterService.clearCachedLogo();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Logo toko berhasil diperbarui'),
@@ -656,15 +659,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // ── 4. INFORMASI SERVER ──────────────────────────────
+                        // ── 4. INFORMASI SERVER & PEMBARUAN ──────────────────
                         _buildSectionCard(
-                          icon: Icons.cloud_done,
-                          title: 'Informasi Server & Versi',
+                          icon: Icons.system_update_rounded,
+                          title: 'Pembaruan & Informasi Aplikasi',
                           children: [
                             _buildReadOnlyRow('Server Backend', 'pos.moonbyte.my.id'),
                             _buildReadOnlyRow('Status Koneksi', 'Terhubung (HTTPS Online)'),
-                            _buildReadOnlyRow('Versi Aplikasi', 'v2.3.0 (FCM + Native Printing)'),
-                            _buildReadOnlyRow('Firebase Project', 'elephant-pos-c6210'),
+                            _buildReadOnlyRow('Versi Aplikasi', 'v${UpdateService.currentVersion} (Build ${UpdateService.currentVersionCode})'),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: ThemeConfig.primary, width: 1.2),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  foregroundColor: ThemeConfig.primary,
+                                ),
+                                icon: _isCheckingUpdate
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: ThemeConfig.primary),
+                                      )
+                                    : const Icon(Icons.refresh_rounded, size: 18),
+                                label: Text(
+                                  _isCheckingUpdate ? 'Memeriksa Pembaruan...' : 'Cek Pembaruan Aplikasi',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: _isCheckingUpdate
+                                    ? null
+                                    : () async {
+                                        setState(() => _isCheckingUpdate = true);
+                                        try {
+                                          await UpdateService.checkUpdate(context, autoPrompt: false);
+                                        } finally {
+                                          if (mounted) setState(() => _isCheckingUpdate = false);
+                                        }
+                                      },
+                              ),
+                            ),
                           ],
                         ),
                       ],

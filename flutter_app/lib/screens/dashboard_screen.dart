@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/update_service.dart';
 import '../utils/formatters.dart';
 import '../utils/theme_config.dart';
 
@@ -70,6 +71,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     NotificationService.setupFcm();
     _initDashboardWithCache();
     _startPendingTransferPolling();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService.checkUpdate(context, autoPrompt: true);
+    });
   }
 
   @override

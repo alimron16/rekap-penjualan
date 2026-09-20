@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\MobileApiController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [MobileApiController::class, 'login']);
+Route::get('/app/version', [MobileApiController::class, 'appVersion']);
 Route::get('/dashboard', [MobileApiController::class, 'dashboard']);
 
 // 1. Master Data
