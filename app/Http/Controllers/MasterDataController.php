@@ -247,7 +247,21 @@ class MasterDataController extends Controller
 
     public function multiProducts(Request $request)
     {
-        $query = DigitalProduct::query();
+        $user     = auth()->user();
+        $outletId = $this->scopedOutletId();
+
+        if ($user?->isAdmin() && $request->has('outlet_id')) {
+            $outletId = $request->input('outlet_id') ?: null;
+        }
+
+        $query = DigitalProduct::with('outlet');
+
+        if ($outletId) {
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
+        }
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -274,7 +288,13 @@ class MasterDataController extends Controller
         $allDigitalCategories = Category::whereIn('type', ['digital_type', 'digital_category'])
             ->orderBy('type')->orderBy('name')->get();
 
-        return view('master.multi', compact('products', 'trxTypes', 'categories', 'allDigitalCategories'));
+        $outlets = $user?->isAdmin()
+            ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get()
+            : collect();
+
+        $selectedOutlet = $outletId ? \App\Models\Outlet::find($outletId) : null;
+
+        return view('master.multi', compact('products', 'trxTypes', 'categories', 'allDigitalCategories', 'outlets', 'outletId', 'selectedOutlet'));
     }
 
     public function storeMultiProduct(Request $request)
@@ -289,7 +309,13 @@ class MasterDataController extends Controller
             'hpp'            => 'required|numeric|min:0',
             'selling_price'  => 'required|numeric|min:0',
             'status'         => 'required|string',
+            'outlet_id'      => 'nullable|exists:outlets,id',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         if ($data['trx_type'] === '__NEW__' && !empty($data['new_trx_type'])) {
             $data['trx_type'] = strtoupper(trim($data['new_trx_type']));
@@ -320,7 +346,13 @@ class MasterDataController extends Controller
             'hpp'           => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
             'status'        => 'required|string',
+            'outlet_id'     => 'nullable|exists:outlets,id',
         ]);
+
+        $user = auth()->user();
+        if ($user && $user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         if ($data['trx_type'] === '__NEW__' && !empty($data['new_trx_type'])) {
             $data['trx_type'] = strtoupper(trim($data['new_trx_type']));

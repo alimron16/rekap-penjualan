@@ -366,6 +366,7 @@ class _PosScreenState extends State<PosScreen> {
                     child: Row(
                       children: [
                         _buildQuickCashChip('Uang Pas', _grandTotal, setSheetState),
+                        _buildQuickCashChip('5rb', 5000, setSheetState),
                         _buildQuickCashChip('10rb', 10000, setSheetState),
                         _buildQuickCashChip('20rb', 20000, setSheetState),
                         _buildQuickCashChip('50rb', 50000, setSheetState),
@@ -507,24 +508,37 @@ class _PosScreenState extends State<PosScreen> {
     final isSelected = _paymentMethod == value;
     return Expanded(
       child: InkWell(
+        borderRadius: BorderRadius.circular(8),
         onTap: () {
           setSheetState(() => _paymentMethod = value);
           setState(() => _paymentMethod = value);
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSelected ? ThemeConfig.primary : Colors.grey.shade100,
+            color: isSelected ? const Color(0xFF0F3D24) : Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isSelected ? ThemeConfig.primary : Colors.grey.shade300),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF0F3D24) : const Color(0xFFCBD5E1),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF0F3D24).withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : null,
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? Colors.white : const Color(0xFF334155),
             ),
           ),
         ),
@@ -533,15 +547,77 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Widget _buildQuickCashChip(String label, double amount, StateSetter setSheetState) {
+    final double currentPaid = Formatters.parseDouble(_paidController.text);
+    final isUangPas = label == 'Uang Pas';
+    final isSelected = (currentPaid == amount) || (isUangPas && currentPaid == _grandTotal && _grandTotal > 0);
+
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+
+    if (isSelected) {
+      bgColor = isUangPas ? const Color(0xFF0F3D24) : const Color(0xFF0284C7);
+      borderColor = isUangPas ? const Color(0xFF0F3D24) : const Color(0xFF0284C7);
+      textColor = Colors.white;
+    } else if (isUangPas) {
+      bgColor = const Color(0xFFECFDF5);
+      borderColor = const Color(0xFF059669);
+      textColor = const Color(0xFF047857);
+    } else {
+      bgColor = Colors.white;
+      borderColor = const Color(0xFFCBD5E1);
+      textColor = const Color(0xFF1E293B);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: ActionChip(
-        label: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.grey.shade100,
-        onPressed: () {
-          _setQuickCash(amount);
-          setSheetState(() {});
-        },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            _setQuickCash(amount);
+            setSheetState(() {});
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1.2),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: (isUangPas ? const Color(0xFF0F3D24) : const Color(0xFF0284C7)).withOpacity(0.25),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isUangPas) ...[
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 13,
+                    color: isSelected ? Colors.white : const Color(0xFF059669),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

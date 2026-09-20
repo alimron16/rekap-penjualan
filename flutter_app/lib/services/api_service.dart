@@ -295,11 +295,12 @@ class ApiService {
   }
 
   // --- Master Data: Multi Products ---
-  static Future<Map<String, dynamic>> getMultiProducts({String? search, String? trxType, String? category}) async {
+  static Future<Map<String, dynamic>> getMultiProducts({String? search, String? trxType, String? category, int? outletId}) async {
     final params = <String>[];
     if (search != null && search.isNotEmpty) params.add('q=${Uri.encodeComponent(search)}');
     if (trxType != null && trxType != 'ALL') params.add('trx_type=${Uri.encodeComponent(trxType)}');
     if (category != null && category != 'ALL') params.add('category=${Uri.encodeComponent(category)}');
+    if (outletId != null) params.add('outlet_id=$outletId');
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     return await _get('$baseUrl/multi-products$query');
   }

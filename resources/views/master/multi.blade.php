@@ -36,6 +36,52 @@
         </div>
     </div>
 
+    <!-- Outlet Filter & Scope Banner -->
+    <div class="bg-white rounded-lg p-3 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg {{ $selectedOutlet ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200' }} flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <div>
+                @if($selectedOutlet)
+                    <div class="font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                        <span>PRODUK MULTI CABANG: {{ $selectedOutlet->name }} ({{ $selectedOutlet->code }})</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-600 text-white font-semibold">Toko Aktif</span>
+                    </div>
+                    <div class="text-[11px] text-emerald-700 mt-0.5">
+                        Menampilkan produk digital khusus untuk toko <strong>{{ $selectedOutlet->name }}</strong> dan produk multi global.
+                    </div>
+                @else
+                    <div class="font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                        <span>PRODUK MULTI GLOBAL: SEMUA TOKO / KONSOLIDASI</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-600 text-white font-semibold">Seluruh Cabang</span>
+                    </div>
+                    <div class="text-[11px] text-blue-700 mt-0.5">
+                        Menampilkan <strong>seluruh produk multi</strong> dari semua cabang dan layanan global.
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        @if(auth()->user() && auth()->user()->isAdmin())
+            <div class="flex items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-200">
+                <span class="text-[11px] font-bold text-slate-700">Filter Cabang:</span>
+                <div class="flex flex-wrap gap-1.5">
+                    <a href="{{ route('master.multi', array_merge(request()->except('outlet_id'), ['outlet_id' => ''])) }}" 
+                       class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ empty($outletId) ? 'bg-blue-700 text-white border-blue-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                        Semua Toko
+                    </a>
+                    @foreach($outlets as $ot)
+                        <a href="{{ route('master.multi', array_merge(request()->except('outlet_id'), ['outlet_id' => $ot->id])) }}" 
+                           class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors {{ (string)$outletId === (string)$ot->id ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100' }}">
+                            {{ $ot->name }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    </div>
+
     <!-- Excel Warning Box -->
     <div class="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs text-slate-800 flex items-start gap-2.5">
         <svg class="w-4 h-4 text-slate-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -48,6 +94,9 @@
 
     <!-- Filters & Search -->
     <form action="{{ route('master.multi') }}" method="GET" class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex flex-wrap items-center gap-3 text-xs">
+        @if(request('outlet_id'))
+            <input type="hidden" name="outlet_id" value="{{ request('outlet_id') }}">
+        @endif
         <div class="flex-1 min-w-[200px]">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kode atau Nama Produk Multi..." class="w-full px-3 py-1.5 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-600">
         </div>
@@ -91,6 +140,7 @@
                         <th class="w-12 text-center">NO</th>
                         <th>KODE PRODUK</th>
                         <th>NAMA PRODUK</th>
+                        <th>CABANG / TOKO</th>
                         <th>JENIS TRX</th>
                         <th>KATEGORI</th>
                         <th class="text-right">HPP (MODAL SERVER)</th>
@@ -106,6 +156,17 @@
                             <td class="text-center text-slate-500 font-semibold">{{ $products->firstItem() + $idx }}</td>
                             <td class="font-mono font-bold text-emerald-800">{{ $mp->product_code }}</td>
                             <td class="font-semibold text-slate-800">{{ $mp->name }}</td>
+                            <td>
+                                @if($mp->outlet)
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                        {{ $mp->outlet->name }}
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        Semua Toko
+                                    </span>
+                                @endif
+                            </td>
                             <td><span class="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-700">{{ $mp->trx_type }}</span></td>
                             <td><span class="px-2 py-0.5 rounded bg-slate-50 text-[10px] font-bold text-slate-500 border border-slate-200">{{ $mp->category }}</span></td>
                             <td class="text-right font-mono font-semibold text-slate-700">Rp {{ number_format($mp->hpp, 0, ',', '.') }}</td>
@@ -135,7 +196,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center py-6 text-slate-400">Tidak ada produk multi ditemukan.</td>
+                            <td colspan="11" class="text-center py-6 text-slate-400">Tidak ada produk multi ditemukan.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -241,6 +302,21 @@
                     <option value="CLOSE">CLOSE (Gangguan)</option>
                 </select>
             </div>
+
+            @if(auth()->user() && auth()->user()->isAdmin())
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Toko / Cabang Pemilik</label>
+                <select name="outlet_id" class="w-full px-3 py-1.5 border border-slate-300 rounded bg-white">
+                    <option value="">-- Semua Cabang (Global) --</option>
+                    @foreach($outlets as $ot)
+                        <option value="{{ $ot->id }}" {{ (string)$outletId === (string)$ot->id ? 'selected' : '' }}>
+                            {{ $ot->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-[10px] text-slate-500 mt-0.5">Pilih "Semua Cabang (Global)" jika produk berlaku di seluruh toko.</p>
+            </div>
+            @endif
 
             <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('modalAddMulti').classList.add('hidden')" class="px-4 py-2 rounded bg-slate-200 hover:bg-slate-300 font-bold">Batal</button>
@@ -425,6 +501,19 @@
                 </select>
             </div>
 
+            @if(auth()->user() && auth()->user()->isAdmin())
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Toko / Cabang Pemilik</label>
+                <select name="outlet_id" id="edit_multi_outlet_id" class="w-full px-2.5 py-1.5 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-emerald-600">
+                    <option value="">-- Semua Cabang (Global) --</option>
+                    @foreach($outlets as $ot)
+                        <option value="{{ $ot->id }}">{{ $ot->name }}</option>
+                    @endforeach
+                </select>
+                <p class="text-[10px] text-slate-500 mt-0.5">Pilih "Semua Cabang (Global)" jika produk berlaku di seluruh toko.</p>
+            </div>
+            @endif
+
             <div class="pt-3 border-t border-slate-200 flex justify-end gap-2 shrink-0">
                 <button type="button" onclick="document.getElementById('modalEditMulti').classList.add('hidden')" class="px-4 py-2 rounded bg-slate-200 hover:bg-slate-300 font-bold">Batal</button>
                 <button type="submit" class="btn-retro btn-save">SIMPAN PERUBAHAN</button>
@@ -472,6 +561,10 @@ function editMulti(data) {
     document.getElementById('edit_multi_hpp').value = data.hpp ?? 0;
     document.getElementById('edit_multi_price').value = data.selling_price ?? 0;
     document.getElementById('edit_multi_status').value = data.status || 'OPEN';
+    const outletSelect = document.getElementById('edit_multi_outlet_id');
+    if (outletSelect) {
+        outletSelect.value = data.outlet_id || '';
+    }
     document.getElementById('modalEditMulti').classList.remove('hidden');
 }
 </script>

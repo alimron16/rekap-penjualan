@@ -267,18 +267,50 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
                     children: [
                       Expanded(
                         child: ChoiceChip(
-                          label: const Center(child: Text('Tunai / Lunas')),
+                          label: Center(
+                            child: Text(
+                              'Tunai / Lunas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: paymentMethod == 'cash' ? Colors.white : const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
                           selected: paymentMethod == 'cash',
-                          selectedColor: ThemeConfig.accent.withOpacity(0.2),
+                          selectedColor: const Color(0xFF0F3D24),
+                          backgroundColor: Colors.white,
+                          showCheckmark: false,
+                          side: BorderSide(
+                            color: paymentMethod == 'cash' ? const Color(0xFF0F3D24) : const Color(0xFFCBD5E1),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           onSelected: (val) => setModalState(() => paymentMethod = 'cash'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: ChoiceChip(
-                          label: const Center(child: Text('Tempo / Hutang')),
+                          label: Center(
+                            child: Text(
+                              'Tempo / Hutang',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: paymentMethod == 'credit' ? Colors.white : const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
                           selected: paymentMethod == 'credit',
-                          selectedColor: Colors.orange.withOpacity(0.2),
+                          selectedColor: Colors.orange.shade800,
+                          backgroundColor: Colors.white,
+                          showCheckmark: false,
+                          side: BorderSide(
+                            color: paymentMethod == 'credit' ? Colors.orange.shade800 : const Color(0xFFCBD5E1),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           onSelected: (val) => setModalState(() => paymentMethod = 'credit'),
                         ),
                       ),

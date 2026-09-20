@@ -44,6 +44,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   Map<String, dynamic>? _currentUser;
   bool _canEditStock = true;
   bool _canEditPrice = true;
+  bool _canFilterOutlet = false;
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         _currentUser = user;
         final role = (user['role'] ?? '').toString().toLowerCase();
         final isAdminOrSuper = role == 'admin' || role == 'super_admin' || role == 'superadmin';
+        _canFilterOutlet = isAdminOrSuper;
         if (isAdminOrSuper) {
           _canEditStock = true;
           _canEditPrice = true;
@@ -146,6 +148,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         search: _searchMultiController.text.trim(),
         trxType: _selectedMultiTrxType,
         category: _selectedMultiCategory,
+        outletId: _selectedOutletId,
       );
       if (mounted) {
         setState(() {
@@ -153,6 +156,9 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             _multiProducts = res['data'] ?? [];
             _multiTrxTypes = res['trx_types'] ?? [];
             _multiCategories = res['categories'] ?? [];
+            if (res['outlets'] != null && res['outlets'] is List && _outlets.isEmpty) {
+              _outlets = res['outlets'];
+            }
             _filteredMultiProducts = _multiProducts;
           }
           _isLoadingMulti = false;
@@ -561,6 +567,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     final hppController = TextEditingController(text: product != null ? Formatters.parseDouble(product['hpp']).toStringAsFixed(0) : '0');
     final sellingPriceController = TextEditingController(text: product != null ? Formatters.parseDouble(product['selling_price']).toStringAsFixed(0) : '0');
     String status = product?['status'] ?? 'OPEN';
+    int? outletId = isEditing ? product['outlet_id'] : _selectedOutletId;
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -684,6 +691,23 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                     ),
                   ],
                 ),
+                if (_canFilterOutlet && _outlets.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Text('Cabang / Toko Pemilik', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<int?>(
+                    value: outletId,
+                    decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('Semua Toko (Global)')),
+                      ..._outlets.map<DropdownMenuItem<int?>>((ot) => DropdownMenuItem<int?>(
+                        value: ot['id'],
+                        child: Text(ot['name'] ?? 'Cabang'),
+                      )),
+                    ],
+                    onChanged: (val) => setModalState(() => outletId = val),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -706,6 +730,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                               'hpp': Formatters.parseDouble(hppController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
                               'selling_price': Formatters.parseDouble(sellingPriceController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
                               'status': status,
+                              'outlet_id': outletId,
                             };
 
                             final res = isEditing
@@ -842,6 +867,104 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     );
   }
 
+  Widget _buildOutletSelectorBar({required VoidCallback onOutletChanged}) {
+    if (!_canFilterOutlet || _outlets.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.storefront_outlined, size: 14, color: ThemeConfig.primary),
+              SizedBox(width: 4),
+              Text(
+                'PILIH TOKO / CABANG:',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    selected: _selectedOutletId == null,
+                    label: const Text('Semua Toko (Global)'),
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _selectedOutletId == null ? Colors.white : const Color(0xFF1E293B),
+                    ),
+                    selectedColor: ThemeConfig.primary,
+                    backgroundColor: Colors.white,
+                    showCheckmark: true,
+                    checkmarkColor: Colors.white,
+                    side: BorderSide(
+                      color: _selectedOutletId == null ? ThemeConfig.primary : const Color(0xFFCBD5E1),
+                      width: 1.2,
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    onSelected: (val) {
+                      if (_selectedOutletId != null) {
+                        setState(() {
+                          _selectedOutletId = null;
+                          _selectedOutletName = 'Semua Toko (Global)';
+                          _isGlobal = true;
+                        });
+                        onOutletChanged();
+                      }
+                    },
+                  ),
+                ),
+                ..._outlets.map((ot) {
+                  final isSelected = _selectedOutletId == ot['id'];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      selected: isSelected,
+                      label: Text(ot['name'] ?? 'Cabang'),
+                      labelStyle: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                      ),
+                      selectedColor: ThemeConfig.primary,
+                      backgroundColor: Colors.white,
+                      showCheckmark: true,
+                      checkmarkColor: Colors.white,
+                      side: BorderSide(
+                        color: isSelected ? ThemeConfig.primary : const Color(0xFFCBD5E1),
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      onSelected: (val) {
+                        if (_selectedOutletId != ot['id']) {
+                          setState(() {
+                            _selectedOutletId = ot['id'];
+                            _selectedOutletName = ot['name'] ?? 'Cabang';
+                            _isGlobal = false;
+                          });
+                          onOutletChanged();
+                        }
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==========================================
   // VIEW: TAB 1 - STOK BARANG FISIK
   // ==========================================
@@ -849,64 +972,10 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
     return Column(
       children: [
         // Admin Outlet Selector Bar
-        if (_canEditPrice && _outlets.isNotEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: const Color(0xFFF1F5F9),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.storefront_outlined, size: 14, color: ThemeConfig.primary),
-                    SizedBox(width: 4),
-                    Text('PILIH TOKO / CABANG:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ThemeConfig.textDark)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          selected: _selectedOutletId == null,
-                          label: const Text('Semua Toko (Global)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          selectedColor: ThemeConfig.primary.withOpacity(0.2),
-                          onSelected: (val) {
-                            if (_selectedOutletId != null) {
-                              setState(() => _selectedOutletId = null);
-                              _loadItems();
-                            }
-                          },
-                        ),
-                      ),
-                      ..._outlets.map((ot) {
-                        final isSelected = _selectedOutletId == ot['id'];
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: ChoiceChip(
-                            selected: isSelected,
-                            label: Text(ot['name'] ?? 'Cabang', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                            selectedColor: const Color(0xFF059669).withOpacity(0.2),
-                            onSelected: (val) {
-                              if (_selectedOutletId != ot['id']) {
-                                setState(() => _selectedOutletId = ot['id']);
-                                _loadItems();
-                              }
-                            },
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        _buildOutletSelectorBar(onOutletChanged: () {
+          _loadItems();
+          _loadMultiProducts();
+        }),
 
         // Informational Banner (Keterangan Sumber Stok Aktif)
         Container(
@@ -1145,6 +1214,48 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
   Widget _buildMultiProductsTab() {
     return Column(
       children: [
+        // Admin Outlet Selector Bar
+        _buildOutletSelectorBar(onOutletChanged: () {
+          _loadItems();
+          _loadMultiProducts();
+        }),
+
+        // Informational Banner (Keterangan Sumber Produk Multi Aktif)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _selectedOutletId == null ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _selectedOutletId == null ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _selectedOutletId == null ? Icons.public : Icons.store,
+                size: 16,
+                color: _selectedOutletId == null ? const Color(0xFF1D4ED8) : const Color(0xFF047857),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _selectedOutletId == null
+                      ? 'MODE: PRODUK MULTI GLOBAL (SEMUA TOKO) — Menampilkan seluruh produk digital.'
+                      : 'MODE: PRODUK MULTI CABANG — ${_selectedOutletName.toUpperCase()} — Menampilkan produk multi toko ini & global.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _selectedOutletId == null ? const Color(0xFF1E40AF) : const Color(0xFF065F46),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Search & Filter Header
         Container(
           padding: const EdgeInsets.all(12),
@@ -1233,6 +1344,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                               DataColumn(label: Text('NO')),
                               DataColumn(label: Text('KODE PRODUK')),
                               DataColumn(label: Text('NAMA PRODUK')),
+                              DataColumn(label: Text('CABANG / TOKO')),
                               DataColumn(label: Text('JENIS TRX')),
                               DataColumn(label: Text('KATEGORI')),
                               DataColumn(label: Text('HPP (MODAL SERVER)')),
@@ -1257,6 +1369,26 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                                     SizedBox(
                                       width: 200,
                                       child: Text(p['name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11), overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: p['outlet_id'] == null ? const Color(0xFFF1F5F9) : const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: p['outlet_id'] == null ? const Color(0xFFCBD5E1) : const Color(0xFFA7F3D0),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        p['outlet'] != null ? (p['outlet']['name'] ?? 'Cabang') : (p['outlet_id'] == null ? 'Semua Cabang' : 'Toko #${p['outlet_id']}'),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: p['outlet_id'] == null ? const Color(0xFF475569) : const Color(0xFF065F46),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   DataCell(

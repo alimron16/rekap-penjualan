@@ -372,8 +372,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           padding: const EdgeInsets.only(right: 6),
                           child: ChoiceChip(
                             selected: _selectedOutletId == null,
-                            label: const Text('Semua Toko (Global)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                            selectedColor: ThemeConfig.primary.withOpacity(0.2),
+                            label: const Text('Semua Toko (Global)'),
+                            labelStyle: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _selectedOutletId == null ? Colors.white : const Color(0xFF1E293B),
+                            ),
+                            selectedColor: ThemeConfig.primary,
+                            backgroundColor: Colors.white,
+                            showCheckmark: true,
+                            checkmarkColor: Colors.white,
+                            side: BorderSide(
+                              color: _selectedOutletId == null ? ThemeConfig.primary : const Color(0xFFCBD5E1),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             onSelected: (val) {
                               if (_selectedOutletId != null) {
                                 setState(() => _selectedOutletId = null);
@@ -388,8 +401,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             padding: const EdgeInsets.only(right: 6),
                             child: ChoiceChip(
                               selected: isSelected,
-                              label: Text(ot['name'] ?? 'Cabang', style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                              selectedColor: const Color(0xFF059669).withOpacity(0.2),
+                              label: Text(ot['name'] ?? 'Cabang'),
+                              labelStyle: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                              ),
+                              selectedColor: ThemeConfig.primary,
+                              backgroundColor: Colors.white,
+                              showCheckmark: true,
+                              checkmarkColor: Colors.white,
+                              side: BorderSide(
+                                color: isSelected ? ThemeConfig.primary : const Color(0xFFCBD5E1),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               onSelected: (val) {
                                 if (_selectedOutletId != ot['id']) {
                                   setState(() => _selectedOutletId = ot['id']);

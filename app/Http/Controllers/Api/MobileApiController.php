@@ -504,11 +504,23 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $outletId = $request->query('outlet_id');
+        if ($user->isToko()) {
+            $outletId = $user->outlet_id;
+        }
+
         $search = $request->query('q') ?? $request->query('search');
         $trxType = $request->query('trx_type');
         $category = $request->query('category');
 
-        $query = DigitalProduct::query();
+        $query = DigitalProduct::with('outlet');
+
+        if ($outletId) {
+            $query->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            });
+        }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -529,12 +541,18 @@ class MobileApiController extends Controller
         $products = $query->orderBy('trx_type')->orderBy('name')->get();
         $trxTypes = Category::where('type', 'digital_type')->pluck('name');
         $categories = Category::where('type', 'digital_category')->pluck('name');
+        $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
+        $selectedOutlet = $outletId ? $outlets->firstWhere('id', (int)$outletId) : null;
 
         return response()->json([
             'success' => true,
             'data' => $products,
             'trx_types' => $trxTypes,
             'categories' => $categories,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId ? (int)$outletId : null,
+            'selected_outlet_name' => $selectedOutlet ? $selectedOutlet->name : 'Semua Toko',
+            'is_global' => empty($outletId),
         ]);
     }
 
@@ -551,7 +569,12 @@ class MobileApiController extends Controller
             'hpp' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
             'status' => 'required|string|in:OPEN,CLOSE',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
+
+        if ($user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         if (!empty($data['trx_type'])) {
             Category::firstOrCreate(['type' => 'digital_type', 'name' => strtoupper(trim($data['trx_type']))]);
@@ -561,6 +584,7 @@ class MobileApiController extends Controller
         }
 
         $product = DigitalProduct::create($data);
+        $product->load('outlet');
         return response()->json(['success' => true, 'message' => 'Produk multi berhasil ditambahkan!', 'data' => $product]);
     }
 
@@ -579,7 +603,12 @@ class MobileApiController extends Controller
             'hpp' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
             'status' => 'required|string|in:OPEN,CLOSE',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
+
+        if ($user->isToko()) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         if (!empty($data['trx_type'])) {
             Category::firstOrCreate(['type' => 'digital_type', 'name' => strtoupper(trim($data['trx_type']))]);
@@ -589,6 +618,7 @@ class MobileApiController extends Controller
         }
 
         $product->update($data);
+        $product->load('outlet');
         return response()->json(['success' => true, 'message' => "Produk Multi [{$product->name}] berhasil diperbarui!", 'data' => $product]);
     }
 
@@ -2421,10 +2451,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.5',
-            'version_code' => 6,
-            'title' => 'Pembaruan Tersedia (v1.0.5)',
-            'release_notes' => "• Pemilihan Toko / Cabang (Semua Toko, Tambun, Cibitung) di Master Data Barang, Pelanggan, dan Supplier.\n• Status banner keterangan mode toko aktif (Global vs Cabang).\n• Label stok dinamis & badge kepemilikan toko pada setiap kartu data.\n• Pilihan penetapan toko cabang pada form tambah & edit pelanggan dan supplier.",
+            'version' => '1.0.6',
+            'version_code' => 7,
+            'title' => 'Pembaruan Tersedia (v1.0.6)',
+            'release_notes' => "• Pemilihan Toko / Cabang di Produk Multi (Digital) & Master Data Barang Fisik, Pelanggan, dan Supplier.\n• Perbaikan kontras warna tombol filter cabang & quick cash kasir (Uang Pas, 5rb, 10rb, dst).\n• Banner status toko aktif dan badge cabang kepemilikan data.\n• Variasi stok produk per toko & penetapan toko pada produk digital.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
