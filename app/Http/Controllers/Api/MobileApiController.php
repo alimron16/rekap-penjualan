@@ -2190,7 +2190,7 @@ class MobileApiController extends Controller
             'version_code' => 4,
             'title' => 'Pembaruan Tersedia',
             'release_notes' => "• Penguncian harga jual dan HPP untuk akun Toko (hanya Admin yang berwenang mengubah harga).\n• Desain baru Rekap Shift & Setor Penjualan: bersih, teratur, dan mudah dipahami.\n• Pemisahan 3 kantong kas: Cash Retail, Cash Multi (Pulsa/PPOB), dan Cash Transfer Agen.\n• Ganti Shift otomatis mereset seluruh indikator transaksi ke 0 untuk shift berikutnya.\n• Histori dan rincian lengkap tutup shift per cabang/toko.\n• Mode Multi-Outlet untuk Admin dan Superadmin.",
-            'download_url' => url('/download-apk') . '?v=' . time(),
+            'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => false,
         ]);

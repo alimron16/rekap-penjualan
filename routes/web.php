@@ -211,13 +211,23 @@ Route::prefix('receipt')->name('receipt.')->group(function () {
     Route::get('/thermal-shift/{shiftLog}', [ReceiptController::class, 'thermalShift'])->name('thermal_shift');
 });
 
-// Download APK (Bypass Cloudflare & Browser Cache)
+// Download APK (Bypass Cloudflare & Browser Cache, Safe without php_fileinfo)
 Route::get('/download-apk', function () {
     $path = public_path('download/elephant-pos.apk');
     if (!file_exists($path)) {
         abort(404, 'File installer APK belum tersedia di server.');
     }
-    return response()->download($path, 'elephant-pos-v1.0.3.apk', [
+    $fileSize = filesize($path);
+
+    return response()->streamDownload(function () use ($path) {
+        $stream = fopen($path, 'rb');
+        if ($stream) {
+            fpassthru($stream);
+            fclose($stream);
+        }
+    }, 'elephant-pos-v1.0.3.apk', [
+        'Content-Type' => 'application/vnd.android.package-archive',
+        'Content-Length' => (string) $fileSize,
         'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
         'Pragma' => 'no-cache',
         'Expires' => '0',
