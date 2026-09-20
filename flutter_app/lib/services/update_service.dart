@@ -5,8 +5,8 @@ import 'api_service.dart';
 import '../utils/theme_config.dart';
 
 class UpdateService {
-  static const String currentVersion = '1.0.2';
-  static const int currentVersionCode = 3;
+  static const String currentVersion = '1.0.3';
+  static const int currentVersionCode = 4;
   static const String _keyLastDismissed = 'app_update_dismissed_time';
 
   /// Check server for app updates
@@ -163,12 +163,15 @@ class UpdateService {
                     onPressed: () async {
                       Navigator.pop(ctx);
                       final uri = Uri.parse(downloadUrl);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      } else {
+                      try {
+                        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        if (!launched) {
+                          await launchUrl(uri, mode: LaunchMode.platformDefault);
+                        }
+                      } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Gagal membuka link unduhan.'), backgroundColor: Colors.red),
+                            SnackBar(content: Text('Gagal membuka browser: $e. Silakan download manual via link.'), backgroundColor: Colors.red),
                           );
                         }
                       }
