@@ -23,12 +23,22 @@ class PurchaseController extends Controller
      */
     public function index(Request $request)
     {
+        $user     = auth()->user();
+        $outletId = $user?->isAdmin() ? null : $user?->outlet_id;
+
+        // Admin can filter by outlet
+        if ($user?->isAdmin() && $request->has('outlet_id')) {
+            $outletId = $request->input('outlet_id') ?: null;
+        }
+
         $suppliers = Supplier::orderBy('name')->get();
-        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
-        $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
+        $products  = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        $accounts  = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
 
         $perPage = $request->input('per_page', 15);
-        $query = Purchase::with(['supplier', 'items.product']);
+        $query   = Purchase::with(['supplier', 'items.product', 'outlet'])
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId));
+
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%$search%")
@@ -38,26 +48,36 @@ class PurchaseController extends Controller
 
         $history = ($perPage === 'all')
             ? $query->orderByDesc('created_at')->paginate(10000)->withQueryString()
-            : $query->orderByDesc('created_at')->paginate((int)$perPage)->withQueryString();
+            : $query->orderByDesc('created_at')->paginate((int) $perPage)->withQueryString();
 
-        return view('purchase.index', compact('suppliers', 'products', 'accounts', 'history'));
+        $outlets = $user?->isAdmin()
+            ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get()
+            : collect();
+
+        return view('purchase.index', compact('suppliers', 'products', 'accounts', 'history', 'outlets', 'outletId'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'date' => 'required|date',
-            'supplier_id' => 'required|exists:suppliers,id',
-            'payment_method' => 'required|string',
-            'account_id' => 'nullable|exists:accounts,id',
-            'paid_amount' => 'nullable|numeric|min:0',
-            'discount' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.qty' => 'required|numeric|min:0.01',
-            'items.*.buy_price' => 'required|numeric|min:0',
+            'date'                    => 'required|date',
+            'supplier_id'             => 'required|exists:suppliers,id',
+            'payment_method'          => 'required|string',
+            'account_id'              => 'nullable|exists:accounts,id',
+            'paid_amount'             => 'nullable|numeric|min:0',
+            'discount'                => 'nullable|numeric|min:0',
+            'notes'                   => 'nullable|string',
+            'items'                   => 'required|array|min:1',
+            'items.*.product_id'      => 'required|exists:products,id',
+            'items.*.qty'             => 'required|numeric|min:0.01',
+            'items.*.buy_price'       => 'required|numeric|min:0',
         ]);
+
+        // Resolve outlet: non-admin always uses their own outlet
+        $user = auth()->user();
+        $data['outlet_id'] = ($user && !$user->isAdmin())
+            ? $user->outlet_id
+            : ($request->input('outlet_id') ?? $user?->outlet_id);
 
         $this->posService->processPurchase($data);
 

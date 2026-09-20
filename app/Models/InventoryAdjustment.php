@@ -9,6 +9,8 @@ class InventoryAdjustment extends Model
 {
     protected $fillable = [
         'adjustment_number',
+        'outlet_id',
+        'user_id',
         'type',
         'date',
         'product_id',
@@ -34,5 +36,15 @@ class InventoryAdjustment extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

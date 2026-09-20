@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Purchase extends Model
 {
     protected $fillable = [
+        'outlet_id',
+        'user_id',
         'invoice_number',
         'date',
         'supplier_id',
@@ -35,6 +37,16 @@ class Purchase extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function account(): BelongsTo

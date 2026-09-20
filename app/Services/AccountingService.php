@@ -115,11 +115,12 @@ class AccountingService
         $hppAcc = Account::where('code', '5-1000')->first(); // HPP PENJUALAN
         $inventoryAcc = Account::where('code', '1-2010')->first(); // PERSEDIAAN BARANG
 
-        // 1. Cash received
-        if ($sale->paid_amount > 0 && $cashAcc) {
+        // 1. Cash received (capped at sale total; any excess paid is change given back to customer)
+        $cashReceived = min((float) $sale->paid_amount, (float) $sale->total);
+        if ($cashReceived > 0 && $cashAcc) {
             $lines[] = [
                 'account_id' => $cashAcc->id,
-                'debit' => $sale->paid_amount,
+                'debit' => $cashReceived,
                 'credit' => 0,
                 'memo' => "Penerimaan kas penjualan {$sale->invoice_number}",
             ];

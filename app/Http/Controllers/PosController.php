@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Customer;
+use App\Models\Outlet;
 use App\Models\Product;
+use App\Models\ProductStock;
 use App\Models\Sale;
 use App\Services\PosTransactionService;
 use Exception;
@@ -22,8 +24,18 @@ class PosController extends Controller
      */
     public function retail()
     {
-        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
-        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        $user     = auth()->user();
+        $outletId = $user?->outlet_id;
+
+        // Products with stock > 0 in this outlet (all shown for admin)
+        $products = $this->getProductsForOutlet($outletId);
+
+        // Customers scoped to this outlet
+        $customers = Customer::where('status', 'Aktif')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+            ->orderBy('name')
+            ->get();
+
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->orderBy('code')->get();
         $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
             ->where('type', 'D')
@@ -31,6 +43,7 @@ class PosController extends Controller
             ->get();
 
         $recentSales = Sale::where('sale_type', 'retail')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with(['customer', 'items.product'])
             ->orderByDesc('created_at')
             ->limit(15)
@@ -44,8 +57,16 @@ class PosController extends Controller
      */
     public function wholesale()
     {
-        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
-        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        $user     = auth()->user();
+        $outletId = $user?->outlet_id;
+
+        $products  = $this->getProductsForOutlet($outletId);
+
+        $customers = Customer::where('status', 'Aktif')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+            ->orderBy('name')
+            ->get();
+
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
         $expenseAccounts = Account::whereIn('group', ['BIAYA', 'BIAYA LAIN', 'KEWAJIBAN'])
             ->where('type', 'D')
@@ -53,12 +74,40 @@ class PosController extends Controller
             ->get();
 
         $recentSales = Sale::where('sale_type', 'grosir')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with(['customer', 'items.product'])
             ->orderByDesc('created_at')
             ->limit(15)
             ->get();
 
         return view('pos.wholesale', compact('products', 'customers', 'accounts', 'expenseAccounts', 'recentSales'));
+    }
+
+    /**
+     * Load products for the POS screen.
+     * Each product gets an `outlet_stock` attribute = stock in this outlet.
+     * Products are sorted: in-stock first, then by name.
+     */
+    private function getProductsForOutlet(?int $outletId): \Illuminate\Database\Eloquent\Collection
+    {
+        $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->pluck('stock', 'product_id');
+
+            $products->each(function ($p) use ($outletStocks) {
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+            });
+
+            // Sort: in-stock first
+            $products = $products->sortByDesc('outlet_stock')->values();
+        } else {
+            $products->each(fn($p) => $p->outlet_stock = (float) $p->stock);
+        }
+
+        return $products;
     }
 
     /**

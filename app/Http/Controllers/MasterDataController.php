@@ -6,17 +6,42 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\DigitalProduct;
 use App\Models\Product;
+use App\Models\ProductStock;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class MasterDataController extends Controller
 {
-    /**
-     * Daftar Item (Physical Products)
-     */
+    // ----------------------------------------------------------------
+    // Helper: resolve outlet scope for the current user
+    // ----------------------------------------------------------------
+
+    /** Returns the outlet_id to scope data by (null = admin sees all). */
+    private function scopedOutletId(): ?int
+    {
+        $user = auth()->user();
+        // Admin & super-admin see all outlets unless they filter
+        if ($user && $user->isAdmin()) {
+            return null;
+        }
+        return $user?->outlet_id;
+    }
+
+    // ================================================================
+    // Items (Physical Products)
+    // ================================================================
+
     public function items(Request $request)
     {
+        $user     = auth()->user();
+        $outletId = $request->input('outlet_id', $user?->outlet_id);
+
+        // Non-admin always uses their own outlet
+        if ($user && !$user->isAdmin()) {
+            $outletId = $user->outlet_id;
+        }
+
         $query = Product::query();
 
         if ($search = $request->input('search')) {
@@ -35,34 +60,55 @@ class MasterDataController extends Controller
         }
 
         $perPage = $request->input('per_page', 25);
-        $items = ($perPage === 'all')
+        $items   = ($perPage === 'all')
             ? $query->orderBy('name')->paginate(10000)->withQueryString()
-            : $query->orderBy('name')->paginate((int)$perPage)->withQueryString();
+            : $query->orderBy('name')->paginate((int) $perPage)->withQueryString();
 
-        $totalStockValue = Product::all()->sum(fn($p) => (float)$p->stock * (float)$p->hpp);
+        // Attach per-outlet stock to each product in this page
+        if ($outletId) {
+            $productIds   = $items->pluck('id');
+            $outletStocks = ProductStock::where('outlet_id', $outletId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('stock', 'product_id');
 
-        $types = Category::where('type', 'physical_type')->pluck('name');
-        $brands = Category::where('type', 'physical_brand')->pluck('name');
-        $allPhysicalCategories = Category::whereIn('type', ['physical_type', 'physical_brand'])->orderBy('type')->orderBy('name')->get();
+            $items->each(function ($product) use ($outletStocks) {
+                $product->outlet_stock = (float) ($outletStocks[$product->id] ?? 0);
+            });
 
-        return view('master.items', compact('items', 'totalStockValue', 'types', 'brands', 'allPhysicalCategories'));
+            // Total stock value for this outlet
+            $totalStockValue = ProductStock::where('outlet_id', $outletId)
+                ->join('products', 'products.id', '=', 'product_stocks.product_id')
+                ->selectRaw('SUM(product_stocks.stock * products.hpp) as val')
+                ->value('val') ?? 0;
+        } else {
+            // Admin without outlet filter: use global products.stock
+            $items->each(fn($p) => $p->outlet_stock = (float) $p->stock);
+            $totalStockValue = Product::all()->sum(fn($p) => (float) $p->stock * (float) $p->hpp);
+        }
+
+        $types                 = Category::where('type', 'physical_type')->pluck('name');
+        $brands                = Category::where('type', 'physical_brand')->pluck('name');
+        $allPhysicalCategories = Category::whereIn('type', ['physical_type', 'physical_brand'])
+            ->orderBy('type')->orderBy('name')->get();
+
+        return view('master.items', compact('items', 'totalStockValue', 'types', 'brands', 'allPhysicalCategories', 'outletId'));
     }
 
     public function storeItem(Request $request)
     {
         $data = $request->validate([
-            'item_code' => 'required|string|unique:products,item_code',
-            'name' => 'required|string',
-            'type' => 'required|string',
-            'new_type' => 'nullable|string',
-            'brand' => 'nullable|string',
-            'new_brand' => 'nullable|string',
-            'stock' => 'required|numeric|min:0',
-            'min_stock' => 'nullable|integer|min:0',
-            'hpp' => 'required|numeric|min:0',
-            'retail_price' => 'required|numeric|min:0',
+            'item_code'       => 'required|string|unique:products,item_code',
+            'name'            => 'required|string',
+            'type'            => 'required|string',
+            'new_type'        => 'nullable|string',
+            'brand'           => 'nullable|string',
+            'new_brand'       => 'nullable|string',
+            'stock'           => 'required|numeric|min:0',
+            'min_stock'       => 'nullable|integer|min:0',
+            'hpp'             => 'required|numeric|min:0',
+            'retail_price'    => 'required|numeric|min:0',
             'wholesale_price' => 'nullable|numeric|min:0',
-            'status' => 'required|string',
+            'status'          => 'required|string',
         ]);
 
         if ($data['type'] === '__NEW__' && !empty($data['new_type'])) {
@@ -81,16 +127,35 @@ class MasterDataController extends Controller
             $data['wholesale_price'] = $data['retail_price'];
         }
 
-        // Server-side: Toko/FL tidak bisa mengubah harga — abaikan nilai harga dari form
         $user = auth()->user();
         if ($user && $user->isToko()) {
-            // Toko tidak bisa buat item baru — set harga ke 0, perlu diisi oleh Admin
-            $data['hpp'] = 0;
-            $data['retail_price'] = 0;
+            $data['hpp']             = 0;
+            $data['retail_price']    = 0;
             $data['wholesale_price'] = 0;
         }
 
-        Product::create($data);
+        $initialStock = (float) $data['stock'];
+        // products.stock will be updated via per-outlet sync; start at 0 globally
+        // and immediately seed the per-outlet record below.
+        $data['stock'] = 0;
+
+        $product = Product::create($data);
+
+        // Seed per-outlet stock for the user's outlet (or default outlet)
+        $outletId = $user?->outlet_id
+            ?? \App\Models\Outlet::where('status', 'active')->value('id');
+
+        if ($outletId) {
+            ProductStock::updateOrCreate(
+                ['product_id' => $product->id, 'outlet_id' => $outletId],
+                ['stock' => $initialStock, 'min_stock' => $data['min_stock'] ?? 0]
+            );
+            // Sync global total
+            $product->syncTotalStock();
+        } else {
+            // No outlet configured; fall back to global stock
+            $product->update(['stock' => $initialStock]);
+        }
 
         return redirect()->route('master.items')->with('success', 'Item berhasil ditambahkan!');
     }
@@ -98,18 +163,18 @@ class MasterDataController extends Controller
     public function updateItem(Request $request, Product $product)
     {
         $data = $request->validate([
-            'item_code' => ['required', 'string', Rule::unique('products', 'item_code')->ignore($product->id)],
-            'name' => 'required|string',
-            'type' => 'required|string',
-            'new_type' => 'nullable|string',
-            'brand' => 'nullable|string',
-            'new_brand' => 'nullable|string',
-            'stock' => 'required|numeric|min:0',
-            'min_stock' => 'nullable|integer|min:0',
-            'hpp' => 'required|numeric|min:0',
-            'retail_price' => 'required|numeric|min:0',
+            'item_code'       => ['required', 'string', Rule::unique('products', 'item_code')->ignore($product->id)],
+            'name'            => 'required|string',
+            'type'            => 'required|string',
+            'new_type'        => 'nullable|string',
+            'brand'           => 'nullable|string',
+            'new_brand'       => 'nullable|string',
+            'stock'           => 'required|numeric|min:0',
+            'min_stock'       => 'nullable|integer|min:0',
+            'hpp'             => 'required|numeric|min:0',
+            'retail_price'    => 'required|numeric|min:0',
             'wholesale_price' => 'nullable|numeric|min:0',
-            'status' => 'required|string',
+            'status'          => 'required|string',
         ]);
 
         if ($data['type'] === '__NEW__' && !empty($data['new_type'])) {
@@ -128,16 +193,33 @@ class MasterDataController extends Controller
             $data['wholesale_price'] = $data['retail_price'];
         }
 
-        // Hak akses edit stok: Jika role toko atau tidak memiliki permission edit_stock, abaikan perubahan angka stok fisik
-        $user = auth()->user();
-        if ($user && (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko()))) {
-            $data['stock'] = $product->stock;
-        }
+        $user     = auth()->user();
+        $outletId = $user?->outlet_id;
 
-        // Hak akses edit harga: Toko/FL tidak bisa mengubah HPP dan harga jual
+        // ------------ Stock editing ------------
+        // Super-admin / users with edit_stock can directly change outlet stock.
+        // Others: stock field is ignored.
+        if ($user && ($user->isSuperAdmin() || ($user->hasPermission('edit_stock') && !$user->isToko()))) {
+            if ($outletId) {
+                // Update per-outlet stock for this user's outlet
+                ProductStock::updateOrCreate(
+                    ['product_id' => $product->id, 'outlet_id' => $outletId],
+                    ['stock' => (float) $data['stock'], 'min_stock' => (int) ($data['min_stock'] ?? 0)]
+                );
+                // Sync global total
+                $product->syncTotalStock();
+            } else {
+                // Admin without outlet: legacy update global stock directly
+                // (edge case; shouldn't normally happen)
+            }
+        }
+        // Remove stock from update payload (managed via product_stocks)
+        unset($data['stock'], $data['min_stock']);
+
+        // ------------ Price editing ------------
         if ($user && $user->isToko()) {
-            $data['hpp'] = $product->hpp;
-            $data['retail_price'] = $product->retail_price;
+            $data['hpp']             = $product->hpp;
+            $data['retail_price']    = $product->retail_price;
             $data['wholesale_price'] = $product->wholesale_price;
         }
 
@@ -153,13 +235,14 @@ class MasterDataController extends Controller
             return back()->with('error', "Item [{$name}] tidak dapat dihapus karena sudah memiliki riwayat transaksi! Ubah status menjadi 'Tidak Dijual' jika ingin menonaktifkan.");
         }
 
-        $product->delete();
+        $product->delete(); // product_stocks will cascade-delete
         return redirect()->route('master.items')->with('success', "Item [{$name}] berhasil dihapus!");
     }
 
-    /**
-     * Produk Multi (Digital Products)
-     */
+    // ================================================================
+    // Multi Products (Digital)
+    // ================================================================
+
     public function multiProducts(Request $request)
     {
         $query = DigitalProduct::query();
@@ -179,14 +262,15 @@ class MasterDataController extends Controller
             $query->where('category', $category);
         }
 
-        $perPage = $request->input('per_page', 25);
+        $perPage  = $request->input('per_page', 25);
         $products = ($perPage === 'all')
             ? $query->orderBy('trx_type')->orderBy('name')->paginate(10000)->withQueryString()
-            : $query->orderBy('trx_type')->orderBy('name')->paginate((int)$perPage)->withQueryString();
+            : $query->orderBy('trx_type')->orderBy('name')->paginate((int) $perPage)->withQueryString();
 
-        $trxTypes = Category::where('type', 'digital_type')->pluck('name');
-        $categories = Category::where('type', 'digital_category')->pluck('name');
-        $allDigitalCategories = Category::whereIn('type', ['digital_type', 'digital_category'])->orderBy('type')->orderBy('name')->get();
+        $trxTypes            = Category::where('type', 'digital_type')->pluck('name');
+        $categories          = Category::where('type', 'digital_category')->pluck('name');
+        $allDigitalCategories = Category::whereIn('type', ['digital_type', 'digital_category'])
+            ->orderBy('type')->orderBy('name')->get();
 
         return view('master.multi', compact('products', 'trxTypes', 'categories', 'allDigitalCategories'));
     }
@@ -194,15 +278,15 @@ class MasterDataController extends Controller
     public function storeMultiProduct(Request $request)
     {
         $data = $request->validate([
-            'product_code' => 'required|string|unique:digital_products,product_code',
-            'name' => 'required|string',
-            'trx_type' => 'required|string',
-            'new_trx_type' => 'nullable|string',
-            'category' => 'required|string',
-            'new_category' => 'nullable|string',
-            'hpp' => 'required|numeric|min:0',
-            'selling_price' => 'required|numeric|min:0',
-            'status' => 'required|string',
+            'product_code'   => 'required|string|unique:digital_products,product_code',
+            'name'           => 'required|string',
+            'trx_type'       => 'required|string',
+            'new_trx_type'   => 'nullable|string',
+            'category'       => 'required|string',
+            'new_category'   => 'nullable|string',
+            'hpp'            => 'required|numeric|min:0',
+            'selling_price'  => 'required|numeric|min:0',
+            'status'         => 'required|string',
         ]);
 
         if ($data['trx_type'] === '__NEW__' && !empty($data['new_trx_type'])) {
@@ -225,15 +309,15 @@ class MasterDataController extends Controller
     public function updateMultiProduct(Request $request, DigitalProduct $digitalProduct)
     {
         $data = $request->validate([
-            'product_code' => ['required', 'string', Rule::unique('digital_products', 'product_code')->ignore($digitalProduct->id)],
-            'name' => 'required|string',
-            'trx_type' => 'required|string',
-            'new_trx_type' => 'nullable|string',
-            'category' => 'required|string',
-            'new_category' => 'nullable|string',
-            'hpp' => 'required|numeric|min:0',
+            'product_code'  => ['required', 'string', Rule::unique('digital_products', 'product_code')->ignore($digitalProduct->id)],
+            'name'          => 'required|string',
+            'trx_type'      => 'required|string',
+            'new_trx_type'  => 'nullable|string',
+            'category'      => 'required|string',
+            'new_category'  => 'nullable|string',
+            'hpp'           => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
-            'status' => 'required|string',
+            'status'        => 'required|string',
         ]);
 
         if ($data['trx_type'] === '__NEW__' && !empty($data['new_trx_type'])) {
@@ -264,9 +348,10 @@ class MasterDataController extends Controller
         return redirect()->route('master.multi')->with('success', "Produk Multi [{$name}] berhasil dihapus!");
     }
 
-    /**
-     * Store new category/type
-     */
+    // ================================================================
+    // Categories
+    // ================================================================
+
     public function storeCategory(Request $request)
     {
         $data = $request->validate([
@@ -280,9 +365,6 @@ class MasterDataController extends Controller
         return back()->with('success', "Kategori / Jenis [{$name}] berhasil ditambahkan!");
     }
 
-    /**
-     * Update category/type
-     */
     public function updateCategory(Request $request, Category $category)
     {
         $data = $request->validate([
@@ -292,7 +374,6 @@ class MasterDataController extends Controller
         $oldName = $category->name;
         $newName = strtoupper(trim($data['name']));
 
-        // Update referencing products
         if ($category->type === 'physical_type') {
             Product::where('type', $oldName)->update(['type' => $newName]);
         } elseif ($category->type === 'physical_brand') {
@@ -308,9 +389,6 @@ class MasterDataController extends Controller
         return back()->with('success', "Kategori / Jenis [{$oldName}] berhasil diperbarui menjadi [{$newName}]!");
     }
 
-    /**
-     * Delete category/type
-     */
     public function destroyCategory(Category $category)
     {
         $name = $category->name;
@@ -318,13 +396,15 @@ class MasterDataController extends Controller
         return back()->with('success', "Kategori / Jenis [{$name}] berhasil dihapus!");
     }
 
-    /**
-     * Suppliers
-     */
+    // ================================================================
+    // Suppliers (global list; purchases are per-outlet)
+    // ================================================================
+
     public function suppliers(Request $request)
     {
         $perPage = $request->input('per_page', 25);
-        $query = Supplier::withCount('purchases');
+        $query   = Supplier::withCount('purchases');
+
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%$search%")
@@ -332,9 +412,10 @@ class MasterDataController extends Controller
                   ->orWhere('bank_name', 'like', "%$search%");
             });
         }
+
         $suppliers = ($perPage === 'all')
             ? $query->orderBy('name')->paginate(10000)->withQueryString()
-            : $query->orderBy('name')->paginate((int)$perPage)->withQueryString();
+            : $query->orderBy('name')->paginate((int) $perPage)->withQueryString();
 
         return view('master.suppliers', compact('suppliers'));
     }
@@ -342,13 +423,13 @@ class MasterDataController extends Controller
     public function storeSupplier(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
-            'bank_name' => 'nullable|string',
+            'name'           => 'required|string',
+            'phone'          => 'nullable|string',
+            'address'        => 'nullable|string',
+            'bank_name'      => 'nullable|string',
             'account_number' => 'nullable|string',
-            'account_name' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'account_name'   => 'nullable|string',
+            'notes'          => 'nullable|string',
         ]);
 
         Supplier::create($data);
@@ -358,13 +439,13 @@ class MasterDataController extends Controller
     public function updateSupplier(Request $request, Supplier $supplier)
     {
         $data = $request->validate([
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
-            'address' => 'nullable|string',
-            'bank_name' => 'nullable|string',
+            'name'           => 'required|string',
+            'phone'          => 'nullable|string',
+            'address'        => 'nullable|string',
+            'bank_name'      => 'nullable|string',
             'account_number' => 'nullable|string',
-            'account_name' => 'nullable|string',
-            'notes' => 'nullable|string',
+            'account_name'   => 'nullable|string',
+            'notes'          => 'nullable|string',
         ]);
 
         $supplier->update($data);
@@ -382,13 +463,27 @@ class MasterDataController extends Controller
         return redirect()->route('master.suppliers')->with('success', "Supplier [{$name}] berhasil dihapus!");
     }
 
-    /**
-     * Customers
-     */
+    // ================================================================
+    // Customers (per-outlet)
+    // ================================================================
+
     public function customers(Request $request)
     {
+        $user     = auth()->user();
+        $outletId = $this->scopedOutletId();
+
+        // Admin can filter by outlet
+        if ($user?->isAdmin() && $request->has('outlet_id')) {
+            $outletId = $request->input('outlet_id') ?: null;
+        }
+
         $perPage = $request->input('per_page', 25);
-        $query = Customer::withCount('sales');
+        $query   = Customer::withCount('sales');
+
+        if ($outletId) {
+            $query->where('outlet_id', $outletId);
+        }
+
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%$search%")
@@ -396,22 +491,30 @@ class MasterDataController extends Controller
                   ->orWhere('address', 'like', "%$search%");
             });
         }
+
         $customers = ($perPage === 'all')
             ? $query->orderBy('name')->paginate(10000)->withQueryString()
-            : $query->orderBy('name')->paginate((int)$perPage)->withQueryString();
+            : $query->orderBy('name')->paginate((int) $perPage)->withQueryString();
 
-        return view('master.customers', compact('customers'));
+        $outlets = $user?->isAdmin()
+            ? \App\Models\Outlet::where('status', 'active')->orderBy('name')->get()
+            : collect();
+
+        return view('master.customers', compact('customers', 'outlets', 'outletId'));
     }
 
     public function storeCustomer(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
+            'name'    => 'required|string',
+            'phone'   => 'nullable|string',
             'address' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'status' => 'required|string',
+            'notes'   => 'nullable|string',
+            'status'  => 'required|string',
         ]);
+
+        $user = auth()->user();
+        $data['outlet_id'] = $request->input('outlet_id') ?? $user?->outlet_id;
 
         Customer::create($data);
         return redirect()->route('master.customers')->with('success', 'Pelanggan berhasil ditambahkan!');
@@ -420,11 +523,11 @@ class MasterDataController extends Controller
     public function updateCustomer(Request $request, Customer $customer)
     {
         $data = $request->validate([
-            'name' => 'required|string',
-            'phone' => 'nullable|string',
+            'name'    => 'required|string',
+            'phone'   => 'nullable|string',
             'address' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'status' => 'required|string',
+            'notes'   => 'nullable|string',
+            'status'  => 'required|string',
         ]);
 
         $customer->update($data);
@@ -435,7 +538,7 @@ class MasterDataController extends Controller
     {
         $name = $customer->name;
         if (strtoupper($name) === 'UMUM') {
-            return back()->with('error', "Pelanggan default sistem [UMUM] tidak dapat dihapus!");
+            return back()->with('error', 'Pelanggan default sistem [UMUM] tidak dapat dihapus!');
         }
         if ($customer->sales()->exists()) {
             return back()->with('error', "Pelanggan [{$name}] tidak dapat dihapus karena memiliki riwayat transaksi penjualan!");

@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
     protected $fillable = [
+        'outlet_id',
         'name',
         'phone',
         'address',
@@ -35,6 +37,11 @@ class Customer extends Model
                 return $value;
             }
         );
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
     }
 
     public function sales(): HasMany

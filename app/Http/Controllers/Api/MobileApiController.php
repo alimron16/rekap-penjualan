@@ -15,6 +15,7 @@ use App\Models\InventoryAdjustment;
 use App\Models\MonthlyTarget;
 use App\Models\Outlet;
 use App\Models\Product;
+use App\Models\ProductStock;
 use App\Models\Purchase;
 use App\Models\ReceivablePayment;
 use App\Models\Sale;
@@ -130,8 +131,19 @@ class MobileApiController extends Controller
             $pl = $this->reportService->getProfitAndLoss($startDate, $endDate, $outletId ? (int)$outletId : null);
 
             // Core KPI Cards (fast pure SQL aggregates)
-            $totalPersediaan = (float) DB::table('products')->selectRaw('COALESCE(SUM(stock * hpp), 0) as val')->value('val');
-            $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')->sum('remaining_debt');
+            if ($outletId) {
+                $totalPersediaan = (float) DB::table('product_stocks')
+                    ->join('products', 'products.id', '=', 'product_stocks.product_id')
+                    ->where('product_stocks.outlet_id', $outletId)
+                    ->selectRaw('COALESCE(SUM(product_stocks.stock * products.hpp), 0) as val')
+                    ->value('val');
+                $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')
+                    ->where('outlet_id', $outletId)
+                    ->sum('remaining_debt');
+            } else {
+                $totalPersediaan = (float) DB::table('products')->selectRaw('COALESCE(SUM(stock * hpp), 0) as val')->value('val');
+                $totalHutang = (float) Purchase::where('status', 'BELUM LUNAS')->sum('remaining_debt');
+            }
             $totalPiutang = (float) Sale::when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->where('status', 'BELUM LUNAS')
                 ->sum('remaining_receivable');
@@ -314,7 +326,30 @@ class MobileApiController extends Controller
             $query->where('brand', $brand);
         }
 
+        $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($user && !$user->isSuperAdmin()) {
+            $outletId = $user->outlet_id;
+        }
+
         $products = $query->orderBy('name')->get();
+
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->pluck('stock', 'product_id');
+
+            $products->each(function ($p) use ($outletStocks) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+                $p->stock = $p->outlet_stock;
+            });
+        } else {
+            $products->each(function ($p) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) $p->stock;
+            });
+        }
+
         $categories = Category::whereIn('type', ['physical_type', 'physical_brand'])->orderBy('type')->orderBy('name')->get();
         $types = Category::where('type', 'physical_type')->pluck('name');
         $brands = Category::where('type', 'physical_brand')->pluck('name');
@@ -365,7 +400,20 @@ class MobileApiController extends Controller
             Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
         }
 
+        $initialStock = (float) ($data['stock'] ?? 0);
+        $data['stock'] = 0; // Set to 0 initially, updated via product_stocks and synced
+
         $product = Product::create($data);
+
+        $outletId = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::first()?->id;
+        if ($outletId) {
+            ProductStock::updateOrCreate(
+                ['product_id' => $product->id, 'outlet_id' => $outletId],
+                ['stock' => $initialStock, 'min_stock' => $data['min_stock'] ?? 5]
+            );
+        }
+        $product->syncTotalStock();
+
         return response()->json(['success' => true, 'message' => 'Produk berhasil ditambahkan!', 'data' => $product]);
     }
 
@@ -400,9 +448,18 @@ class MobileApiController extends Controller
             Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
         }
 
+        $outletId = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::first()?->id;
+        $newStock = isset($data['stock']) ? (float) $data['stock'] : null;
+
         // FL Toko cannot edit stock physical quantity unless granted permission
         if (!$user->isSuperAdmin() && (!$user->hasPermission('edit_stock') || $user->isToko())) {
-            $data['stock'] = $product->stock;
+            unset($data['stock']);
+        } elseif ($newStock !== null && $outletId) {
+            ProductStock::updateOrCreate(
+                ['product_id' => $product->id, 'outlet_id' => $outletId],
+                ['stock' => $newStock, 'min_stock' => $data['min_stock'] ?? 5]
+            );
+            unset($data['stock']);
         }
 
         // Server-side: Toko/FL tidak bisa mengubah harga
@@ -413,6 +470,7 @@ class MobileApiController extends Controller
         }
 
         $product->update($data);
+        $product->syncTotalStock();
         return response()->json(['success' => true, 'message' => "Item [{$product->name}] berhasil diperbarui!", 'data' => $product]);
     }
 
@@ -552,7 +610,20 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $customers = Customer::orderBy('name')->get();
+        $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($user && !$user->isSuperAdmin()) {
+            $outletId = $user->outlet_id;
+        }
+
+        $customers = Customer::when($outletId, function ($q) use ($outletId) {
+                $q->where(function ($sub) use ($outletId) {
+                    $sub->where('outlet_id', $outletId)
+                        ->orWhereNull('outlet_id');
+                });
+            })
+            ->orderBy('name')
+            ->get();
+
         return response()->json(['success' => true, 'data' => $customers]);
     }
 
@@ -569,7 +640,10 @@ class MobileApiController extends Controller
             'account_number' => 'nullable|string',
             'notes' => 'nullable|string',
             'status' => 'required|string|in:Aktif,Nonaktif',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
+
+        $data['outlet_id'] = $user->outlet_id ?? $data['outlet_id'] ?? Outlet::first()?->id;
 
         $customer = Customer::create($data);
         return response()->json(['success' => true, 'message' => 'Pelanggan berhasil disimpan!', 'data' => $customer]);
@@ -589,7 +663,12 @@ class MobileApiController extends Controller
             'account_number' => 'nullable|string',
             'notes' => 'nullable|string',
             'status' => 'required|string|in:Aktif,Nonaktif',
+            'outlet_id' => 'nullable|exists:outlets,id',
         ]);
+
+        if (!$customer->outlet_id && $user->outlet_id) {
+            $data['outlet_id'] = $user->outlet_id;
+        }
 
         $customer->update($data);
         return response()->json(['success' => true, 'message' => "Pelanggan [{$customer->name}] berhasil diperbarui!", 'data' => $customer]);
@@ -773,8 +852,30 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $outletId = $user->outlet_id ?? $request->query('outlet_id');
+
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
-        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)
+                ->whereIn('product_id', $products->pluck('id'))
+                ->pluck('stock', 'product_id');
+
+            $products->each(function ($p) use ($outletStocks) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+                $p->stock = $p->outlet_stock;
+            });
+        }
+
+        $customers = Customer::where('status', 'Aktif')
+            ->when($outletId && !$user->isSuperAdmin(), function ($q) use ($outletId) {
+                $q->where(function ($sub) use ($outletId) {
+                    $sub->where('outlet_id', $outletId)
+                        ->orWhereNull('outlet_id');
+                });
+            })
+            ->orderBy('name')
+            ->get();
         $cashAndBankAccounts = Account::where('group', 'AKTIVA')
             ->where('type', 'D')
             ->where(function ($q) {
@@ -1006,7 +1107,12 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $unpaidSales = Sale::where('status', 'BELUM LUNAS')->with('customer')->orderByDesc('date')->get();
+        $outletId = $user->outlet_id;
+        $unpaidSales = Sale::where('status', 'BELUM LUNAS')
+            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->with('customer')
+            ->orderByDesc('date')
+            ->get();
         $payments = ReceivablePayment::with(['customer', 'account'])->latest()->take(30)->get();
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
 
@@ -1045,10 +1151,31 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $returns = SaleReturn::with(['sale', 'customer', 'product', 'account'])->latest()->take(30)->get();
+        $outletId = $user->outlet_id;
+        $returns = SaleReturn::with(['sale', 'customer', 'product', 'account'])
+            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->whereHas('sale', fn($sq) => $sq->where('outlet_id', $outletId)))
+            ->latest()
+            ->take(30)
+            ->get();
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)->whereIn('product_id', $products->pluck('id'))->pluck('stock', 'product_id');
+            $products->each(function ($p) use ($outletStocks) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+                $p->stock = $p->outlet_stock;
+            });
+        }
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
-        $customers = Customer::where('status', 'Aktif')->orderBy('name')->get();
+        $customers = Customer::where('status', 'Aktif')
+            ->when($outletId && !$user->isSuperAdmin(), function ($q) use ($outletId) {
+                $q->where(function ($sub) use ($outletId) {
+                    $sub->where('outlet_id', $outletId)
+                        ->orWhereNull('outlet_id');
+                });
+            })
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -1076,6 +1203,8 @@ class MobileApiController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            $data['user_id'] = $user->id;
             $this->posService->processSaleReturn($data);
             return response()->json(['success' => true, 'message' => 'Retur penjualan berhasil dicatat!']);
         } catch (Exception $e) {
@@ -1092,11 +1221,27 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $purchases = Purchase::with(['supplier', 'items.product'])->latest()->take(30)->get();
+        $outletId = $user->outlet_id;
+        $purchases = Purchase::with(['supplier', 'items.product', 'outlet'])
+            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->latest()
+            ->take(30)
+            ->get();
         $suppliers = Supplier::orderBy('name')->get();
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)->whereIn('product_id', $products->pluck('id'))->pluck('stock', 'product_id');
+            $products->each(function ($p) use ($outletStocks) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+                $p->stock = $p->outlet_stock;
+            });
+        }
         $accounts = Account::where('group', 'AKTIVA')->whereIn('type', ['D'])->get();
-        $debts = Purchase::where('status', 'BELUM LUNAS')->with('supplier')->get();
+        $debts = Purchase::where('status', 'BELUM LUNAS')
+            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->with('supplier')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -1128,6 +1273,8 @@ class MobileApiController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            $data['user_id'] = $user->id;
             $purchase = $this->posService->processPurchase($data);
             return response()->json(['success' => true, 'message' => 'Faktur pembelian berhasil disimpan!', 'data' => $purchase]);
         } catch (Exception $e) {
@@ -1166,8 +1313,21 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $adjustments = InventoryAdjustment::with('product')->latest()->take(50)->get();
+        $outletId = $user->outlet_id;
+        $adjustments = InventoryAdjustment::with(['product', 'outlet', 'user'])
+            ->when($outletId && !$user->isSuperAdmin(), fn($q) => $q->where('outlet_id', $outletId))
+            ->latest()
+            ->take(50)
+            ->get();
         $products = Product::where('status', 'Masih Dijual')->orderBy('name')->get();
+        if ($outletId) {
+            $outletStocks = ProductStock::where('outlet_id', $outletId)->whereIn('product_id', $products->pluck('id'))->pluck('stock', 'product_id');
+            $products->each(function ($p) use ($outletStocks) {
+                $p->global_stock = (float) $p->stock;
+                $p->outlet_stock = (float) ($outletStocks[$p->id] ?? 0);
+                $p->stock = $p->outlet_stock;
+            });
+        }
 
         return response()->json([
             'success' => true,
@@ -1190,6 +1350,8 @@ class MobileApiController extends Controller
         ]);
 
         try {
+            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            $data['user_id'] = $user->id;
             $this->posService->processInventoryAdjustment($data);
             return response()->json(['success' => true, 'message' => 'Penyesuaian stok berhasil disimpan!']);
         } catch (Exception $e) {
@@ -2352,6 +2514,9 @@ class MobileApiController extends Controller
         $startDate = $request->query('start_date', $date);
         $endDate = $request->query('end_date', $date);
 
+        $outletId = $user->outlet_id ?? $request->query('outlet_id');
+        $scopedOutlet = ($outletId && !$user->isSuperAdmin()) ? $outletId : $request->query('outlet_id');
+
         $applyDateFilter = function ($q) use ($startDate, $endDate) {
             if ($startDate && $endDate) {
                 $q->whereBetween('date', ["{$startDate} 00:00:00", "{$endDate} 23:59:59"]);
@@ -2365,6 +2530,7 @@ class MobileApiController extends Controller
         // 1. Tarik Tunai
         $withdrawals = CashTransaction::where('type', 'TRANSFER')
             ->where('notes', 'like', 'Tarik Tunai%')
+            ->when($scopedOutlet, fn($q) => $q->where('outlet_id', $scopedOutlet))
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
@@ -2385,6 +2551,7 @@ class MobileApiController extends Controller
 
         // 2. Barang Masuk (Pembelian & Opname IN)
         $purchases = Purchase::with(['supplier', 'items.product'])
+            ->when($scopedOutlet, fn($q) => $q->where('outlet_id', $scopedOutlet))
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
@@ -2406,6 +2573,7 @@ class MobileApiController extends Controller
 
         // 3. Barang Keluar (Penjualan Sales Items)
         $sales = Sale::with(['customer', 'items.product'])
+            ->when($scopedOutlet, fn($q) => $q->where('outlet_id', $scopedOutlet))
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
@@ -2427,6 +2595,7 @@ class MobileApiController extends Controller
 
         // 4. Retur Penjualan
         $returns = SaleReturn::with(['originalSale', 'customer', 'product', 'refundAccount'])
+            ->when($scopedOutlet, fn($q) => $q->whereHas('originalSale', fn($sq) => $sq->where('outlet_id', $scopedOutlet)))
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
@@ -2448,6 +2617,7 @@ class MobileApiController extends Controller
 
         // 5. Produk Multi (Pulsa, PLN, Paket Data)
         $digitalSales = DigitalSale::with(['digitalProduct', 'depositAccount', 'cashAccount'])
+            ->when($scopedOutlet, fn($q) => $q->where('outlet_id', $scopedOutlet))
             ->when($startDate || $endDate, $applyDateFilter)
             ->latest('date')
             ->take(100)
