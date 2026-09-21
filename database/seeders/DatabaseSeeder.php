@@ -9,16 +9,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            StoreSettingSeeder::class,
-            OutletSeeder::class,
-            AccountSeeder::class,
-            CategorySeeder::class,
-            SupplierCustomerSeeder::class,
-            ProductSeeder::class,
-            DigitalProductSeeder::class,
-            MonthlyTargetSeeder::class,
-            UserSeeder::class,
-            DemoDataSeeder::class,
+            StoreSettingSeeder::class,  // Pengaturan toko
+            OutletSeeder::class,        // Outlet/cabang
+            AccountSeeder::class,       // Chart of Accounts (COA) — JANGAN dihapus
+            CategorySeeder::class,      // Kategori produk
+            DigitalProductSeeder::class,// Produk multi/pulsa
+            UserSeeder::class,          // Hanya superadmin/owner
+            // DemoDataSeeder tidak dijalankan — data bersih
         ]);
     }
 }
