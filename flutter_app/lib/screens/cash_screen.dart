@@ -19,6 +19,8 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
   List<dynamic> _cashAccounts = [];
   List<dynamic> _expenseAccounts = [];
   List<dynamic> _incomeAccounts = [];
+  List<dynamic> _outlets = []; // untuk admin
+  int? _selectedOutletId; // outlet yang dipilih admin untuk filter
   bool _isLoading = true;
 
   final currencyFormatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
@@ -100,6 +102,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
         type: _currentType,
         startDate: s,
         endDate: e,
+        outletId: _selectedOutletId,
       );
       if (mounted) {
         setState(() {
@@ -108,6 +111,10 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
             _cashAccounts = res['cash_accounts'] ?? [];
             _expenseAccounts = res['expense_accounts'] ?? [];
             _incomeAccounts = res['income_accounts'] ?? [];
+            // Ambil daftar outlet hanya untuk admin
+            if (!_isKasir && res['outlets'] != null) {
+              _outlets = res['outlets'] ?? [];
+            }
           }
           _isLoading = false;
         });
@@ -194,6 +201,9 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
       oppositeId = defaultInc['id'];
     }
 
+    // Outlet yang akan dipakai (untuk admin: pakai _selectedOutletId atau outlet pertama)
+    int? modalOutletId = _isKasir ? null : (_selectedOutletId ?? (_outlets.isNotEmpty ? _outlets[0]['id'] as int : null));
+
     bool isSubmitting = false;
     final isOut = _currentType == 'out';
     final label = isOut ? 'Kas Keluar' : 'Kas Masuk';
@@ -236,6 +246,36 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
                       ],
                     ),
                     const Divider(height: 16),
+
+                    // Pilihan Toko untuk Admin
+                    if (!_isKasir && _outlets.isNotEmpty) ...[
+                      const Text('Pilih Toko *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<int>(
+                        value: modalOutletId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          filled: true,
+                          fillColor: Colors.blue.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.blue.shade300),
+                          ),
+                        ),
+                        items: _outlets.map<DropdownMenuItem<int>>((o) {
+                          return DropdownMenuItem<int>(
+                            value: o['id'] as int,
+                            child: Text(
+                              '${o['code'] ?? ''} - ${o['name'] ?? ''}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setModalState(() => modalOutletId = val),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
                     // Quick Chips for Kas Keluar
                     if (isOut) ...[
@@ -348,6 +388,14 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
                                   return;
                                 }
 
+                                // Validasi outlet untuk admin
+                                if (!_isKasir && _outlets.isNotEmpty && modalOutletId == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Pilih toko terlebih dahulu!'), backgroundColor: Colors.red),
+                                  );
+                                  return;
+                                }
+
                                 setModalState(() => isSubmitting = true);
 
                                 try {
@@ -357,6 +405,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
                                     oppositeAccountId: oppositeId ?? sourceId!,
                                     amount: amount,
                                     description: descController.text.trim(),
+                                    outletId: _isKasir ? null : modalOutletId,
                                   );
 
                                   if (res['success'] == true) {
@@ -372,7 +421,7 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
 
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('$label berhasil disimpan!'),
+                                        content: Text(res['message'] ?? '$label berhasil disimpan!'),
                                         backgroundColor: isOut ? Colors.orange.shade800 : ThemeConfig.primary,
                                       ),
                                     );
@@ -513,6 +562,46 @@ class _CashScreenState extends State<CashScreen> with SingleTickerProviderStateM
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Text('Reset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Filter Outlet untuk Admin
+                if (!_isKasir && _outlets.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    color: Colors.blue.shade50,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.store_outlined, size: 16, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Text('Toko:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButton<int?>(
+                            value: _selectedOutletId,
+                            isExpanded: true,
+                            isDense: true,
+                            underline: const SizedBox(),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                            hint: const Text('Semua Toko', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                            items: [
+                              const DropdownMenuItem<int?>(
+                                value: null,
+                                child: Text('Semua Toko', style: TextStyle(fontSize: 12)),
+                              ),
+                              ..._outlets.map<DropdownMenuItem<int?>>((o) {
+                                return DropdownMenuItem<int?>(
+                                  value: o['id'] as int,
+                                  child: Text('${o['name']}', style: const TextStyle(fontSize: 12)),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              setState(() => _selectedOutletId = val);
+                              _loadData();
+                            },
                           ),
                         ),
                       ],

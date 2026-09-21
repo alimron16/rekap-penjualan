@@ -654,11 +654,12 @@ class ApiService {
   }
 
   // --- Kas & Akuntansi ---
-  static Future<Map<String, dynamic>> getCashTransactions({String? type, String? startDate, String? endDate}) async {
+  static Future<Map<String, dynamic>> getCashTransactions({String? type, String? startDate, String? endDate, int? outletId}) async {
     final params = <String>[];
     if (type != null && type.isNotEmpty) params.add('type=$type');
     if (startDate != null && startDate.isNotEmpty) params.add('start_date=$startDate');
     if (endDate != null && endDate.isNotEmpty) params.add('end_date=$endDate');
+    if (outletId != null) params.add('outlet_id=$outletId');
     final q = params.isNotEmpty ? '?${params.join('&')}' : '';
     return await _get('$baseUrl/cash-transactions$q');
   }
@@ -669,6 +670,7 @@ class ApiService {
     required int oppositeAccountId,
     required double amount,
     required String description,
+    int? outletId,
   }) async {
     return await _post('$baseUrl/cash-transactions', {
       'type': type,
@@ -676,6 +678,7 @@ class ApiService {
       'opposite_account_id': oppositeAccountId,
       'amount': amount,
       'description': description,
+      if (outletId != null) 'outlet_id': outletId,
     });
   }
 

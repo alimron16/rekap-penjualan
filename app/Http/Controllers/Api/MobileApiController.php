@@ -1900,7 +1900,21 @@ class MobileApiController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
+        // Kasir/Toko hanya lihat transaksi outlet mereka sendiri
+        // Admin bisa filter per outlet via query param
+        $outletId = null;
+        if ($user->isToko()) {
+            $outletId = $user->outlet_id;
+        } elseif ($request->query('outlet_id')) {
+            $outletId = (int) $request->query('outlet_id');
+        }
+
         $query = CashTransaction::with(['debitAccount', 'creditAccount'])->latest('date');
+
+        // Filter per outlet jika kasir atau admin memilih outlet
+        if ($outletId) {
+            $query->where('outlet_id', $outletId);
+        }
 
         if (!empty($type) && in_array($type, ['IN', 'OUT', 'TRANSFER'])) {
             $query->where('type', $type);
@@ -1958,12 +1972,23 @@ class MobileApiController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'current_balance']);
 
+        // Daftar outlet untuk admin (agar bisa pilih outlet)
+        $outlets = [];
+        if (!$user->isToko()) {
+            $outlets = Outlet::where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code'])
+                ->toArray();
+        }
+
         return response()->json([
             'success' => true,
             'data' => $transactions,
             'expense_accounts' => $expenseAccounts,
             'income_accounts' => $incomeAccounts,
             'cash_accounts' => $cashAccounts,
+            'outlets' => $outlets,
+            'selected_outlet_id' => $outletId,
         ]);
     }
 
@@ -1979,6 +2004,7 @@ class MobileApiController extends Controller
             'amount' => 'required|numeric|min:1',
             'description' => 'required|string|max:255',
             'transaction_date' => 'nullable|date',
+            'outlet_id' => 'nullable|exists:outlets,id', // Admin bisa pilih outlet
         ]);
 
         $type = strtoupper($data['type']);
@@ -1987,6 +2013,17 @@ class MobileApiController extends Controller
                 'success' => false,
                 'message' => 'Kasir hanya diizinkan untuk mencatat Kas Keluar.',
             ], 403);
+        }
+
+        // Tentukan outlet:
+        // - Kasir/Toko: wajib pakai outlet mereka sendiri
+        // - Admin: bisa pilih via request, fallback ke outlet pertama aktif
+        if ($user->isToko()) {
+            $outletId = $user->outlet_id;
+        } else {
+            $outletId = $data['outlet_id']
+                ?? $user->outlet_id
+                ?? Outlet::where('status', 'active')->value('id');
         }
 
         $prefix = $type === 'IN' ? 'KM' : ($type === 'OUT' ? 'KK' : 'KT');
@@ -2003,7 +2040,7 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => $type,
                 'date' => $data['transaction_date'] ?? now(),
-                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'outlet_id' => $outletId,
                 'user_id' => $user->id,
                 'debit_account_id' => $debitAccountId,
                 'credit_account_id' => $creditAccountId,
@@ -2014,9 +2051,11 @@ class MobileApiController extends Controller
 
             $this->accountingService->recordCashTransaction($trx);
 
+            $outletName = $outletId ? (Outlet::find($outletId)?->name ?? '') : '';
+
             return response()->json([
                 'success' => true,
-                'message' => ($type === 'IN' ? 'Kas Masuk' : 'Kas Keluar') . ' berhasil dicatat!',
+                'message' => ($type === 'IN' ? 'Kas Masuk' : 'Kas Keluar') . ' berhasil dicatat!' . ($outletName ? " (Toko: $outletName)" : ''),
                 'data' => $trx,
             ]);
         } catch (Exception $e) {
@@ -2626,10 +2665,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.9',
-            'version_code' => 10,
-            'title' => 'Pembaruan Tersedia (v1.0.9)',
-            'release_notes' => "• Sinkronisasi & pemilihan toko tujuan pada Faktur Pembelian dan Penyesuaian Stok.\n• Pembatasan hak akses Kasir: Kas Masuk dinonaktifkan.\n• Retur Penjualan otomatis memotong kas & mengembalikan stok sesuai toko/cabang kasir terkait.\n• Peningkatan validasi transaksi dan performa aplikasi.",
+            'version' => '1.1.0',
+            'version_code' => 11,
+            'title' => 'Pembaruan Tersedia (v1.1.0)',
+            'release_notes' => "• [BARU] Admin bisa pilih toko saat input Kas Masuk / Kas Keluar.\n• [BARU] Filter per toko pada halaman Kas Masuk & Kas Keluar.\n• [FIX] Kasir/Toko kini bisa input Kas Keluar (uang makan, sampah, dll).\n• [FIX] Data kas keluar kasir tidak lagi tercampur antar toko.\n• Peningkatan stabilitas dan performa aplikasi.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
