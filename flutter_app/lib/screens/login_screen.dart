@@ -271,69 +271,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                           fontSize: 15,
                                           fontWeight: FontWeight.w700,
                                         ),
-                                      ),
+                                       ),
                               ),
-                            ),
-
-                            const SizedBox(height: 20),
-                            // Quick Demo Chips
-                            Row(
-                              children: [
-                                const Expanded(child: Divider()),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  child: Text(
-                                    'AKUN DEMO',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey.shade400,
-                                      letterSpacing: 1.1,
-                                    ),
-                                  ),
-                                ),
-                                const Expanded(child: Divider()),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _emailController.text = 'demo@elephantcell.com';
-                                        _passwordController.text = 'demo12345';
-                                      });
-                                    },
-                                    icon: const Text('👑', style: TextStyle(fontSize: 13)),
-                                    label: const Text('Admin Demo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      side: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _emailController.text = 'demo.kasir@elephantcell.com';
-                                        _passwordController.text = 'demo12345';
-                                      });
-                                    },
-                                    icon: const Text('🛒', style: TextStyle(fontSize: 13)),
-                                    label: const Text('Kasir Demo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      side: BorderSide(color: Colors.grey.shade300),
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),

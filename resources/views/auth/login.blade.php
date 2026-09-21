@@ -113,25 +113,6 @@
                 </button>
             </form>
 
-            <!-- Quick Demo Login Helpers -->
-            <div class="mt-6 pt-5 border-t border-slate-100">
-                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-center mb-2.5">Akun Demo (Klik untuk Isi Cepat)</p>
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="fillDemo('demo@elephantcell.com', 'demo12345')" class="p-2.5 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-left transition group cursor-pointer">
-                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-emerald-800">
-                            <span>👑</span> Admin Demo
-                        </div>
-                        <div class="text-[10px] text-slate-500 mt-0.5 font-mono truncate">demo@elephantcell.com</div>
-                    </button>
-                    <button type="button" onclick="fillDemo('demo.kasir@elephantcell.com', 'demo12345')" class="p-2.5 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-left transition group cursor-pointer">
-                        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-emerald-800">
-                            <span>🛒</span> Kasir Demo
-                        </div>
-                        <div class="text-[10px] text-slate-500 mt-0.5 font-mono truncate">demo.kasir@elephantcell.com</div>
-                    </button>
-                </div>
-            </div>
-
         </div>
 
         <div class="text-center mt-8 text-xs text-slate-400">
@@ -148,11 +129,6 @@
             } else {
                 pwdInput.type = 'password';
             }
-        }
-
-        function fillDemo(email, password) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
         }
     </script>
 </body>
