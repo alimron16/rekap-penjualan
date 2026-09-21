@@ -474,7 +474,9 @@ class MobileApiController extends Controller
             Category::firstOrCreate(['type' => 'physical_brand', 'name' => strtoupper(trim($data['brand']))]);
         }
 
-        $outletId = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::first()?->id;
+        $outletId = $user->isToko()
+            ? $user->outlet_id
+            : ($request->input('outlet_id') ?: ($user->outlet_id ?: Outlet::first()?->id));
         $newStock = isset($data['stock']) ? (float) $data['stock'] : null;
 
         // FL Toko cannot edit stock physical quantity unless granted permission
@@ -1447,10 +1449,9 @@ class MobileApiController extends Controller
 
         $isAdmin  = $user->isSuperAdmin() || $user->isAdmin();
         // Kasir: outlet dari user. Admin: bisa pilih via ?outlet_id=, atau lihat semua kalau kosong
-        $outletId = $user->outlet_id;
-        if ($isAdmin && $request->filled('outlet_id')) {
-            $outletId = (int) $request->outlet_id;
-        }
+        $outletId = $isAdmin
+            ? ($request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $purchases = Purchase::with(['supplier', 'items.product', 'outlet'])
             ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
@@ -1520,8 +1521,14 @@ class MobileApiController extends Controller
         ]);
 
         try {
-            // Kasir: pakai outlet sendiri. Admin/SuperAdmin: wajib kirim outlet_id
-            $data['outlet_id'] = $user->outlet_id ?? (int) $request->input('outlet_id');
+            // Admin/SuperAdmin atau user tanpa outlet terkunci: prioritaskan outlet_id dari form/request
+            $targetOutletId = $request->input('outlet_id');
+            if ($user->isAdmin() || !$user->outlet_id) {
+                $data['outlet_id'] = $targetOutletId ? (int) $targetOutletId : ($user->outlet_id ?: Outlet::where('status', 'active')->value('id'));
+            } else {
+                $data['outlet_id'] = $user->outlet_id ?: ($targetOutletId ? (int) $targetOutletId : Outlet::where('status', 'active')->value('id'));
+            }
+
             if (!$data['outlet_id']) {
                 return response()->json(['success' => false, 'message' => 'Pilih toko tujuan pembelian terlebih dahulu.'], 422);
             }
@@ -1601,7 +1608,12 @@ class MobileApiController extends Controller
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id');
+            $targetOutletId = $request->input('outlet_id');
+            if ($user->isAdmin() || !$user->outlet_id) {
+                $data['outlet_id'] = $targetOutletId ? (int) $targetOutletId : ($user->outlet_id ?: Outlet::where('status', 'active')->value('id'));
+            } else {
+                $data['outlet_id'] = $user->outlet_id ?: ($targetOutletId ? (int) $targetOutletId : Outlet::where('status', 'active')->value('id'));
+            }
             $data['user_id'] = $user->id;
             $this->posService->processInventoryAdjustment($data);
             return response()->json(['success' => true, 'message' => 'Penyesuaian stok berhasil disimpan!']);
@@ -2614,10 +2626,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.8',
-            'version_code' => 9,
-            'title' => 'Pembaruan Tersedia (v1.0.8)',
-            'release_notes' => "• Pembatasan hak akses Kasir: Kas Masuk dinonaktifkan.\n• Retur Penjualan otomatis memotong kas & mengembalikan stok sesuai toko/cabang kasir terkait.\n• Peningkatan validasi transaksi dan perbaikan sinkronisasi data antar toko.",
+            'version' => '1.0.9',
+            'version_code' => 10,
+            'title' => 'Pembaruan Tersedia (v1.0.9)',
+            'release_notes' => "• Sinkronisasi & pemilihan toko tujuan pada Faktur Pembelian dan Penyesuaian Stok.\n• Pembatasan hak akses Kasir: Kas Masuk dinonaktifkan.\n• Retur Penjualan otomatis memotong kas & mengembalikan stok sesuai toko/cabang kasir terkait.\n• Peningkatan validasi transaksi dan performa aplikasi.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,

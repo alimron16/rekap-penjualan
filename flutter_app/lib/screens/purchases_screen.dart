@@ -24,6 +24,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   List<dynamic> _accounts = [];
   List<dynamic> _outlets = [];
   int? _selectedOutletId;
+  bool _isInitialLoad = true;
 
   @override
   void initState() {
@@ -38,14 +39,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
     super.dispose();
   }
 
-  void _loadData({int? outletId}) async {
+  void _loadData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final res = await ApiService.getPurchases(outletId: outletId ?? _selectedOutletId);
+      final res = await ApiService.getPurchases(outletId: _selectedOutletId);
       if (mounted) {
         setState(() {
           if (res['success'] == true) {
@@ -55,8 +56,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
             _products = res['products'] ?? [];
             _accounts = res['accounts'] ?? [];
             _outlets = res['outlets'] ?? [];
-            if (_selectedOutletId == null && res['selected_outlet_id'] != null) {
+            if (_isInitialLoad) {
               _selectedOutletId = res['selected_outlet_id'];
+              _isInitialLoad = false;
             }
           } else {
             _errorMessage = res['message'] ?? 'Gagal memuat data pembelian';
@@ -77,7 +79,9 @@ class _PurchasesScreenState extends State<PurchasesScreen> with SingleTickerProv
   void _showNewPurchaseModal() {
     int? selectedSupplierId = _suppliers.isNotEmpty ? _suppliers.first['id'] : null;
     int? selectedAccountId = _accounts.isNotEmpty ? _accounts.first['id'] : null;
-    int? modalOutletId = _selectedOutletId ?? (_outlets.isNotEmpty ? _outlets.first['id'] : null);
+    int? modalOutletId = (_selectedOutletId != null && _outlets.any((o) => o['id'] == _selectedOutletId))
+        ? _selectedOutletId
+        : (_outlets.isNotEmpty ? _outlets.first['id'] : null);
     String paymentMethod = 'cash';
     final paidAmountController = TextEditingController();
     final notesController = TextEditingController();
