@@ -2614,10 +2614,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.0.7',
-            'version_code' => 8,
-            'title' => 'Pembaruan Tersedia (v1.0.7)',
-            'release_notes' => "• Pemilihan Toko / Cabang di Halaman Kasir POS (Eceran & Grosir) khusus Admin.\n• Pemilihan Alokasi Stok Toko saat Tambah Barang Baru.\n• Pemecahan dan distribusi Master Data Pelanggan, Supplier, dan Produk Digital per cabang.\n• Tampilan jumlah item ada stok vs habis per toko di Master Data.",
+            'version' => '1.0.8',
+            'version_code' => 9,
+            'title' => 'Pembaruan Tersedia (v1.0.8)',
+            'release_notes' => "• Pembatasan hak akses Kasir: Kas Masuk dinonaktifkan.\n• Retur Penjualan otomatis memotong kas & mengembalikan stok sesuai toko/cabang kasir terkait.\n• Peningkatan validasi transaksi dan perbaikan sinkronisasi data antar toko.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
