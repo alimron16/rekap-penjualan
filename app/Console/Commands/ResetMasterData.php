@@ -28,8 +28,8 @@ class ResetMasterData extends Command
         // Urutan: hapus transaksi dulu, baru master
         $tables = [
             // Transaksi keuangan
-            'journal_entries',
             'journal_entry_items',
+            'journal_entries',
             'cash_transactions',
             'receivable_payments',
             'debt_payments',
@@ -39,7 +39,7 @@ class ResetMasterData extends Command
 
             // Transaksi penjualan & retur
             'sale_items',
-            'sale_returns',
+            'sales_returns',   // ← nama tabel yang benar (bukan sale_returns)
             'sales',
 
             // Transaksi pembelian
