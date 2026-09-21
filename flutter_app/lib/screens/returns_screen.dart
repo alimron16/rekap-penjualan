@@ -487,6 +487,9 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                         },
                       ),
                     ),
+                  ),
+                ],
+              ),
     );
   }
 }
