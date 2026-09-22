@@ -470,6 +470,20 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> adjustCashRetail({
+    required int outletId,
+    required String type,
+    required double amount,
+    required String notes,
+  }) async {
+    return await _post('$baseUrl/pos/adjust-cash-retail', {
+      'outlet_id': outletId,
+      'type': type,
+      'amount': amount,
+      'notes': notes,
+    });
+  }
+
   static Future<Map<String, dynamic>> getShiftHistory({int? outletId, int page = 1}) async {
     final params = <String>['page=$page'];
     if (outletId != null) params.add('outlet_id=$outletId');

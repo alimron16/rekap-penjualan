@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/wholesale', [PosController::class, 'wholesale'])->name('wholesale');
         Route::get('/shift', [PosController::class, 'shift'])->name('shift');
         Route::post('/shift/close', [PosController::class, 'closeShiftWeb'])->name('shift.close');
+        Route::post('/shift/adjust-cash-retail', [PosController::class, 'adjustCashRetailWeb'])->name('shift.adjust_cash_retail');
         Route::post('/checkout', [PosController::class, 'checkout'])->name('checkout');
         Route::post('/withdraw', [PosController::class, 'withdraw'])->name('withdraw');
     });

@@ -1075,11 +1075,14 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $isAdmin  = $user->isSuperAdmin() || $user->isAdmin();
+        $isAdmin = $user->isSuperAdmin() || $user->isAdmin();
         // Kasir: outlet tetap dari user. Admin: bisa pilih outlet via ?outlet_id=
         $outletId = $user->outlet_id;
         if ($isAdmin && $request->filled('outlet_id')) {
             $outletId = (int) $request->outlet_id;
+        }
+        if (!$outletId) {
+            $outletId = Outlet::where('status', 'active')->orderBy('id')->value('id');
         }
 
         // Produk digital: lihat milik toko + produk global (outlet_id NULL)
@@ -1091,22 +1094,26 @@ class MobileApiController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Dedicated per-outlet multi account
+        $multiAccount = Account::getOutletMultiAccount($outletId);
+
         // Deposit accounts: akun per-outlet (1-1131-X, 1-1113-X, 1-1120-X)
         $depositAccounts = Account::where('group', 'AKTIVA')
             ->where('type', 'D')
-            ->when(
-                $outletId,
-                fn($q) => $q->where('outlet_id', $outletId)->where(fn($s) =>
-                    $s->where('code', 'like', '1-1131%')
-                      ->orWhere('code', 'like', '1-1113%')
-                      ->orWhere('code', 'like', '1-1120%')
-                ),
-                fn($q) => $q->whereNull('outlet_id')->whereIn('code', ['1-1131', '1-1113', '1-1120'])
-            )
+            ->where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhere(fn($s) => $s->whereNull('outlet_id')->whereIn('code', ['1-1113', '1-1120']));
+            })
+            ->where(function ($s) {
+                $s->where('code', 'like', '1-1131%')
+                  ->orWhere('code', 'like', '1-1113%')
+                  ->orWhere('code', 'like', '1-1120%');
+            })
+            ->orderByRaw("CASE WHEN code LIKE '1-1131%' THEN 0 ELSE 1 END")
             ->get();
 
         // Fallback ke akun global kalau outlet belum punya akun per-outlet
-        if ($outletId && $depositAccounts->isEmpty()) {
+        if ($depositAccounts->isEmpty()) {
             $depositAccounts = Account::whereIn('code', ['1-1131', '1-1113', '1-1120'])
                 ->whereNull('outlet_id')
                 ->get();
@@ -1118,12 +1125,8 @@ class MobileApiController extends Controller
             ->orderByRaw("FIELD(code, '1-1113', '1-1110', '1-1111', '1-1112', '1-1120')")
             ->get();
 
-        // Saldo dari akun per-outlet, fallback ke global
-        $saldoMulti = Account::when(
-            $outletId,
-            fn($q) => $q->where('outlet_id', $outletId)->where('code', 'like', '1-1131%'),
-            fn($q) => $q->whereNull('outlet_id')->where('code', '1-1131')
-        )->value('current_balance') ?? 0;
+        // Saldo dari akun per-outlet
+        $saldoMulti = (float) $multiAccount->current_balance;
 
         $saldoBca = Account::when(
             $outletId,
@@ -1250,12 +1253,13 @@ class MobileApiController extends Controller
             'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        // Top up ke akun SALDO MULTI milik outlet user; fallback ke akun global
-        $outletId    = $user->outlet_id ?? $request->input('outlet_id');
-        $multiAccount = $outletId
-            ? Account::where('outlet_id', $outletId)->where('code', 'like', '1-1131%')->first()
-                ?? Account::where('code', '1-1131')->whereNull('outlet_id')->firstOrFail()
-            : Account::where('code', '1-1131')->whereNull('outlet_id')->firstOrFail();
+        $isAdmin = $user->isSuperAdmin() || $user->isAdmin();
+        $outletId = ($isAdmin && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id') ?? Outlet::where('status', 'active')->orderBy('id')->value('id'));
+
+        $multiAccount = Account::getOutletMultiAccount($outletId);
+        $outlet = Outlet::find($outletId);
 
         try {
             $trxNumber = $this->posService->generateTransactionNumber('TP');
@@ -1264,20 +1268,23 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'OUT',
                 'date' => now(),
-                'outlet_id' => $outletId ?? Outlet::where('status', 'active')->value('id'),
+                'outlet_id' => $outletId,
                 'user_id' => $user->id,
                 'debit_account_id' => $multiAccount->id,
                 'credit_account_id' => $data['source_account_id'],
                 'amount' => $data['amount'],
                 'admin_fee' => 0,
-                'notes' => $data['notes'] ?? 'Top Up Saldo Multi Server',
+                'notes' => $data['notes'] ?? ('Top Up Saldo Multi [' . ($outlet?->name ?? 'Cabang ' . $outletId) . ']'),
             ]);
 
             $this->accountingService->recordCashTransaction($trx);
+            $multiAccount->refresh();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Top Up Saldo Multi sebesar Rp ' . number_format($data['amount'], 0, ',', '.') . ' berhasil!',
+                'message' => 'Top Up Saldo Multi [' . $multiAccount->name . '] sebesar Rp ' . number_format($data['amount'], 0, ',', '.') . ' berhasil!',
+                'saldo_multi' => (float) $multiAccount->current_balance,
+                'outlet_id' => $outletId,
                 'transaction' => $trx,
             ]);
         } catch (Exception $e) {
@@ -2729,6 +2736,88 @@ class MobileApiController extends Controller
                 'store_name' => $summary['outlet_name'],
             ],
         ]);
+    }
+
+    /**
+     * Koreksi / Edit Cash Retail (+ / -) oleh Admin / Superadmin
+     */
+    public function adjustCashRetail(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        if (!$user->isAdmin()) {
+            return response()->json(['error' => 'Akses ditolak. Hanya Admin / Superadmin yang dapat mengubah Cash Retail.'], 403);
+        }
+
+        $data = $request->validate([
+            'outlet_id' => 'required|exists:outlets,id',
+            'type'      => 'required|in:ADD,SUBTRACT,+,-',
+            'amount'    => 'required|numeric|min:1',
+            'notes'     => 'required|string|max:255',
+        ]);
+
+        $outletId = (int) $data['outlet_id'];
+        $amount   = (float) $data['amount'];
+        $notes    = trim($data['notes']);
+        $isAdd    = in_array($data['type'], ['ADD', '+'], true);
+
+        $cashRetailAcc = Account::getOutletCashRetailAccount($outletId);
+
+        // Akun penyeimbang: Modal Usaha / Brankas
+        $balancingAcc = Account::where('code', '3-1100')->first()
+            ?: Account::where('code', '1-1113')->first()
+            ?: Account::where('code', '1-1110')->whereNull('outlet_id')->firstOrFail();
+
+        try {
+            if ($isAdd) {
+                // Tambah kas ke laci toko (+)
+                $trxNumber = $this->posService->generateTransactionNumber('KM-ADJ');
+                $trx = CashTransaction::create([
+                    'transaction_number' => $trxNumber,
+                    'type'               => 'IN',
+                    'date'               => now(),
+                    'outlet_id'          => $outletId,
+                    'user_id'            => $user->id,
+                    'debit_account_id'   => $cashRetailAcc->id, // Kas Retail bertambah
+                    'credit_account_id'  => $balancingAcc->id,  // Penyeimbang modal / kas induk
+                    'amount'             => $amount,
+                    'admin_fee'          => 0,
+                    'notes'              => "[Koreksi + Cash Retail] {$notes}",
+                ]);
+            } else {
+                // Kurang kas dari laci toko (-)
+                $trxNumber = $this->posService->generateTransactionNumber('KK-ADJ');
+                $trx = CashTransaction::create([
+                    'transaction_number' => $trxNumber,
+                    'type'               => 'OUT',
+                    'date'               => now(),
+                    'outlet_id'          => $outletId,
+                    'user_id'            => $user->id,
+                    'debit_account_id'   => $balancingAcc->id,  // Penyeimbang
+                    'credit_account_id'  => $cashRetailAcc->id, // Kas Retail berkurang
+                    'amount'             => $amount,
+                    'admin_fee'          => 0,
+                    'notes'              => "[Koreksi - Cash Retail] {$notes}",
+                ]);
+            }
+
+            $this->accountingService->recordCashTransaction($trx);
+
+            $cashRetailAcc->refresh();
+            $summary = $this->shiftService->getShiftSummary($outletId, $user->id);
+
+            return response()->json([
+                'success'       => true,
+                'message'       => ($isAdd ? 'Penambahan (+)' : 'Pengurangan (-)') . ' Kas Retail sebesar Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!',
+                'new_balance'   => (float) $cashRetailAcc->current_balance,
+                'shift_balance' => (float) $summary['cash_retail']['balance'],
+                'shift_summary' => $summary,
+                'transaction'   => $trx,
+            ]);
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Gagal mengubah kas retail: ' . $e->getMessage()], 422);
+        }
     }
 
     /**

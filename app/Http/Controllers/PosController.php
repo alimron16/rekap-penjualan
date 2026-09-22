@@ -269,4 +269,72 @@ class PosController extends Controller
             return back()->with('error', 'Gagal memproses tutup shift: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Koreksi / Edit Cash Retail (+ / -) via Web
+     */
+    public function adjustCashRetailWeb(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            abort(403, 'Hanya Admin / Superadmin yang dapat mengubah Cash Retail.');
+        }
+
+        $data = $request->validate([
+            'outlet_id' => 'required|exists:outlets,id',
+            'type'      => 'required|in:ADD,SUBTRACT,+,-',
+            'amount'    => 'required|numeric|min:1',
+            'notes'     => 'required|string|max:255',
+        ]);
+
+        $outletId = (int) $data['outlet_id'];
+        $amount   = (float) $data['amount'];
+        $notes    = trim($data['notes']);
+        $isAdd    = in_array($data['type'], ['ADD', '+'], true);
+
+        $cashRetailAcc = Account::getOutletCashRetailAccount($outletId);
+        $balancingAcc = Account::where('code', '3-1100')->first()
+            ?: Account::where('code', '1-1113')->first()
+            ?: Account::where('code', '1-1110')->whereNull('outlet_id')->firstOrFail();
+
+        try {
+            if ($isAdd) {
+                $trxNumber = $this->posService->generateTransactionNumber('KM-ADJ');
+                $trx = \App\Models\CashTransaction::create([
+                    'transaction_number' => $trxNumber,
+                    'type'               => 'IN',
+                    'date'               => now(),
+                    'outlet_id'          => $outletId,
+                    'user_id'            => $user->id,
+                    'debit_account_id'   => $cashRetailAcc->id,
+                    'credit_account_id'  => $balancingAcc->id,
+                    'amount'             => $amount,
+                    'admin_fee'          => 0,
+                    'notes'              => "[Koreksi + Cash Retail] {$notes}",
+                ]);
+            } else {
+                $trxNumber = $this->posService->generateTransactionNumber('KK-ADJ');
+                $trx = \App\Models\CashTransaction::create([
+                    'transaction_number' => $trxNumber,
+                    'type'               => 'OUT',
+                    'date'               => now(),
+                    'outlet_id'          => $outletId,
+                    'user_id'            => $user->id,
+                    'debit_account_id'   => $balancingAcc->id,
+                    'credit_account_id'  => $cashRetailAcc->id,
+                    'amount'             => $amount,
+                    'admin_fee'          => 0,
+                    'notes'              => "[Koreksi - Cash Retail] {$notes}",
+                ]);
+            }
+
+            app(\App\Services\AccountingService::class)->recordCashTransaction($trx);
+
+            return redirect()->route('pos.shift', ['outlet_id' => $outletId])
+                ->with('success', ($isAdd ? 'Penambahan (+)' : 'Pengurangan (-)') . ' Cash Retail sebesar Rp ' . number_format($amount, 0, ',', '.') . ' berhasil!');
+        } catch (Exception $e) {
+            return redirect()->route('pos.shift', ['outlet_id' => $outletId])
+                ->with('error', 'Gagal koreksi kas retail: ' . $e->getMessage());
+        }
+    }
 }

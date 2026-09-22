@@ -5,13 +5,28 @@
 @section('content')
 <div class="space-y-4">
 
+    <!-- Outlet Selector for Admin -->
+    @if($isAdmin && isset($outlets) && $outlets->count() > 0)
+    <div class="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between flex-wrap gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-700">Pilih Cabang / Toko:</span>
+            <select onchange="window.location.href='{{ route('digital.index') }}?outlet_id=' + this.value" class="text-xs font-bold border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 text-slate-800 cursor-pointer focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                @foreach($outlets as $o)
+                    <option value="{{ $o->id }}" {{ $selectedOutletId == $o->id ? 'selected' : '' }}>{{ $o->name }} ({{ $o->code }})</option>
+                @endforeach
+            </select>
+        </div>
+        <span class="text-[11px] text-slate-500 font-medium">Saldo multi & transaksi dipisahkan per masing-masing toko.</span>
+    </div>
+    @endif
+
     <!-- Top Live Balances & Controls -->
     <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <!-- Saldo Multi Server -->
         <div class="bg-[#14421b] text-white p-3 rounded-lg border-2 border-slate-200 shadow flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[10px] text-green-200 block font-semibold uppercase">SALDO MULTI (MODAL SERVER)</span>
+                    <span class="text-[10px] text-green-200 block font-semibold uppercase">SALDO MULTI ({{ $outlets->firstWhere('id', $selectedOutletId)?->name ?? 'MODAL SERVER' }})</span>
                     <button type="button" onclick="openTopupModal()" class="px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-[10px] shadow-xs flex items-center gap-1 transition">
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         <span>Top Up</span>
@@ -19,7 +34,7 @@
                 </div>
                 <span class="text-xl font-mono font-extrabold text-white mt-1 block">Rp {{ number_format($saldoMulti, 0, ',', '.') }}</span>
             </div>
-            <span class="text-[10px] text-green-300 block mt-1">Akun: 1-1131 SALDO MULTI</span>
+            <span class="text-[10px] text-green-300 block mt-1">Akun: {{ $depositAccounts->firstWhere('code', 'like', '1-1131%')?->code ?? '1-1131' }} ({{ $depositAccounts->firstWhere('code', 'like', '1-1131%')?->name ?? 'SALDO MULTI' }})</span>
         </div>
 
         <!-- Cash Laci Kasir -->
@@ -71,6 +86,7 @@
 
             <form action="{{ route('digital.store') }}" method="POST" class="p-4 space-y-3.5 text-xs flex-1 flex flex-col justify-between">
                 @csrf
+                <input type="hidden" name="outlet_id" value="{{ $selectedOutletId }}">
                 
                 <div class="space-y-3">
                     <div>
@@ -248,6 +264,21 @@
 
         <form action="{{ route('digital.topup') }}" method="POST" class="p-5 space-y-3.5 text-xs">
             @csrf
+
+            @if($isAdmin && isset($outlets) && $outlets->count() > 0)
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Pilih Cabang / Toko Tujuan Top Up *</label>
+                <select name="outlet_id" id="topupOutletId" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                    @foreach($outlets as $o)
+                        <option value="{{ $o->id }}" {{ $selectedOutletId == $o->id ? 'selected' : '' }}>{{ $o->name }} ({{ $o->code }})</option>
+                    @endforeach
+                </select>
+                <span class="text-[10px] text-slate-400 mt-1 block">Saldo multi akan terisi ke akun deposit cabang yang dipilih.</span>
+            </div>
+            @else
+            <input type="hidden" name="outlet_id" value="{{ $selectedOutletId }}">
+            @endif
+
             <div>
                 <label class="font-bold text-slate-700 block mb-1">Sumber Rekening / Kas Pembayaran *</label>
                 <select name="source_account_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">

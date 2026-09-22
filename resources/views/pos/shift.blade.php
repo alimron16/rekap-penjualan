@@ -87,7 +87,15 @@
                                 <p class="text-[10px] text-slate-400">Kas Tunai Penjualan Toko (1-1110)</p>
                             </div>
                         </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200/60">Kas Laci</span>
+                        <div class="flex items-center gap-1.5">
+                            @if($isAdmin)
+                            <button type="button" onclick="openAdjustRetailModal()" class="px-2 py-0.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-[10px] shadow-xs flex items-center gap-1 transition cursor-pointer" title="Koreksi Kas Laci (+ / -)">
+                                <svg class="w-3 h-3 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                <span>+/- Edit Kas</span>
+                            </button>
+                            @endif
+                            <span class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200/60">Kas Laci</span>
+                        </div>
                     </div>
 
                     <div class="mt-3 pt-3 border-t border-slate-100">
@@ -99,6 +107,22 @@
 
                     <div class="mt-3 bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100/80 text-xs space-y-1">
                         <div class="flex justify-between text-slate-600 text-[11px]">
+                            <span>Penjualan Tunai (+):</span>
+                            <span class="font-bold text-slate-800">+Rp {{ number_format($summary['cash_retail']['shift_cash_sales'], 0, ',', '.') }}</span>
+                        </div>
+                        @if(($summary['cash_retail']['shift_cash_in'] ?? 0) > 0)
+                        <div class="flex justify-between text-emerald-700 text-[11px]">
+                            <span>Kas Masuk / Koreksi (+):</span>
+                            <span class="font-bold">+Rp {{ number_format($summary['cash_retail']['shift_cash_in'], 0, ',', '.') }}</span>
+                        </div>
+                        @endif
+                        @if(($summary['cash_retail']['shift_cash_out'] ?? 0) > 0)
+                        <div class="flex justify-between text-rose-600 text-[11px]">
+                            <span>Kas Keluar / Beban (-):</span>
+                            <span class="font-bold">-Rp {{ number_format($summary['cash_retail']['shift_cash_out'], 0, ',', '.') }}</span>
+                        </div>
+                        @endif
+                        <div class="flex justify-between text-slate-600 text-[11px] pt-1 border-t border-emerald-200/40">
                             <span>Cadangan Modal Awal:</span>
                             <span class="font-bold text-slate-800">Rp {{ number_format($summary['cash_retail']['required_reserve'], 0, ',', '.') }}</span>
                         </div>
@@ -522,5 +546,77 @@
             alert('Error: ' + err.message);
         });
     }
+
+    function openAdjustRetailModal() {
+        document.getElementById('modalAdjustRetail').classList.remove('hidden');
+    }
+
+    function closeAdjustRetailModal() {
+        document.getElementById('modalAdjustRetail').classList.add('hidden');
+    }
 </script>
+
+<!-- MODAL KOREKSI CASH RETAIL (+ / -) -->
+<div id="modalAdjustRetail" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-800 text-white px-5 py-3.5 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-base">💵</span>
+                <h3 class="font-bold text-sm">Edit / Koreksi Cash Retail (Kas Laci)</h3>
+            </div>
+            <button onclick="closeAdjustRetailModal()" class="text-white/80 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form action="{{ route('pos.shift.adjust_cash_retail') }}" method="POST" class="p-5 space-y-4 text-xs">
+            @csrf
+            <input type="hidden" name="outlet_id" value="{{ $selectedOutletId ?? $outlets->first()?->id }}">
+
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] text-slate-400 block uppercase font-bold">Cabang / Toko</span>
+                    <span class="font-bold text-slate-800">{{ $summary['outlet_name'] }}</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block uppercase font-bold">Saldo Laci Saat Ini</span>
+                    <span class="font-extrabold text-emerald-800 text-sm">Rp {{ number_format($summary['cash_retail']['balance'], 0, ',', '.') }}</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1.5">Pilih Aksi Koreksi Kas *</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 p-2.5 border border-emerald-300 rounded-xl bg-emerald-50 cursor-pointer hover:bg-emerald-100 transition">
+                        <input type="radio" name="type" value="ADD" checked class="text-emerald-600 focus:ring-emerald-500">
+                        <div>
+                            <span class="font-bold text-emerald-900 block text-xs">(+) Tambah Kas</span>
+                            <span class="text-[10px] text-emerald-700">Modal masuk / koreksi lebih</span>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-2 p-2.5 border border-rose-300 rounded-xl bg-rose-50 cursor-pointer hover:bg-rose-100 transition">
+                        <input type="radio" name="type" value="SUBTRACT" class="text-rose-600 focus:ring-rose-500">
+                        <div>
+                            <span class="font-bold text-rose-900 block text-xs">(-) Kurang Kas</span>
+                            <span class="text-[10px] text-rose-700">Ambil kas / koreksi kurang</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Nominal (Rp) *</label>
+                <input type="number" step="1000" min="1" name="amount" required placeholder="Contoh: 50000" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-sm text-slate-900 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="font-bold text-slate-700 block mb-1">Keterangan / Alasan Koreksi *</label>
+                <input type="text" name="notes" required placeholder="Misal: Tambah modal uang receh / Koreksi fisik kasir" class="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                <button type="button" onclick="closeAdjustRetailModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">Batal</button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-xs">SIMPAN KOREKSI</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection

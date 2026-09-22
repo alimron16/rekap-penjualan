@@ -116,10 +116,20 @@ class ShiftService
         $expenses = $expenseQuery->get();
         $totalExpense = (float) $expenses->sum('amount');
 
-        // 7. Balances of the 3 Cash categories
-        $cashRetailAcc = Account::where('code', '1-1110')->first();
+        // 6b. Fetch Kas Masuk / Penambahan Modal Kas Retail (Koreksi + Kas Retail, Modal Masuk)
+        $cashInQuery = CashTransaction::where('type', 'IN')
+            ->where('date', '>=', $startTime)
+            ->where('date', '<=', $now);
+        if ($outletId) {
+            $cashInQuery->where('outlet_id', $outletId);
+        }
+        $cashIns = $cashInQuery->get();
+        $totalCashIn = (float) $cashIns->sum('amount');
+
+        // 7. Balances of the 3 Cash categories (Per-outlet dedicated accounts)
+        $cashRetailAcc = Account::getOutletCashRetailAccount($outletId);
+        $saldoMultiAcc = Account::getOutletMultiAccount($outletId);
         $cashTransferAcc = Account::where('code', '1-1111')->first();
-        $saldoMultiAcc = Account::where('code', '1-1131')->first();
         $saldoBcaAcc = Account::where('code', '1-1113')->first();
 
         $saldoMultiBalance = (float) ($saldoMultiAcc?->current_balance ?? 0);
@@ -130,12 +140,12 @@ class ShiftService
 
         if ($outletId) {
             // Per-outlet cash drawer calculation:
-            // Drawer physical cash = starting retained modal + cash sales - operational expenses
+            // Drawer physical cash = starting retained modal + cash sales + cash in - operational expenses
             $modalAwalRetail = ($lastShift && $lastShift->cash_retail_retained !== null)
                 ? (float) $lastShift->cash_retail_retained
                 : $requiredReserve;
 
-            $cashRetailBalance = max(0.0, $modalAwalRetail + $cashSales - $totalExpense);
+            $cashRetailBalance = max(0.0, $modalAwalRetail + $cashSales + $totalCashIn - $totalExpense);
             $recommendedDeposit = max(0.0, $cashRetailBalance - $requiredReserve);
 
             // Transfer cash on hand = starting transfer modal + incoming cash - withdrawals paid out
@@ -175,15 +185,19 @@ class ShiftService
             // 3 Cash Categories Details
             'cash_retail' => [
                 'name' => 'Cash Retail (Kas Laci Toko)',
-                'code' => '1-1110',
+                'code' => $cashRetailAcc->code,
                 'balance' => $cashRetailBalance,
+                'ledger_balance' => (float) $cashRetailAcc->current_balance,
                 'required_reserve' => $requiredReserve,
                 'recommended_deposit' => $recommendedDeposit,
                 'shift_cash_sales' => $cashSales,
+                'shift_cash_in' => $totalCashIn,
+                'shift_cash_out' => $totalExpense,
+                'starting_modal' => $modalAwalRetail ?? $requiredReserve,
             ],
             'cash_multi' => [
                 'name' => 'Cash Multi (Produk Digital / Pulsa)',
-                'code' => '1-1131',
+                'code' => $saldoMultiAcc->code,
                 'balance' => $saldoMultiBalance,
                 'shift_sales' => $totalDigitalSales,
                 'shift_profit' => $totalDigitalProfit,
