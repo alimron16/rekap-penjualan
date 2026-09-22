@@ -516,12 +516,13 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
             // Card 1: Cash Retail
             _buildCashCard(
               title: '1. Cash Retail (Laci Toko)',
-              code: '1-1110',
+              code: _shiftData?['cash_retail']?['code'] ?? '1-1110',
               icon: '💵',
               balance: retailBal,
               bgColor: const Color(0xFFF0FDF4),
               borderColor: const Color(0xFFBBF7D0),
               textColor: const Color(0xFF166534),
+              onEditPressed: _isAdmin && _selectedOutletId != null ? _showAdjustCashRetailSheet : null,
               footer: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -776,6 +777,7 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
     required Color textColor,
     required Widget footer,
     String balanceLabel = 'Saldo di Laci',
+    VoidCallback? onEditPressed,
   }) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -797,13 +799,38 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
                 children: [
                   Text(icon, style: const TextStyle(fontSize: 16)),
                   const SizedBox(width: 6),
-                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  Flexible(child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87))),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
-                child: Text(code, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onEditPressed != null)
+                    GestureDetector(
+                      onTap: onEditPressed,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ThemeConfig.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_rounded, color: Colors.white, size: 11),
+                            SizedBox(width: 3),
+                            Text('+/- Edit Kas', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
+                    child: Text(code, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1021,5 +1048,284 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
         );
       }
     }
+  }
+
+  // ==========================================
+  // BOTTOM SHEET: EDIT / KOREKSI CASH RETAIL
+  // ==========================================
+  void _showAdjustCashRetailSheet() {
+    if (_selectedOutletId == null) return;
+    final amountController = TextEditingController();
+    final notesController = TextEditingController();
+    String selectedType = 'ADD'; // ADD or SUBTRACT
+    bool isProcessing = false;
+
+    final outletName = _outlets.firstWhere(
+      (o) => o['id'] == _selectedOutletId,
+      orElse: () => {'name': 'Cabang $_selectedOutletId'},
+    )['name'];
+
+    final currentBal = (_shiftData?['cash_retail']?['balance'] as num?)?.toDouble() ?? 0.0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(
+            top: 24,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: ThemeConfig.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.edit_rounded, color: ThemeConfig.primary, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Edit / Koreksi Cash Retail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            Text(outletName, style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(height: 20),
+
+                // Info saldo saat ini
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Saldo Laci Saat Ini:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(
+                        currencyFormatter.format(currentBal),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF166534)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Pilih Aksi (ADD / SUBTRACT)
+                const Text('Jenis Koreksi:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setModalState(() => selectedType = 'ADD'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: selectedType == 'ADD' ? const Color(0xFFDCFCE7) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selectedType == 'ADD' ? const Color(0xFF16A34A) : Colors.grey.shade300,
+                              width: selectedType == 'ADD' ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.add_circle_rounded,
+                                color: selectedType == 'ADD' ? const Color(0xFF16A34A) : Colors.grey,
+                                size: 22,
+                              ),
+                              const SizedBox(height: 4),
+                              Text('(+) Tambah Kas',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 12,
+                                  color: selectedType == 'ADD' ? const Color(0xFF15803D) : Colors.grey.shade700,
+                                ),
+                              ),
+                              Text('Modal masuk / koreksi lebih',
+                                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setModalState(() => selectedType = 'SUBTRACT'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: selectedType == 'SUBTRACT' ? const Color(0xFFFFF1F2) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selectedType == 'SUBTRACT' ? const Color(0xFFE11D48) : Colors.grey.shade300,
+                              width: selectedType == 'SUBTRACT' ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.remove_circle_rounded,
+                                color: selectedType == 'SUBTRACT' ? const Color(0xFFE11D48) : Colors.grey,
+                                size: 22,
+                              ),
+                              const SizedBox(height: 4),
+                              Text('(-) Kurangi Kas',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 12,
+                                  color: selectedType == 'SUBTRACT' ? const Color(0xFFBE123C) : Colors.grey.shade700,
+                                ),
+                              ),
+                              Text('Ambil kas / koreksi kurang',
+                                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Nominal
+                const Text('Nominal (Rp):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  decoration: InputDecoration(
+                    prefixText: 'Rp ',
+                    hintText: 'Contoh: 50000',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Keterangan
+                const Text('Keterangan / Alasan Koreksi:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesController,
+                  decoration: InputDecoration(
+                    hintText: 'Misal: Tambah modal receh / Koreksi fisik kasir',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selectedType == 'ADD' ? const Color(0xFF16A34A) : const Color(0xFFE11D48),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isProcessing
+                        ? null
+                        : () async {
+                            final amount = double.tryParse(
+                              amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
+                            ) ?? 0.0;
+                            final notes = notesController.text.trim();
+
+                            if (amount <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Masukkan nominal yang valid'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+                            if (notes.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Keterangan koreksi wajib diisi'), backgroundColor: Colors.red),
+                              );
+                              return;
+                            }
+
+                            setModalState(() => isProcessing = true);
+
+                            final res = await ApiService.adjustCashRetail(
+                              outletId: _selectedOutletId!,
+                              type: selectedType,
+                              amount: amount,
+                              notes: notes,
+                            );
+
+                            if (!mounted) return;
+
+                            if (res['success'] == true) {
+                              Navigator.pop(ctx);
+                              _loadShiftData();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res['message'] ?? 'Koreksi kas berhasil!'),
+                                  backgroundColor: ThemeConfig.primary,
+                                ),
+                              );
+                            } else {
+                              setModalState(() => isProcessing = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res['message'] ?? 'Gagal koreksi kas'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                    icon: isProcessing
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Icon(selectedType == 'ADD' ? Icons.add_circle_rounded : Icons.remove_circle_rounded, size: 18),
+                    label: isProcessing
+                        ? const Text('Memproses...')
+                        : Text(
+                            selectedType == 'ADD' ? 'KONFIRMASI TAMBAH KAS' : 'KONFIRMASI KURANGI KAS',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -575,7 +575,12 @@ class _DigitalScreenState extends State<DigitalScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Saldo Multi Server', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  Text(
+                                    _selectedOutletId != null && _outlets.any((o) => o['id'] == _selectedOutletId)
+                                        ? 'Saldo Multi (${_outlets.firstWhere((o) => o['id'] == _selectedOutletId)['name']})'
+                                        : 'Saldo Multi Server',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                  ),
                                   const SizedBox(height: 4),
                                   Text(
                                     Formatters.formatRupiah(_saldoMulti),

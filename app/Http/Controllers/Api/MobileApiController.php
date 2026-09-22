@@ -2672,10 +2672,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.1',
-            'version_code' => 12,
-            'title' => 'Pembaruan Tersedia (v1.1.1)',
-            'release_notes' => "• [BARU] Logo & ikon aplikasi diperbarui ke Elephant Cells.\n• [BARU] Admin bisa pilih toko saat input Kas Masuk / Kas Keluar.\n• [FIX] Kasir/Toko kini bisa input Kas Keluar (uang makan, dll).\n• [FIX] Data kas keluar kasir tidak lagi tercampur antar toko.\n• Peningkatan stabilitas dan performa aplikasi.",
+            'version' => '1.1.2',
+            'version_code' => 13,
+            'title' => 'Pembaruan Tersedia (v1.1.2)',
+            'release_notes' => "• [BARU] Saldo Multi & Cash Retail kini terpisah per toko/cabang.\n• [BARU] Admin bisa koreksi (+/-) Cash Retail langsung dari aplikasi di halaman Shift.\n• [BARU] Topup Saldo Multi langsung ke saldo toko yang dipilih.\n• [FIX] Tampilkan nama toko pada card Saldo Multi di halaman Elektrik.\n• Peningkatan stabilitas dan performa aplikasi.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
