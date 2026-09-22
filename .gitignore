@@ -26,3 +26,9 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /android-app/build/
+/flutter_app/android/build/
+/flutter_app/build/
+
+# File debug / test sementara (tidak perlu di-commit)
+check_*.php
+test_*.php
