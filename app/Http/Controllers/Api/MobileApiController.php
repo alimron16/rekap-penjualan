@@ -960,6 +960,127 @@ class MobileApiController extends Controller
         return response()->json(['success' => true, 'message' => "Akun [{$name}] berhasil dihapus!"]);
     }
 
+    // --- Outlet / Cabang Toko ---
+
+    public function outlets(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $query = Outlet::query();
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $outlets = $query->orderBy('name')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $outlets,
+        ]);
+    }
+
+    public function storeOutlet(Request $request)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        if (!$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Admin yang dapat menambah cabang toko.'], 403);
+        }
+
+        $data = $request->validate([
+            'code' => 'required|string|max:50|unique:outlets,code',
+            'name' => 'required|string|max:150',
+            'address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:30',
+            'status' => 'nullable|in:active,inactive',
+        ]);
+
+        $data['status'] = $data['status'] ?? 'active';
+        $outlet = Outlet::create($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cabang [{$outlet->name}] berhasil dibuat!",
+            'data' => $outlet,
+        ]);
+    }
+
+    public function updateOutlet(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        if (!$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Admin yang dapat mengedit cabang toko.'], 403);
+        }
+
+        $outlet = Outlet::findOrFail($id);
+        $data = $request->validate([
+            'code' => 'required|string|max:50|unique:outlets,code,' . $outlet->id,
+            'name' => 'required|string|max:150',
+            'address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:30',
+            'status' => 'nullable|in:active,inactive',
+        ]);
+
+        $outlet->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cabang [{$outlet->name}] berhasil diperbarui!",
+            'data' => $outlet,
+        ]);
+    }
+
+    public function toggleOutletStatus(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        if (!$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Admin yang dapat mengubah status cabang.'], 403);
+        }
+
+        $outlet = Outlet::findOrFail($id);
+        $outlet->status = $outlet->status === 'active' ? 'inactive' : 'active';
+        $outlet->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Status cabang [{$outlet->name}] diubah menjadi " . ($outlet->status === 'active' ? 'Aktif' : 'Nonaktif'),
+            'data' => $outlet,
+        ]);
+    }
+
+    public function destroyOutlet(Request $request, $id)
+    {
+        $user = $this->getUserFromToken($request);
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        if (!$user->isAdmin()) {
+            return response()->json(['success' => false, 'message' => 'Hanya Admin yang dapat menghapus cabang toko.'], 403);
+        }
+
+        $outlet = Outlet::findOrFail($id);
+        if ($outlet->users()->exists() || $outlet->sales()->exists() || $outlet->transfers()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cabang [{$outlet->name}] tidak dapat dihapus karena sudah memiliki data transaksi atau kasir terhubung.",
+            ], 422);
+        }
+
+        $name = $outlet->name;
+        $outlet->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cabang [{$name}] berhasil dihapus!",
+        ]);
+    }
+
     // ==========================================
     // 2. POS & PENJUALAN
     // ==========================================
@@ -1176,7 +1297,9 @@ class MobileApiController extends Controller
         ]);
 
         try {
-            $data['outlet_id'] = $user->outlet_id ?? $request->input('outlet_id') ?? Outlet::where('status', 'active')->value('id');
+            $data['outlet_id'] = ($user->isAdmin() && $request->filled('outlet_id'))
+                ? (int) $request->outlet_id
+                : ($user->outlet_id ?? $request->input('outlet_id') ?? Outlet::where('status', 'active')->value('id'));
             $data['user_id'] = $user->id;
             $digitalSale = $this->posService->processDigitalSale($data);
             $digitalSale->load(['digitalProduct', 'depositAccount', 'cashAccount']);
@@ -2672,10 +2795,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.2',
-            'version_code' => 13,
-            'title' => 'Pembaruan Tersedia (v1.1.2)',
-            'release_notes' => "• [BARU] Saldo Multi & Cash Retail kini terpisah per toko/cabang.\n• [BARU] Admin bisa koreksi (+/-) Cash Retail langsung dari aplikasi di halaman Shift.\n• [BARU] Topup Saldo Multi langsung ke saldo toko yang dipilih.\n• [FIX] Tampilkan nama toko pada card Saldo Multi di halaman Elektrik.\n• Peningkatan stabilitas dan performa aplikasi.",
+            'version' => '1.1.3',
+            'version_code' => 14,
+            'title' => 'Pembaruan Tersedia (v1.1.3)',
+            'release_notes' => "• [FIX] Perbaikan menu Rekap Shift: Pilihan toko/cabang untuk Admin/Owner kini tampil sempurna.\n• [FIX] Perbaikan crash halaman Produk Elektrik / Pulsa (SQL duplicate entry saldo multi).\n• [BARU] Master Cabang Toko API & kestabilan multi-outlet.\n• Peningkatan kecepatan dan stabilitas aplikasi.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
@@ -2694,7 +2817,7 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        // Allow admin/super_admin to select outlet, regular cashier views their own outlet
+        // Allow admin/super_admin/owner to select outlet, regular cashier views their own outlet
         $isAdmin = $user->isAdmin();
         if ($isAdmin) {
             $outletId = $request->has('outlet_id')
@@ -2709,6 +2832,8 @@ class MobileApiController extends Controller
         // Provide backwards-compatible keys and rich new structured data
         return response()->json([
             'success' => true,
+            'is_admin' => $isAdmin,
+            'outlets' => $isAdmin ? Outlet::where('status', 'active')->orderBy('name')->get() : [],
             'shift_number' => $summary['shift_number'],
             'date' => date('Y-m-d'),
             'start_time' => $summary['start_time'],

@@ -104,7 +104,11 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
           if (res['success'] == true) {
             _shiftData = res;
             final role = res['user']?['role']?.toString().toLowerCase() ?? '';
-            _isAdmin = role == 'admin' || role == 'superadmin' || role == 'super_admin';
+            _isAdmin = res['is_admin'] == true || role == 'admin' || role == 'superadmin' || role == 'super_admin' || role == 'owner';
+
+            if (res['outlets'] != null && res['outlets'] is List && (res['outlets'] as List).isNotEmpty) {
+              _outlets = res['outlets'];
+            }
 
             // Auto-select outlet if not selected yet
             if (_selectedOutletId == null && res['outlet_id'] != null) {

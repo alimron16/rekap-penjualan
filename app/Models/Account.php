@@ -59,27 +59,44 @@ class Account extends Model
         }
 
         if ($outletId) {
+            $code = '1-1131-' . $outletId;
+
+            // 1. Cari jika sudah ada akun untuk outlet ini
             $account = self::where('outlet_id', $outletId)
-                ->where('code', 'like', '1-1131%')
+                ->where(function ($q) use ($code) {
+                    $q->where('code', $code)
+                      ->orWhere('code', 'like', '1-1131%');
+                })
                 ->first();
 
             if ($account) {
                 return $account;
             }
 
+            // 2. Jika ada akun dengan kode ini namun outlet_id belum sinkron
+            $account = self::where('code', $code)->first();
+            if ($account) {
+                if ($account->outlet_id !== $outletId) {
+                    $account->update(['outlet_id' => $outletId]);
+                }
+                return $account;
+            }
+
             $outlet = Outlet::find($outletId);
             $shortName = $outlet ? strtoupper($outlet->code) : "OUT-{$outletId}";
 
-            return self::create([
-                'outlet_id' => $outletId,
-                'code' => '1-1131-' . $outletId,
-                'name' => 'SALDO MULTI ' . $shortName,
-                'type' => 'D',
-                'group' => 'AKTIVA',
-                'initial_balance' => 0,
-                'current_balance' => 0,
-                'is_system_locked' => false,
-            ]);
+            return self::firstOrCreate(
+                ['code' => $code],
+                [
+                    'outlet_id' => $outletId,
+                    'name' => 'SALDO MULTI ' . $shortName,
+                    'type' => 'D',
+                    'group' => 'AKTIVA',
+                    'initial_balance' => 0,
+                    'current_balance' => 0,
+                    'is_system_locked' => false,
+                ]
+            );
         }
 
         return self::where('code', '1-1131')->firstOrFail();
@@ -95,27 +112,44 @@ class Account extends Model
         }
 
         if ($outletId) {
+            $code = '1-1110-' . $outletId;
+
+            // 1. Cari jika sudah ada akun untuk outlet ini
             $account = self::where('outlet_id', $outletId)
-                ->where('code', 'like', '1-1110%')
+                ->where(function ($q) use ($code) {
+                    $q->where('code', $code)
+                      ->orWhere('code', 'like', '1-1110%');
+                })
                 ->first();
 
             if ($account) {
                 return $account;
             }
 
+            // 2. Jika ada akun dengan kode ini namun outlet_id belum sinkron
+            $account = self::where('code', $code)->first();
+            if ($account) {
+                if ($account->outlet_id !== $outletId) {
+                    $account->update(['outlet_id' => $outletId]);
+                }
+                return $account;
+            }
+
             $outlet = Outlet::find($outletId);
             $shortName = $outlet ? strtoupper($outlet->code) : "OUT-{$outletId}";
 
-            return self::create([
-                'outlet_id' => $outletId,
-                'code' => '1-1110-' . $outletId,
-                'name' => 'CASH RETAIL ' . $shortName,
-                'type' => 'D',
-                'group' => 'AKTIVA',
-                'initial_balance' => 0,
-                'current_balance' => 0,
-                'is_system_locked' => false,
-            ]);
+            return self::firstOrCreate(
+                ['code' => $code],
+                [
+                    'outlet_id' => $outletId,
+                    'name' => 'CASH RETAIL ' . $shortName,
+                    'type' => 'D',
+                    'group' => 'AKTIVA',
+                    'initial_balance' => 0,
+                    'current_balance' => 0,
+                    'is_system_locked' => false,
+                ]
+            );
         }
 
         return self::where('code', '1-1110')->firstOrFail();
