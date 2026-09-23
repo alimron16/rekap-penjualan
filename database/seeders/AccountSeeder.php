@@ -122,5 +122,38 @@ class AccountSeeder extends Seeder
                 ]
             );
         }
+
+        // Generate akun per-outlet untuk setiap cabang yang ada
+        $outlets = \App\Models\Outlet::all();
+        foreach ($outlets as $outlet) {
+            Account::getOutletMultiAccount($outlet->id);
+            Account::getOutletCashRetailAccount($outlet->id);
+
+            Account::firstOrCreate(
+                ['code' => '1-1113-' . $outlet->id],
+                [
+                    'outlet_id' => $outlet->id,
+                    'name' => 'SALDO BCA ' . strtoupper($outlet->code),
+                    'type' => 'D',
+                    'group' => 'AKTIVA',
+                    'initial_balance' => 0,
+                    'current_balance' => 0,
+                    'is_system_locked' => false,
+                ]
+            );
+
+            Account::firstOrCreate(
+                ['code' => '1-1120-' . $outlet->id],
+                [
+                    'outlet_id' => $outlet->id,
+                    'name' => 'SALDO BRI ' . strtoupper($outlet->code),
+                    'type' => 'D',
+                    'group' => 'AKTIVA',
+                    'initial_balance' => 0,
+                    'current_balance' => 0,
+                    'is_system_locked' => false,
+                ]
+            );
+        }
     }
 }
