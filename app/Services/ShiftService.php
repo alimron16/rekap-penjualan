@@ -30,6 +30,8 @@ class ShiftService
         $now = Carbon::now();
 
         // 1. Determine shift start time
+        // Shift berjalan berkesinambungan dan TIDAK PERNAH ter-reset otomatis oleh pergantian tanggal / tengah malam.
+        // Shift HANYA berganti jika kasir/admin secara manual menekan tombol "Tutup Shift & Setor".
         $lastShift = ShiftLog::when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->latest('end_time')
             ->first();
@@ -37,14 +39,14 @@ class ShiftService
         if ($lastShift && $lastShift->end_time) {
             $startTime = Carbon::parse($lastShift->end_time);
         } else {
-            $startTime = Carbon::today()->startOfDay();
+            // Jika belum ada riwayat tutup shift sama sekali, ambil sejak transaksi paling awal
+            $firstSaleDate = Sale::when($outletId, fn($q) => $q->where('outlet_id', $outletId))->min('date');
+            $startTime = $firstSaleDate ? Carbon::parse($firstSaleDate) : Carbon::create(2020, 1, 1);
         }
 
-        // Calculate shift sequence number today
-        $shiftsTodayCount = ShiftLog::when($outletId, fn($q) => $q->where('outlet_id', $outletId))
-            ->whereDate('end_time', Carbon::today())
-            ->count();
-        $shiftNumber = $shiftsTodayCount + 1;
+        // Urutan nomor shift berkesinambungan untuk outlet ini (tidak ter-reset ke 1 saat tengah malam)
+        $totalShiftsCount = ShiftLog::when($outletId, fn($q) => $q->where('outlet_id', $outletId))->count();
+        $shiftNumber = $totalShiftsCount + 1;
 
         // 2. Fetch Retail POS Sales during this shift
         $salesQuery = Sale::where('date', '>=', $startTime)
@@ -95,7 +97,10 @@ class ShiftService
 
         // 5. Fetch Tarik Tunai (Uang keluar dari laci ke nasabah)
         $withdrawQuery = CashTransaction::where('type', 'TRANSFER')
-            ->where('notes', 'like', 'Tarik Tunai%')
+            ->where(function ($q) {
+                $q->where('notes', 'like', 'Tarik Tunai%')
+                  ->orWhere('transaction_number', 'like', 'TT%');
+            })
             ->where('date', '>=', $startTime)
             ->where('date', '<=', $now);
         if ($outletId) {
@@ -145,15 +150,16 @@ class ShiftService
                 ? (float) $lastShift->cash_retail_retained
                 : $requiredReserve;
 
-            $cashRetailBalance = max(0.0, $modalAwalRetail + $cashSales + $totalCashIn - $totalExpense);
+            $cashRetailBalance = $modalAwalRetail + $cashSales + $totalCashIn - $totalExpense;
             $recommendedDeposit = max(0.0, $cashRetailBalance - $requiredReserve);
 
             // Transfer cash on hand = starting transfer modal + incoming cash - withdrawals paid out
+            // Saldo ini BISA bernilai minus jika uang keluar tarik tunai melebihi saldo kas transfer yang ada
             $modalAwalTransfer = ($lastShift && $lastShift->cash_transfer_retained !== null)
                 ? (float) $lastShift->cash_transfer_retained
                 : 0.0;
 
-            $cashTransferBalance = max(0.0, $modalAwalTransfer + $totalTransferCash - $totalWithdrawCash);
+            $cashTransferBalance = $modalAwalTransfer + $totalTransferCash - $totalWithdrawCash;
         } else {
             // Global view across all stores from general ledger
             $cashRetailBalance = (float) ($cashRetailAcc?->current_balance ?? 0);

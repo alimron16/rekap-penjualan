@@ -840,7 +840,26 @@ class _ShiftScreenState extends State<ShiftScreen> with SingleTickerProviderStat
           ),
           const SizedBox(height: 8),
           Text(balanceLabel, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-          Text(currencyFormatter.format(balance), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textColor)),
+          Row(
+            children: [
+              Text(
+                currencyFormatter.format(balance),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: balance < 0 ? const Color(0xFFDC2626) : textColor,
+                ),
+              ),
+              if (balance < 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(6)),
+                  child: const Text('MINUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(8),

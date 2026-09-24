@@ -422,6 +422,7 @@ class ApiService {
     String? customerName,
     String? customerPhone,
     String? notes,
+    int? outletId,
   }) async {
     return await _post(
       '$baseUrl/pos/withdraw',
@@ -432,6 +433,7 @@ class ApiService {
         'customer_name': customerName,
         'customer_phone': customerPhone,
         'notes': notes,
+        if (outletId != null) 'outlet_id': outletId,
       },
       timeout: const Duration(seconds: 20),
     );

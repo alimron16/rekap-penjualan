@@ -1210,7 +1210,12 @@ class MobileApiController extends Controller
         $amount = (float) $data['amount'];
         $customerName = $data['customer_name'] ?? 'Pelanggan';
 
-        $bankAcc = Account::where('code', '1-1113')->first() // default SALDO BCA
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id') ?? Outlet::where('status', 'active')->value('id'));
+
+        $bankAcc = Account::where('outlet_id', $outletId)->where('code', 'like', '1-1113%')->first()
+            ?: Account::where('code', '1-1113')->first() // default SALDO BCA
             ?: Account::where('code', '1-1111')->first() // CASH TRANSFER
             ?: Account::find($data['source_account_id']);
 
@@ -1221,7 +1226,7 @@ class MobileApiController extends Controller
                 'transaction_number' => $trxNumber,
                 'type' => 'TRANSFER',
                 'date' => now(),
-                'outlet_id' => $user->outlet_id ?? Outlet::where('status', 'active')->value('id'),
+                'outlet_id' => $outletId,
                 'user_id' => $user->id,
                 'debit_account_id' => $bankAcc->id,
                 'credit_account_id' => $data['source_account_id'],
@@ -2674,10 +2679,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.3',
-            'version_code' => 14,
-            'title' => 'Pembaruan Tersedia (v1.1.3)',
-            'release_notes' => "• [FIX] Perbaikan menu Rekap Shift: Pilihan toko/cabang untuk Admin/Owner kini tampil sempurna.\n• [FIX] Perbaikan crash halaman Produk Elektrik / Pulsa (SQL duplicate entry saldo multi).\n• [BARU] Master Cabang Toko API & kestabilan multi-outlet.\n• Peningkatan kecepatan dan stabilitas aplikasi.",
+            'version' => '1.1.4',
+            'version_code' => 15,
+            'title' => 'Pembaruan Tersedia (v1.1.4)',
+            'release_notes' => "• [FIX] Rekap Shift kini berjalan berkesinambungan tanpa ter-reset saat tengah malam/ganti tanggal.\n• [FIX] Saldo Cash Transfer kini otomatis berkurang (bisa bernilai minus) jika ada penarikan tunai saat saldo belum mencukupi.\n• [FIX] Sinkronisasi timezone lokal WIB (Asia/Jakarta) untuk seluruh log operasional & shift.\n• Peningkatan akurasi perhitungan kasir.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,

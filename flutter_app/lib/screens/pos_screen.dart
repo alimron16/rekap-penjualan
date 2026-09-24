@@ -1202,6 +1202,7 @@ class _PosScreenState extends State<PosScreen> {
                               customerName: customerNameController.text.trim(),
                               customerPhone: customerPhoneController.text.trim(),
                               notes: notesController.text.trim(),
+                              outletId: _selectedOutletId,
                             );
                             if (res['success'] == true) {
                               Navigator.pop(ctx);
