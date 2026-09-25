@@ -2113,9 +2113,9 @@ class MobileApiController extends Controller
         $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
         $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
         $saleType = $request->query('sale_type', 'all');
-        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
-            ? (int) $request->outlet_id
-            : ($user->outlet_id ?? $request->input('outlet_id'));
+        $outletId = $user->isAdmin()
+            ? ($request->has('outlet_id') && $request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $unified = collect();
 
@@ -2225,9 +2225,9 @@ class MobileApiController extends Controller
 
         $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
         $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
-        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
-            ? (int) $request->outlet_id
-            : ($user->outlet_id ?? $request->input('outlet_id'));
+        $outletId = $user->isAdmin()
+            ? ($request->has('outlet_id') && $request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $purchases = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
@@ -2270,9 +2270,9 @@ class MobileApiController extends Controller
 
         $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
         $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
-        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
-            ? (int) $request->outlet_id
-            : ($user->outlet_id ?? $request->input('outlet_id'));
+        $outletId = $user->isAdmin()
+            ? ($request->has('outlet_id') && $request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $kasMasuk = CashTransaction::where('type', 'IN')
             ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
@@ -2315,9 +2315,9 @@ class MobileApiController extends Controller
 
         $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
         $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
-        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
-            ? (int) $request->outlet_id
-            : ($user->outlet_id ?? $request->input('outlet_id'));
+        $outletId = $user->isAdmin()
+            ? ($request->has('outlet_id') && $request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $pl = $this->reportService->getProfitAndLoss($startDate, $endDate, $outletId ? (int)$outletId : null);
         return response()->json(['success' => true, 'data' => $pl]);
@@ -2338,9 +2338,9 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
-            ? (int) $request->outlet_id
-            : ($user->outlet_id ?? $request->input('outlet_id'));
+        $outletId = $user->isAdmin()
+            ? ($request->has('outlet_id') && $request->filled('outlet_id') ? (int) $request->outlet_id : null)
+            : $user->outlet_id;
 
         $debts = Purchase::where('status', 'BELUM LUNAS')
             ->where('remaining_debt', '>', 0)
@@ -2704,10 +2704,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.5',
-            'version_code' => 16,
-            'title' => 'Pembaruan Tersedia (v1.1.5)',
-            'release_notes' => "• [BARU] Kartu Pendapatan Jasa TF di Dashboard Utama (akumulasi fee Transfer Agen & Tarik Tunai).\n• [FIX] Perbaikan filter tanggal laporan & analitik keuangan (penanganan filter tanggal dan outlet).\n• Peningkatan akurasi perhitungan laporan laba rugi.",
+            'version' => '1.1.6',
+            'version_code' => 17,
+            'title' => 'Pembaruan Tersedia (v1.1.6)',
+            'release_notes' => "• [BARU] Tombol / Bar Filter Toko di Halaman Laporan & Analitik Keuangan (Super Admin / Admin bebas memilih Semua Toko atau Toko Tertentu).\n• [BARU] Indikator nama cabang toko pada rincian transaksi laporan penjualan saat mode konsolidasi.\n• Penyempurnaan penyaringan data multi-cabang laporan.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,

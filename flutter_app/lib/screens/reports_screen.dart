@@ -28,8 +28,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   Map<String, dynamic>? _purchasesData;
   Map<String, dynamic>? _cashData;
   Map<String, dynamic>? _debtsData;
-  Map<String, dynamic>? _userData;
   int? _selectedOutletId;
+  List<dynamic> _outlets = [];
+  bool _canFilterOutlet = false;
 
   bool _isLoading = false;
 
@@ -47,11 +48,30 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   void _loadUserAndData() async {
     final user = await ApiService.getUser();
+    if (!mounted) return;
+
+    final role = (user?['role'] ?? '').toString().toLowerCase();
+    final canFilter = role == 'super_admin' || role == 'superadmin' || role == 'admin' || role == 'owner';
+
+    List<dynamic> outletsList = [];
+    if (canFilter) {
+      try {
+        final outletRes = await ApiService.getOutlets();
+        if (outletRes['success'] == true && outletRes['data'] is List) {
+          outletsList = outletRes['data'];
+        }
+      } catch (_) {}
+    }
+
     if (mounted) {
       setState(() {
-        _userData = user;
-        final role = (user?['role'] ?? '').toString().toLowerCase();
-        if (role != 'super_admin' && role != 'superadmin') {
+        _canFilterOutlet = canFilter;
+        _outlets = outletsList;
+        if (role == 'super_admin' || role == 'superadmin' || role == 'owner') {
+          _selectedOutletId = null;
+        } else if (role == 'admin') {
+          _selectedOutletId = user?['outlet_id'];
+        } else {
           _selectedOutletId = user?['outlet_id'];
         }
       });
@@ -157,6 +177,73 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
       body: Column(
         children: [
+          // Outlet Filter Bar (Khusus Super Admin & Admin)
+          if (_canFilterOutlet && _outlets.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront, size: 18, color: ThemeConfig.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Toko:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThemeConfig.textDark),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Semua Toko (Konsolidasi)', style: TextStyle(fontSize: 11)),
+                            selected: _selectedOutletId == null,
+                            selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                            labelStyle: TextStyle(
+                              color: _selectedOutletId == null ? ThemeConfig.primary : Colors.black87,
+                              fontWeight: _selectedOutletId == null ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            onSelected: (selected) {
+                              if (selected && _selectedOutletId != null) {
+                                setState(() => _selectedOutletId = null);
+                                _loadCurrentTabData();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                          ..._outlets.map((ot) {
+                            final isSel = _selectedOutletId == ot['id'];
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: Text('${ot['code']} - ${ot['name']}', style: const TextStyle(fontSize: 11)),
+                                selected: isSel,
+                                selectedColor: ThemeConfig.primary.withOpacity(0.15),
+                                labelStyle: TextStyle(
+                                  color: isSel ? ThemeConfig.primary : Colors.black87,
+                                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                onSelected: (selected) {
+                                  if (selected && _selectedOutletId != ot['id']) {
+                                    setState(() => _selectedOutletId = ot['id']);
+                                    _loadCurrentTabData();
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Filter Period Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -205,20 +292,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     );
   }
 
-  void _openReceiptUrl(String path) async {
-    final uri = Uri.parse('https://pos.moonbyte.my.id$path');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tidak dapat membuka nota: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
+
 
   // 1. LABA RUGI TAB
   Widget _buildProfitLossTab() {
@@ -499,7 +573,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text(isDigital ? 'Waktu: $date • Produk: $cust' : 'Tanggal: $date • Pelanggan: $cust', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text(
+                            isDigital
+                                ? 'Waktu: $date • Produk: $cust${item['outlet']?['name'] != null ? ' • Toko: ${item['outlet']['name']}' : ''}'
+                                : 'Tanggal: $date • Pelanggan: $cust${item['outlet']?['name'] != null ? ' • Toko: ${item['outlet']['name']}' : ''}',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
                           const Divider(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

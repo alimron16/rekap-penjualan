@@ -5,8 +5,8 @@ import 'api_service.dart';
 import '../utils/theme_config.dart';
 
 class UpdateService {
-  static const String currentVersion = '1.1.5';
-  static const int currentVersionCode = 16;
+  static const String currentVersion = '1.1.6';
+  static const int currentVersionCode = 17;
   static const String _keyLastDismissed = 'app_update_dismissed_time';
 
   /// Check server for app updates
