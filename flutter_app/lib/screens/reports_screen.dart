@@ -28,6 +28,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   Map<String, dynamic>? _purchasesData;
   Map<String, dynamic>? _cashData;
   Map<String, dynamic>? _debtsData;
+  Map<String, dynamic>? _userData;
+  int? _selectedOutletId;
 
   bool _isLoading = false;
 
@@ -40,7 +42,21 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         _loadCurrentTabData();
       }
     });
-    _loadCurrentTabData();
+    _loadUserAndData();
+  }
+
+  void _loadUserAndData() async {
+    final user = await ApiService.getUser();
+    if (mounted) {
+      setState(() {
+        _userData = user;
+        final role = (user?['role'] ?? '').toString().toLowerCase();
+        if (role != 'super_admin' && role != 'superadmin') {
+          _selectedOutletId = user?['outlet_id'];
+        }
+      });
+      _loadCurrentTabData();
+    }
   }
 
   @override
@@ -55,23 +71,35 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
     try {
       if (idx == 0) {
-        final res = await ApiService.getProfitLossReport(startDate: _startDate, endDate: _endDate);
-        if (mounted && res['success'] == true) _plData = res['data'];
+        final res = await ApiService.getProfitLossReport(startDate: _startDate, endDate: _endDate, outletId: _selectedOutletId);
+        if (mounted) {
+          setState(() => _plData = res['success'] == true ? res['data'] : null);
+        }
       } else if (idx == 1) {
         final res = await ApiService.getBalanceSheetReport(asOfDate: _endDate);
-        if (mounted && res['success'] == true) _bsData = res['data'];
+        if (mounted) {
+          setState(() => _bsData = res['success'] == true ? res['data'] : null);
+        }
       } else if (idx == 2) {
-        final res = await ApiService.getSalesReport(startDate: _startDate, endDate: _endDate);
-        if (mounted && res['success'] == true) _salesData = res;
+        final res = await ApiService.getSalesReport(startDate: _startDate, endDate: _endDate, outletId: _selectedOutletId);
+        if (mounted) {
+          setState(() => _salesData = res['success'] == true ? res : null);
+        }
       } else if (idx == 3) {
-        final res = await ApiService.getPurchasesReport(startDate: _startDate, endDate: _endDate);
-        if (mounted && res['success'] == true) _purchasesData = res;
+        final res = await ApiService.getPurchasesReport(startDate: _startDate, endDate: _endDate, outletId: _selectedOutletId);
+        if (mounted) {
+          setState(() => _purchasesData = res['success'] == true ? res : null);
+        }
       } else if (idx == 4) {
-        final res = await ApiService.getCashReport(startDate: _startDate, endDate: _endDate);
-        if (mounted && res['success'] == true) _cashData = res;
+        final res = await ApiService.getCashReport(startDate: _startDate, endDate: _endDate, outletId: _selectedOutletId);
+        if (mounted) {
+          setState(() => _cashData = res['success'] == true ? res : null);
+        }
       } else if (idx == 5) {
-        final res = await ApiService.getDebtsReceivablesReport();
-        if (mounted && res['success'] == true) _debtsData = res;
+        final res = await ApiService.getDebtsReceivablesReport(outletId: _selectedOutletId);
+        if (mounted) {
+          setState(() => _debtsData = res['success'] == true ? res : null);
+        }
       }
     } catch (_) {}
 
@@ -429,7 +457,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = list[index];
-                    final date = (item['date'] ?? '').toString().substring(0, 10);
+                    final rawDate = (item['date'] ?? '').toString();
+                    final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : (rawDate.isNotEmpty ? rawDate : '-');
                     final inv = item['invoice_number'] ?? '-';
                     final cust = item['customer']?['name'] ?? 'UMUM';
                     final type = (item['sale_type'] ?? 'retail').toString().toUpperCase();
@@ -550,7 +579,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = list[index];
-                    final date = (item['date'] ?? '').toString().substring(0, 10);
+                    final rawDate = (item['date'] ?? '').toString();
+                    final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : (rawDate.isNotEmpty ? rawDate : '-');
                     final inv = item['invoice_number'] ?? '-';
                     final supp = item['supplier']?['name'] ?? '-';
                     final total = Formatters.parseDouble(item['total']);

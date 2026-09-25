@@ -124,7 +124,19 @@
         </div>
         @endif
 
-        <!-- 5. Total Pendapatan -->
+        <!-- 5. Pendapatan Jasa TF -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pendapatan Jasa TF</p>
+                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                </div>
+            </div>
+            <p class="text-xl font-extrabold font-mono mt-2 text-emerald-700">Rp {{ number_format($pl['revenues']['jasa_transfer'], 0, ',', '.') }}</p>
+            <span class="text-[11px] text-slate-400 mt-1">Fee transfer agen, bank & tarik tunai</span>
+        </div>
+
+        <!-- 6. Total Pendapatan -->
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between">
                 <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Pendapatan</p>

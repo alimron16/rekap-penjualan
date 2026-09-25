@@ -23,8 +23,8 @@ class ReportController extends Controller
      */
     public function purchases(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
         $perPage = $request->input('per_page', 25);
 
         $query = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"]);
@@ -65,8 +65,8 @@ class ReportController extends Controller
      */
     public function sales(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
         $saleType = $request->input('sale_type', 'all');
         $perPage = $request->input('per_page', 25);
         $search = $request->input('search');
@@ -228,8 +228,8 @@ class ReportController extends Controller
      */
     public function inventory(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
 
         $itemsIn = InventoryAdjustment::where('type', 'IN')
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
@@ -251,8 +251,8 @@ class ReportController extends Controller
      */
     public function cash(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
 
         $kasMasuk = CashTransaction::where('type', 'IN')
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
@@ -274,8 +274,8 @@ class ReportController extends Controller
      */
     public function profitSales(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
         $perPage = $request->input('per_page', 25);
 
         $productSummary = $this->reportService->getProductProfitSummary($startDate, $endDate);
@@ -302,8 +302,8 @@ class ReportController extends Controller
      */
     public function profitLoss(Request $request)
     {
-        $startDate = $request->input('start_date', date('Y-m-01'));
-        $endDate = $request->input('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : date('Y-m-d');
 
         $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
 
@@ -315,7 +315,7 @@ class ReportController extends Controller
      */
     public function balanceSheet(Request $request)
     {
-        $asOfDate = $request->input('as_of_date', date('Y-m-d'));
+        $asOfDate = $request->filled('as_of_date') ? $request->input('as_of_date') : date('Y-m-d');
         $bs = $this->reportService->getBalanceSheet($asOfDate);
 
         return view('reports.balance_sheet', compact('bs', 'asOfDate'));

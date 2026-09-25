@@ -117,8 +117,8 @@ class MobileApiController extends Controller
         }
 
         try {
-            $startDate = $request->query('start_date', date('Y-m-01'));
-            $endDate = $request->query('end_date', date('Y-m-d'));
+            $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+            $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
 
             // Multi-Outlet Filter & Scoping
             $outlets = Outlet::where('status', 'active')->orderBy('name')->get();
@@ -234,6 +234,7 @@ class MobileApiController extends Controller
                 'totalPiutang' => (float)$totalPiutang,
                 'totalKasBank' => (float)$totalKasBank,
                 'pl' => $pl,
+                'totalJasaTransfer' => (float)($pl['revenues']['jasa_transfer'] ?? 0),
                 'salesCount' => $salesCount,
                 'retailSalesCount' => $retailSalesCount,
                 'grosirSalesCount' => $grosirSalesCount,
@@ -2109,15 +2110,19 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
         $saleType = $request->query('sale_type', 'all');
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id'));
 
         $unified = collect();
 
         // 1. Penjualan Fisik (Retail / Grosir)
         if ($saleType !== 'digital') {
             $query = Sale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->with(['customer', 'items.product', 'outlet', 'user']);
 
             if ($saleType !== 'all') {
@@ -2152,6 +2157,7 @@ class MobileApiController extends Controller
         // 2. Penjualan Elektrik / Multi Pulsa (Digital)
         if ($saleType === 'all' || $saleType === 'digital') {
             $digitalSales = DigitalSale::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->with(['digitalProduct', 'depositAccount', 'cashAccount'])
                 ->orderByDesc('date')
                 ->get();
@@ -2217,13 +2223,17 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id'));
 
         $purchases = Purchase::whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with(['supplier', 'items.product'])
             ->orderByDesc('date')
-            ->take(100)
+            ->take(200)
             ->get();
 
         $totalQty = 0;
@@ -2258,22 +2268,28 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id'));
 
         $kasMasuk = CashTransaction::where('type', 'IN')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->with(['debitAccount', 'creditAccount'])
             ->orderByDesc('date')
             ->get();
 
         $kasKeluar = CashTransaction::where('type', 'OUT')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->with(['debitAccount', 'creditAccount'])
             ->orderByDesc('date')
             ->get();
 
         $kasTransfer = CashTransaction::where('type', 'TRANSFER')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->with(['debitAccount', 'creditAccount'])
             ->orderByDesc('date')
@@ -2297,10 +2313,13 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id'));
 
-        $pl = $this->reportService->getProfitAndLoss($startDate, $endDate);
+        $pl = $this->reportService->getProfitAndLoss($startDate, $endDate, $outletId ? (int)$outletId : null);
         return response()->json(['success' => true, 'data' => $pl]);
     }
 
@@ -2309,7 +2328,7 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
-        $asOfDate = $request->query('as_of_date', date('Y-m-d'));
+        $asOfDate = $request->filled('as_of_date') ? $request->query('as_of_date') : date('Y-m-d');
         $bs = $this->reportService->getBalanceSheet($asOfDate);
         return response()->json(['success' => true, 'data' => $bs]);
     }
@@ -2319,14 +2338,20 @@ class MobileApiController extends Controller
         $user = $this->getUserFromToken($request);
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $outletId = ($user->isAdmin() && $request->filled('outlet_id'))
+            ? (int) $request->outlet_id
+            : ($user->outlet_id ?? $request->input('outlet_id'));
+
         $debts = Purchase::where('status', 'BELUM LUNAS')
             ->where('remaining_debt', '>', 0)
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with('supplier')
             ->orderByDesc('date')
             ->get();
 
         $receivables = Sale::where('status', 'BELUM LUNAS')
             ->where('remaining_receivable', '>', 0)
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->with('customer')
             ->orderByDesc('date')
             ->get();
@@ -2679,10 +2704,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.4',
-            'version_code' => 15,
-            'title' => 'Pembaruan Tersedia (v1.1.4)',
-            'release_notes' => "• [FIX] Rekap Shift kini berjalan berkesinambungan tanpa ter-reset saat tengah malam/ganti tanggal.\n• [FIX] Saldo Cash Transfer kini otomatis berkurang (bisa bernilai minus) jika ada penarikan tunai saat saldo belum mencukupi.\n• [FIX] Sinkronisasi timezone lokal WIB (Asia/Jakarta) untuk seluruh log operasional & shift.\n• Peningkatan akurasi perhitungan kasir.",
+            'version' => '1.1.5',
+            'version_code' => 16,
+            'title' => 'Pembaruan Tersedia (v1.1.5)',
+            'release_notes' => "• [BARU] Kartu Pendapatan Jasa TF di Dashboard Utama (akumulasi fee Transfer Agen & Tarik Tunai).\n• [FIX] Perbaikan filter tanggal laporan & analitik keuangan (penanganan filter tanggal dan outlet).\n• Peningkatan akurasi perhitungan laporan laba rugi.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,

@@ -26,8 +26,8 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $setting = StoreSetting::first();
-        $startDate = $request->query('start_date', date('Y-m-01'));
-        $endDate = $request->query('end_date', date('Y-m-d'));
+        $startDate = $request->filled('start_date') ? $request->query('start_date') : date('Y-m-01');
+        $endDate = $request->filled('end_date') ? $request->query('end_date') : date('Y-m-d');
 
         // Outlet scoping & filtering
         $user = auth()->user();

@@ -33,13 +33,23 @@ class FinancialReportService
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('total');
 
-        $transferFeeRevenue = (float) DB::table('cash_transactions')
+        $cashTransferFee = (float) DB::table('cash_transactions')
             ->where('type', 'TRANSFER')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('admin_fee');
 
+        $agentTransferFee = (float) DB::table('agent_transfers')
+            ->where('status', 'approved')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
+            ->whereBetween('created_at', ["$startDate 00:00:00", "$endDate 23:59:59"])
+            ->sum('admin_fee');
+
+        $transferFeeRevenue = $cashTransferFee + $agentTransferFee;
+
         $multiRevenue = (float) DB::table('digital_sales')
             ->where('status', 'SUKSES')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('selling_price');
 
@@ -69,6 +79,7 @@ class FinancialReportService
 
         $multiHpp = (float) DB::table('digital_sales')
             ->where('status', 'SUKSES')
+            ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
             ->sum('hpp');
 
@@ -98,6 +109,7 @@ class FinancialReportService
         // If no journal expense yet, check cash out transactions
         if ($totalExpense === 0) {
             $cashOuts = CashTransaction::where('type', 'OUT')
+                ->when($outletId, fn($q) => $q->where('outlet_id', $outletId))
                 ->whereBetween('date', ["$startDate 00:00:00", "$endDate 23:59:59"])
                 ->with('debitAccount')
                 ->get();

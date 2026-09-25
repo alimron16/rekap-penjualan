@@ -833,28 +833,32 @@ class ApiService {
     return await _get('$baseUrl/reports?start_date=$s&end_date=$e');
   }
 
-  static Future<Map<String, dynamic>> getSalesReport({String? startDate, String? endDate, String saleType = 'all'}) async {
+  static Future<Map<String, dynamic>> getSalesReport({String? startDate, String? endDate, String saleType = 'all', int? outletId}) async {
     final s = startDate ?? '';
     final e = endDate ?? '';
-    return await _get('$baseUrl/reports/sales?start_date=$s&end_date=$e&sale_type=$saleType');
+    final ot = outletId != null ? '&outlet_id=$outletId' : '';
+    return await _get('$baseUrl/reports/sales?start_date=$s&end_date=$e&sale_type=$saleType$ot');
   }
 
-  static Future<Map<String, dynamic>> getPurchasesReport({String? startDate, String? endDate}) async {
+  static Future<Map<String, dynamic>> getPurchasesReport({String? startDate, String? endDate, int? outletId}) async {
     final s = startDate ?? '';
     final e = endDate ?? '';
-    return await _get('$baseUrl/reports/purchases?start_date=$s&end_date=$e');
+    final ot = outletId != null ? '&outlet_id=$outletId' : '';
+    return await _get('$baseUrl/reports/purchases?start_date=$s&end_date=$e$ot');
   }
 
-  static Future<Map<String, dynamic>> getCashReport({String? startDate, String? endDate}) async {
+  static Future<Map<String, dynamic>> getCashReport({String? startDate, String? endDate, int? outletId}) async {
     final s = startDate ?? '';
     final e = endDate ?? '';
-    return await _get('$baseUrl/reports/cash?start_date=$s&end_date=$e');
+    final ot = outletId != null ? '&outlet_id=$outletId' : '';
+    return await _get('$baseUrl/reports/cash?start_date=$s&end_date=$e$ot');
   }
 
-  static Future<Map<String, dynamic>> getProfitLossReport({String? startDate, String? endDate}) async {
+  static Future<Map<String, dynamic>> getProfitLossReport({String? startDate, String? endDate, int? outletId}) async {
     final s = startDate ?? '';
     final e = endDate ?? '';
-    return await _get('$baseUrl/reports/profit-loss?start_date=$s&end_date=$e');
+    final ot = outletId != null ? '&outlet_id=$outletId' : '';
+    return await _get('$baseUrl/reports/profit-loss?start_date=$s&end_date=$e$ot');
   }
 
   static Future<Map<String, dynamic>> getBalanceSheetReport({String? asOfDate}) async {
@@ -862,8 +866,9 @@ class ApiService {
     return await _get('$baseUrl/reports/balance-sheet?as_of_date=$d');
   }
 
-  static Future<Map<String, dynamic>> getDebtsReceivablesReport() async {
-    return await _get('$baseUrl/reports/debts-receivables');
+  static Future<Map<String, dynamic>> getDebtsReceivablesReport({int? outletId}) async {
+    final ot = outletId != null ? '?outlet_id=$outletId' : '';
+    return await _get('$baseUrl/reports/debts-receivables$ot');
   }
 
   // --- Users & Settings ---

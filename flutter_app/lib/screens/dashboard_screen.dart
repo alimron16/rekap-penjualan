@@ -686,6 +686,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final totalHutang = Formatters.parseDouble(d['totalHutang']);
     final totalPiutang = Formatters.parseDouble(d['totalPiutang']);
     final totalKasBank = Formatters.parseDouble(d['totalKasBank']);
+    final totalJasaTransfer = Formatters.parseDouble(revenues['jasa_transfer'] ?? d['totalJasaTransfer']);
     final totalPendapatan = Formatters.parseDouble(revenues['total']);
     final totalBiaya = Formatters.parseDouble(expenses['total']);
     final salesCount = Formatters.parseInt(d['salesCount']);
@@ -740,6 +741,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'iconBg': AppColors.emeraldLight,
           'isDark': false,
         },
+      {
+        'title': 'PENDAPATAN JASA TF',
+        'value': Formatters.formatRupiah(totalJasaTransfer),
+        'desc': 'Fee transfer agen & tarik tunai',
+        'icon': Icons.swap_horiz_rounded,
+        'iconColor': AppColors.emeraldIcon,
+        'iconBg': AppColors.emeraldLight,
+        'isDark': false,
+      },
       {
         'title': 'TOTAL PENDAPATAN',
         'value': Formatters.formatRupiah(totalPendapatan),
