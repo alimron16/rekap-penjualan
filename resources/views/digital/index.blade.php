@@ -282,11 +282,20 @@
             <div>
                 <label class="font-bold text-slate-700 block mb-1">Sumber Rekening / Kas Pembayaran *</label>
                 <select name="source_account_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                    @php $hasSelected = false; @endphp
                     @foreach($cashAccounts as $acc)
-                        <option value="{{ $acc->id }}">{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
+                        @php
+                            $isBca = !$hasSelected && (str_contains(strtoupper($acc->name), 'BCA') || str_starts_with($acc->code, '1-1113'));
+                            if ($isBca) $hasSelected = true;
+                        @endphp
+                        <option value="{{ $acc->id }}" {{ $isBca ? 'selected' : '' }}>{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
                     @endforeach
                     @foreach($depositAccounts->where('code', '!=', '1-1131') as $acc)
-                        <option value="{{ $acc->id }}">{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
+                        @php
+                            $isBca = !$hasSelected && (str_contains(strtoupper($acc->name), 'BCA') || str_starts_with($acc->code, '1-1113'));
+                            if ($isBca) $hasSelected = true;
+                        @endphp
+                        <option value="{{ $acc->id }}" {{ $isBca ? 'selected' : '' }}>{{ $acc->name }} (Saldo: Rp {{ number_format($acc->current_balance, 0, ',', '.') }})</option>
                     @endforeach
                 </select>
                 <span class="text-[10px] text-slate-400 mt-1 block">Kas atau Bank ini akan berkurang untuk membeli saldo deposit multi.</span>

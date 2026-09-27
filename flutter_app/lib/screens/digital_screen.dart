@@ -167,8 +167,14 @@ class _DigitalScreenState extends State<DigitalScreen> {
   void _showTopupModal() {
     final amountController = TextEditingController();
     final notesController = TextEditingController(text: 'Top Up Deposit Server Multi');
-    final bcaAcc = _cashAccounts.firstWhere((a) => (a['code'] ?? '') == '1-1113', orElse: () => null);
-    int? sourceAccountId = bcaAcc != null ? (bcaAcc['id'] as int) : (_cashAccounts.isNotEmpty ? (_cashAccounts[0]['id'] as int) : null);
+    // Prioritaskan akun BCA (baik BCA cabang/outlet maupun BCA global)
+    final bcaAcc = _cashAccounts.firstWhere(
+      (a) => (a['code'] ?? '').toString().startsWith('1-1113') || (a['name'] ?? '').toString().toUpperCase().contains('BCA'),
+      orElse: () => null,
+    );
+    int? sourceAccountId = bcaAcc != null 
+        ? (bcaAcc['id'] as int) 
+        : (_cashAccounts.isNotEmpty ? (_cashAccounts[0]['id'] as int) : null);
     bool isProcessing = false;
 
     showModalBottomSheet(
@@ -212,7 +218,7 @@ class _DigitalScreenState extends State<DigitalScreen> {
                 ),
                 const Divider(height: 12),
                 const SizedBox(height: 8),
-                const Text('Sumber Kas / Bank Pembayaran', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                const Text('Sumber Kas / Bank Pembayaran *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<int>(
                   value: sourceAccountId,
@@ -229,6 +235,47 @@ class _DigitalScreenState extends State<DigitalScreen> {
                     );
                   }).toList(),
                   onChanged: (val) => setModalState(() => sourceAccountId = val),
+                ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final selectedAcc = _cashAccounts.firstWhere((a) => a['id'] == sourceAccountId, orElse: () => null);
+                    final isBca = selectedAcc != null && 
+                        ((selectedAcc['code'] ?? '').toString().startsWith('1-1113') || 
+                         (selectedAcc['name'] ?? '').toString().toUpperCase().contains('BCA'));
+                    final accName = selectedAcc != null ? (selectedAcc['name'] ?? 'Akun Kas') : 'Kas';
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isBca ? const Color(0xFFEFF6FF) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isBca ? const Color(0xFFBFDBFE) : const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isBca ? Icons.account_balance : Icons.info_outline,
+                            size: 16,
+                            color: isBca ? const Color(0xFF1D4ED8) : const Color(0xFFB45309),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              isBca
+                                  ? 'Sumber dana: $accName (Saldo BCA akan dipotong).'
+                                  : 'PERHATIAN: Sumber dana adalah $accName. Saldo $accName akan berkurang!',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isBca ? const Color(0xFF1E40AF) : const Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
                 const Text('Nominal Top Up (Rp)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),

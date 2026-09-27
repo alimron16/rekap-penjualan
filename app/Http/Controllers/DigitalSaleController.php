@@ -59,9 +59,18 @@ class DigitalSaleController extends Controller
                   ->orWhereNull('outlet_id');
             })
             ->where(function ($s) {
-                $s->where('code', 'like', '1-1110%')
-                  ->orWhereIn('code', ['1-1113', '1-1111', '1-1112', '1-1120', '1-1121']);
+                $s->where('code', 'like', '1-1113%') // BCA
+                  ->orWhere('code', 'like', '1-1120%') // BRI
+                  ->orWhere('code', 'like', '1-1110%') // CASH RETAIL
+                  ->orWhereIn('code', ['1-1111', '1-1112', '1-1121', '1-1122', '1-1123', '1-1130']);
             })
+            ->orderByRaw("CASE 
+                WHEN code = '1-1113' THEN 1 
+                WHEN code LIKE '1-1113%' THEN 2 
+                WHEN code LIKE '1-1120%' THEN 3 
+                WHEN code LIKE '1-1110%' THEN 4 
+                ELSE 5 
+            END")
             ->get();
 
         $saldoMulti = (float) $multiAccount->current_balance;

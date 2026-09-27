@@ -1120,10 +1120,24 @@ class MobileApiController extends Controller
                 ->get();
         }
 
-        // Cash accounts: akun penerimaan uang tunai (tetap global/shared)
-        $cashAccounts = Account::whereNull('outlet_id')
-            ->whereIn('code', ['1-1113', '1-1110', '1-1111', '1-1112', '1-1120', '1-1121', '1-1122', '1-1123', '1-1130'])
-            ->orderByRaw("FIELD(code, '1-1113', '1-1110', '1-1111', '1-1112', '1-1120')")
+        // Cash accounts: akun penerimaan uang tunai & bank (utamakan BCA teratas, lalu Bank lain, lalu Kas Toko)
+        $cashAccounts = Account::where(function ($q) use ($outletId) {
+                $q->where('outlet_id', $outletId)
+                  ->orWhereNull('outlet_id');
+            })
+            ->where(function ($s) {
+                $s->where('code', 'like', '1-1113%') // BCA
+                  ->orWhere('code', 'like', '1-1120%') // BRI
+                  ->orWhere('code', 'like', '1-1110%') // CASH RETAIL
+                  ->orWhereIn('code', ['1-1121', '1-1122', '1-1123', '1-1130', '1-1111', '1-1112', '1-1190']);
+            })
+            ->orderByRaw("CASE 
+                WHEN code = '1-1113' THEN 1 
+                WHEN code LIKE '1-1113%' THEN 2 
+                WHEN code LIKE '1-1120%' THEN 3 
+                WHEN code LIKE '1-1110%' THEN 4 
+                ELSE 5 
+            END")
             ->get();
 
         // Saldo dari akun per-outlet
@@ -2704,10 +2718,10 @@ class MobileApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'version' => '1.1.6',
-            'version_code' => 17,
-            'title' => 'Pembaruan Tersedia (v1.1.6)',
-            'release_notes' => "• [BARU] Tombol / Bar Filter Toko di Halaman Laporan & Analitik Keuangan (Super Admin / Admin bebas memilih Semua Toko atau Toko Tertentu).\n• [BARU] Indikator nama cabang toko pada rincian transaksi laporan penjualan saat mode konsolidasi.\n• Penyempurnaan penyaringan data multi-cabang laporan.",
+            'version' => '1.1.7',
+            'version_code' => 18,
+            'title' => 'Pembaruan Tersedia (v1.1.7)',
+            'release_notes' => "• [FIX] Top Up Saldo Multi kini otomatis memotong Saldo BCA (bukan Cash Retail toko).\n• [BARU] Indikator & peringatan visual sumber kas/bank pada modal Top Up Saldo Multi Server.\n• Perbaikan urutan dan prioritas akun kas/bank pada modul transaksi digital.",
             'download_url' => 'https://pos.moonbyte.my.id/download/elephant-pos.apk?v=' . time(),
             'file_size' => "{$fileSizeMb} MB",
             'force_update' => true,
