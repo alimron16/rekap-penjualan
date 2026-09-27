@@ -111,10 +111,31 @@ class ShiftService
         $totalWithdrawFee = (float) $withdraws->sum('admin_fee');
         $withdrawCount = $withdraws->count();
 
-        // 6. Fetch Kas Keluar / Beban Operasional (Makan, Sampah, dll)
+        // Akun-akun bank & deposit server yang BUKAN kas fisik laci toko
+        $nonDrawerAccountIds = Account::where(function ($q) {
+                $q->where('code', 'like', '1-1113%') // BCA
+                  ->orWhere('code', 'like', '1-1120%') // BRI
+                  ->orWhere('code', 'like', '1-1121%') // Mandiri
+                  ->orWhere('code', 'like', '1-1122%') // QRIS
+                  ->orWhere('code', 'like', '1-1123%') // SeaBank
+                  ->orWhere('code', 'like', '1-1130%') // Dana
+                  ->orWhere('code', 'like', '1-1131%') // Multi Server
+                  ->orWhere('code', 'like', '1-1190%'); // Brangkas
+            })
+            ->pluck('id')
+            ->toArray();
+
+        // 6. Fetch Kas Keluar / Beban Operasional dari Laci Kas Retail (Makan, Sampah, dll)
+        // PENTING: Transaksi Top Up Saldo Multi (TP) atau transaksi yang dibayar via Bank (BCA, dll)
+        // TIDAK BOLEH memotong uang fisik kas laci toko (Cash Retail)!
         $expenseQuery = CashTransaction::where('type', 'OUT')
             ->where('date', '>=', $startTime)
-            ->where('date', '<=', $now);
+            ->where('date', '<=', $now)
+            ->where('transaction_number', 'not like', 'TP%')
+            ->where('notes', 'not like', '%Top Up Saldo Multi%')
+            ->where('notes', 'not like', '%Topup Saldo Multi%')
+            ->whereNotIn('credit_account_id', $nonDrawerAccountIds);
+
         if ($outletId) {
             $expenseQuery->where('outlet_id', $outletId);
         }
@@ -124,7 +145,9 @@ class ShiftService
         // 6b. Fetch Kas Masuk / Penambahan Modal Kas Retail (Koreksi + Kas Retail, Modal Masuk)
         $cashInQuery = CashTransaction::where('type', 'IN')
             ->where('date', '>=', $startTime)
-            ->where('date', '<=', $now);
+            ->where('date', '<=', $now)
+            ->whereNotIn('debit_account_id', $nonDrawerAccountIds);
+
         if ($outletId) {
             $cashInQuery->where('outlet_id', $outletId);
         }
@@ -294,7 +317,7 @@ class ShiftService
                 ?: Account::where('code', '1-1113')->first()
                 ?: Account::where('type', 'D')->first();
 
-            $cashRetailAcc = Account::where('code', '1-1110')->first();
+            $cashRetailAcc = Account::getOutletCashRetailAccount($outletId);
             $cashTransferAcc = Account::where('code', '1-1111')->first();
 
             // 3. Create accounting cash transactions for each deposit
